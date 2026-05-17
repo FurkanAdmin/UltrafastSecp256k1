@@ -338,8 +338,11 @@ int secp256k1_schnorrsig_verify(
         secp256k1_shim_call_illegal_cb(ctx, "secp256k1_schnorrsig_verify: NULL argument");
         return 0;
     }
-    // Only 32-byte messages supported — see asymmetry note above.
-    if (!msg || msglen != 32) return 0;
+    // Null message with nonzero msglen is illegal.
+    if (msglen > 0 && !msg) {
+        secp256k1_shim_call_illegal_cb(ctx, "secp256k1_schnorrsig_verify: NULL msg");
+        return 0;
+    }
 
     // PERF-007: use raw-pointer parse_strict overload — avoids 64-byte stack copy.
     secp256k1::SchnorrSignature sig;

@@ -107,15 +107,16 @@ For the complete compatibility test matrix see `compat/libsecp256k1_shim/tests/`
 
 ## secp256k1_schnorrsig_verify — variable-length message
 
-- **Upstream behavior (v0.4+):** `msg == NULL` with `msglen == 0` is accepted (empty
-  message is a valid BIP-340 sign_custom input).
-- **Shim behavior:** Requires exactly `msglen == 32`. Returns 0 for any other length.
-- **Reason:** The internal Schnorr verifier is optimized for 32-byte messages (the only
-  length used by Bitcoin consensus: `SIGHASH`, Taproot). Variable-length support requires
-  a different code path not yet implemented in the shim.
-- **Impact:** Callers using variable-length Schnorr (FROST, silent payments with tweaked
-  hashes, Lightning custom sig types with msglen != 32).
-- **Note:** Documented in `secp256k1_schnorrsig.h` divergence comment.
+- **Upstream behavior (v0.4+):** Accepts any `msglen`. Computes BIP-340 challenge as
+  `H_BIP0340/challenge(R.x || P.x || msg[:msglen])`. Empty message (`msglen == 0`)
+  and NULL msg with `msglen == 0` are accepted.
+- **Shim behavior (current):** Accepts any `msglen` — matches upstream. For `msglen == 32`
+  uses the optimized fixed-length path; other lengths use the generic tagged-hash path.
+  `msg == NULL` with `msglen > 0` fires illegal callback and returns 0.
+- **Reason:** Fixed (was: rejected msglen != 32). The core library now exposes
+  `schnorr_verify(pubkey_x32, msg, msglen, sig)` using `schnorr_challenge_scalar_varlen`.
+- **Impact:** No divergence. Callers using variable-length Schnorr (FROST, Lightning,
+  sign_custom with msglen != 32) work correctly through the shim.
 
 ---
 

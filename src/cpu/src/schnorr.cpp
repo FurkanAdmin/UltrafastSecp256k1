@@ -190,6 +190,21 @@ static inline Scalar schnorr_challenge_scalar(const uint8_t* r32,
                                                          sizeof(challenge_input)));
 }
 
+// Variable-length variant for arbitrary-length messages (BIP-340 extension,
+// matches libsecp256k1 secp256k1_schnorrsig_verify which accepts any msglen).
+// Uses generic tagged_hash (no midstate optimization) since input size varies.
+static Scalar schnorr_challenge_scalar_varlen(const uint8_t* r32,
+                                              const uint8_t* pubkey_x32,
+                                              const uint8_t* msg,
+                                              std::size_t msglen) {
+    std::vector<uint8_t> input(64 + msglen);
+    std::memcpy(input.data() +  0, r32,        32);
+    std::memcpy(input.data() + 32, pubkey_x32, 32);
+    if (msglen > 0) std::memcpy(input.data() + 64, msg, msglen);
+    return Scalar::from_bytes(secp256k1::tagged_hash("BIP0340/challenge",
+                                                      input.data(), input.size()));
+}
+
 #if !defined(SECP256K1_PLATFORM_ESP32) && !defined(SECP256K1_PLATFORM_STM32)
 
 static constexpr std::size_t kLiftXCacheSlots = 1024;
@@ -734,6 +749,44 @@ bool schnorr_verify(const SchnorrXonlyPubkey& pubkey,
     FieldElement z_inv3 = z_inv * z_inv2;
     FieldElement y_aff = R.y_raw() * z_inv3;
     return (x_aff == r_fe_check) & ((y_aff.limbs()[0] & 1) == 0);
+#endif
+}
+
+// -- Variable-length message verify (libsecp256k1 API compat) ----------------
+// Matches secp256k1_schnorrsig_verify() which accepts any msglen.
+// For msglen == 32 use the fast fixed-length path; otherwise use varlen hash.
+bool schnorr_verify(const uint8_t* pubkey_x32,
+                    const uint8_t* msg, std::size_t msglen,
+                    const SchnorrSignature& sig) noexcept {
+    if (msglen == 32) return schnorr_verify(pubkey_x32, msg, sig);
+    if (sig.s.is_zero()) return false;
+    std::uint64_t rL[4];
+    if (!parse_and_check_lt_p(sig.r.data(), rL)) return false;
+    Point P = Point::infinity();
+    if (!lift_x_cached(pubkey_x32, P)) return false;
+    const auto e     = schnorr_challenge_scalar_varlen(sig.r.data(), pubkey_x32, msg, msglen);
+    const auto neg_e = e.negate_var();
+    const auto R     = Point::dual_scalar_mul_gen_point(sig.s, neg_e, P);
+    if (R.is_infinity()) return false;
+#if defined(SECP256K1_FAST_52BIT)
+    FE52 const z_inv  = R.Z52().inverse_safegcd();
+    FE52 const z_inv2 = z_inv.square();
+    FE52 x_aff        = R.X52() * z_inv2;
+    FE52 const z_inv3 = z_inv * z_inv2;
+    FE52 y_aff        = R.Y52() * z_inv3;
+    const FE52 r52 = FE52::from_4x64_limbs(rL);
+    x_aff.negate_assign(1);
+    x_aff.add_assign(r52);
+    const bool x_match = x_aff.normalizes_to_zero_var();
+    y_aff.normalize();
+    return x_match & ((y_aff.n[0] & 1) == 0);
+#else
+    FieldElement r_fe = FieldElement::from_limbs_raw({rL[0],rL[1],rL[2],rL[3]});
+    FieldElement z_inv = R.z_raw().inverse();
+    FieldElement z_inv2 = z_inv; z_inv2.square_inplace();
+    FieldElement x_aff = R.x_raw() * z_inv2;
+    FieldElement y_aff = R.y_raw() * (z_inv * z_inv2);
+    return (x_aff == r_fe) & ((y_aff.limbs()[0] & 1) == 0);
 #endif
 }
 
