@@ -561,13 +561,14 @@ static void test_bitcoin_p2tr_address() {
     PASS();
 }
 
-static void test_no_taproot_returns_empty() {
-    TEST("Litecoin: P2TR returns empty (no Taproot)");
+static void test_litecoin_p2tr_address() {
+    TEST("Litecoin: P2TR starts with ltc1p (Taproot activated May 2023)");
 
     auto pubkey = secp256k1::fast::Point::generator();
 
     auto addr = secp256k1::coins::coin_address_p2tr(pubkey, secp256k1::coins::Litecoin);
-    ASSERT_TRUE(addr.empty(), "Litecoin should return empty for P2TR");
+    ASSERT_TRUE(!addr.empty(), "Litecoin should return P2TR address (supports_taproot=true)");
+    ASSERT_TRUE(addr.substr(0, 5) == "ltc1p", "Litecoin P2TR should start with 'ltc1p'");
 
     PASS();
 }
@@ -840,7 +841,7 @@ int test_coins_run() {
     
     printf("\n[Taproot]\n");
     test_bitcoin_p2tr_address();
-    test_no_taproot_returns_empty();
+    test_litecoin_p2tr_address();
     
     printf("\n[WIF]\n");
     test_bitcoin_wif();
