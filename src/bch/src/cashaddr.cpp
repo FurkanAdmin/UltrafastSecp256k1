@@ -3,6 +3,7 @@
 // ============================================================================
 #include "secp256k1/bch/cashaddr.hpp"
 #include "secp256k1/sha256.hpp"
+#include "secp256k1/address.hpp"
 #include <cstring>
 #include <cassert>
 #include <vector>
@@ -165,15 +166,9 @@ std::optional<CashAddr> cashaddr_decode(std::string_view addr) noexcept {
 
 std::string cashaddr_from_pubkey(const uint8_t* pubkey33,
                                  Network network) noexcept {
-    // hash160 = RIPEMD160(SHA256(pubkey))
-    std::array<uint8_t, 32> sha256_out{};
-    secp256k1::sha256_once(pubkey33, 33, sha256_out.data());
-    // RIPEMD160 — use our tagged_hash approximation or raw SHA256 for now
-    // TODO: integrate proper RIPEMD160
-    // For now: use SHA256(SHA256(pubkey))[0:20] as placeholder
-    std::array<uint8_t, 32> hash2{};
-    secp256k1::sha256_once(sha256_out.data(), 32, hash2.data());
-    return cashaddr_encode(hash2.data(), 20, AddrType::P2PKH, network);
+    // hash160 = RIPEMD160(SHA256(pubkey)) — real implementation via secp256k1::hash160
+    auto h160 = secp256k1::hash160(pubkey33, 33);
+    return cashaddr_encode(h160.data(), 20, AddrType::P2PKH, network);
 }
 
 std::string cashaddr_from_script_hash(const uint8_t* hash20,

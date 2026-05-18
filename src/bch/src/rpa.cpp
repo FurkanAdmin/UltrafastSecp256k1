@@ -14,14 +14,11 @@ namespace secp256k1::bch {
 // ── SHA256 helpers ────────────────────────────────────────────────────────────
 
 static SHA256::digest_type sha256_bytes(const uint8_t* data, size_t len) noexcept {
-    SHA256 h;
-    h.update(data, len);
-    return h.final();
+    return SHA256::hash(data, len);
 }
 
 static SHA256::digest_type sha256_double(const uint8_t* data, size_t len) noexcept {
-    auto first = sha256_bytes(data, len);
-    return sha256_bytes(first.data(), first.size());
+    return SHA256::hash256(data, len);
 }
 
 // ── Shared secret helpers ─────────────────────────────────────────────────────
@@ -106,7 +103,7 @@ std::array<uint8_t, 33> rpa_derive_payment_pubkey(
     if (P.is_infinity()) return {};
 
     // t*G using generator mul (public scalar — fast path)
-    fast::Point tG = fast::Point::generator_scalar_mul(t);
+    fast::Point tG = fast::Point::generator().scalar_mul(t);
     fast::Point child = P.add(tG);
     if (child.is_infinity()) return {};
 
@@ -158,11 +155,16 @@ GrindResult rpa_grind_cpu(
             uint8_t(nonce >>  8), uint8_t(nonce)
         };
 
-        // CT ECDSA sign — nonce derived from RFC6979 + extra
-        auto sig_opt = secp256k1::ct::ecdsa_sign(msg32, input_privkey, extra.data());
-        if (!sig_opt) continue;
+        // CT ECDSA sign hedged — RFC6979 + extra entropy for grinding
+        std::array<uint8_t, 32> msg_arr{};
+        std::memcpy(msg_arr.data(), msg32, 32);
+        std::array<uint8_t, 32> aux_arr{};
+        // embed 4-byte nonce in first 4 bytes of aux_rand
+        std::memcpy(aux_arr.data(), extra.data(), 4);
+        auto sig = secp256k1::ct::ecdsa_sign_hedged(msg_arr, input_privkey, aux_arr);
+        {
 
-        auto compact = sig_opt->to_compact();
+        auto compact = sig.to_compact();
         if (rpa_prefix_matches(compact.data(), prefix_bits, prefix_data)) {
             result.found = true;
             result.nonce = nonce;
@@ -170,20 +172,138 @@ GrindResult rpa_grind_cpu(
             result.input_hash = rpa_sig_hash(compact.data());
             return result;
         }
+        } // end sig scope
     }
     return result;
 }
 
-// ── Paycode parsing (stub) ────────────────────────────────────────────────────
+// ── Paycode parse / encode ────────────────────────────────────────────────────
+// RPA paycode format (base32, CashAddr charset):
+//   "paycode:" + base32(version[1] + prefix_bits[1] + scan_pubkey[33]
+//                       + spend_pubkey[33] + expiry[4]) + checksum[8]
+// Total raw bytes: 1 + 1 + 33 + 33 + 4 = 72 bytes → ~115 base32 chars
 
-std::optional<RpaPaycode> rpa_parse_paycode(std::string_view) noexcept {
-    // TODO: base32 paycode parsing
-    return std::nullopt;
+static constexpr char BASE32_CHARSET[] = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
+static constexpr std::string_view PAYCODE_PREFIX = "paycode";
+
+static uint64_t paycode_polymod(const std::vector<uint8_t>& v) noexcept {
+    static constexpr uint64_t GEN[5] = {
+        0x98f2bc8e61ULL, 0x79b76d99e2ULL,
+        0xf33e5fb3c4ULL, 0xae2eabe2a8ULL, 0x1e4f43e470ULL
+    };
+    uint64_t c = 1;
+    for (uint8_t d : v) {
+        uint8_t c0 = static_cast<uint8_t>(c >> 35);
+        c = ((c & 0x07ffffffffULL) << 5) ^ d;
+        for (int i = 0; i < 5; ++i)
+            if ((c0 >> i) & 1) c ^= GEN[i];
+    }
+    return c ^ 1;
 }
 
-std::string rpa_encode_paycode(const RpaPaycode&) noexcept {
-    // TODO: base32 paycode encoding
-    return {};
+static void bytes_to_base32(std::vector<uint8_t>& out,
+                             const uint8_t* in, size_t len) {
+    int acc = 0, bits = 0;
+    for (size_t i = 0; i < len; ++i) {
+        acc = (acc << 8) | in[i];
+        bits += 8;
+        while (bits >= 5) {
+            bits -= 5;
+            out.push_back((acc >> bits) & 31);
+        }
+    }
+    if (bits > 0) out.push_back((acc << (5 - bits)) & 31);
+}
+
+static bool base32_to_bytes(std::vector<uint8_t>& out,
+                             const uint8_t* in, size_t len) {
+    int acc = 0, bits = 0;
+    for (size_t i = 0; i < len; ++i) {
+        if (in[i] >= 32) return false;
+        acc = (acc << 5) | in[i];
+        bits += 5;
+        if (bits >= 8) {
+            bits -= 8;
+            out.push_back((acc >> bits) & 0xff);
+        }
+    }
+    return true;
+}
+
+std::optional<RpaPaycode> rpa_parse_paycode(std::string_view s) noexcept {
+    // strip "paycode:" prefix (case-insensitive)
+    if (s.size() > 8 && s.substr(0, 8) == "paycode:")
+        s = s.substr(8);
+    else if (s.size() > 8 && s.substr(0, 8) == "PAYCODE:")
+        s = s.substr(8);
+
+    // decode chars → 5-bit groups
+    std::vector<uint8_t> data5;
+    data5.reserve(s.size());
+    for (char c : s) {
+        const char* p = std::strchr(BASE32_CHARSET, std::tolower(static_cast<unsigned char>(c)));
+        if (!p) return std::nullopt;
+        data5.push_back(static_cast<uint8_t>(p - BASE32_CHARSET));
+    }
+    if (data5.size() < 8) return std::nullopt;
+
+    // verify checksum
+    std::vector<uint8_t> chk_input;
+    for (char c : PAYCODE_PREFIX)
+        chk_input.push_back(static_cast<uint8_t>(c) & 0x1f);
+    chk_input.push_back(0);
+    chk_input.insert(chk_input.end(), data5.begin(), data5.end());
+    if (paycode_polymod(chk_input) != 0) return std::nullopt;
+
+    // strip checksum
+    data5.resize(data5.size() - 8);
+
+    // decode to bytes
+    std::vector<uint8_t> raw;
+    if (!base32_to_bytes(raw, data5.data(), data5.size())) return std::nullopt;
+    if (raw.size() < 72) return std::nullopt;  // 1+1+33+33+4
+
+    RpaPaycode pc;
+    size_t pos = 0;
+    pc.version     = raw[pos++];
+    pc.prefix_bits = raw[pos++];
+    std::memcpy(pc.scan_pubkey.data(),  raw.data() + pos, 33); pos += 33;
+    std::memcpy(pc.spend_pubkey.data(), raw.data() + pos, 33); pos += 33;
+    pc.expiry  = (uint32_t(raw[pos]) << 24) | (uint32_t(raw[pos+1]) << 16)
+               | (uint32_t(raw[pos+2]) << 8) | raw[pos+3];
+    return pc;
+}
+
+std::string rpa_encode_paycode(const RpaPaycode& pc) noexcept {
+    // pack raw bytes: version + prefix_bits + scan_pubkey + spend_pubkey + expiry
+    uint8_t raw[72];
+    raw[0] = pc.version;
+    raw[1] = pc.prefix_bits;
+    std::memcpy(raw + 2,  pc.scan_pubkey.data(),  33);
+    std::memcpy(raw + 35, pc.spend_pubkey.data(), 33);
+    raw[68] = (pc.expiry >> 24) & 0xff;
+    raw[69] = (pc.expiry >> 16) & 0xff;
+    raw[70] = (pc.expiry >>  8) & 0xff;
+    raw[71] =  pc.expiry        & 0xff;
+
+    // encode to 5-bit groups
+    std::vector<uint8_t> data5;
+    bytes_to_base32(data5, raw, sizeof(raw));
+
+    // compute checksum
+    std::vector<uint8_t> chk_input;
+    for (char c : PAYCODE_PREFIX)
+        chk_input.push_back(static_cast<uint8_t>(c) & 0x1f);
+    chk_input.push_back(0);
+    chk_input.insert(chk_input.end(), data5.begin(), data5.end());
+    for (int i = 0; i < 8; ++i) chk_input.push_back(0);
+    uint64_t cksum = paycode_polymod(chk_input);
+
+    std::string result = "paycode:";
+    for (uint8_t v : data5) result += BASE32_CHARSET[v];
+    for (int i = 7; i >= 0; --i)
+        result += BASE32_CHARSET[(cksum >> (5 * i)) & 0x1f];
+    return result;
 }
 
 } // namespace secp256k1::bch
