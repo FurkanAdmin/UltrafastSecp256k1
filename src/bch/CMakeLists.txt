@@ -31,3 +31,12 @@ if(SECP256K1_BUILD_EXAMPLES)
     target_compile_options(rpa_wallet_example PRIVATE -O2)
     message(STATUS "  BCH example: rpa_wallet_example")
 endif()
+# GPU grinding kernels (per-backend, all off by default)
+if(SECP256K1_BUILD_BCH AND SECP256K1_BUILD_CUDA)
+    message(STATUS "  BCH GPU: CUDA grinding kernel")
+    target_sources(secp256k1_cuda PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/cuda/bch_grinding.cu)
+    target_compile_definitions(secp256k1_cuda PUBLIC SECP256K1_BCH_CUDA=1)
+endif()
+
+# OpenCL + Metal stubs follow the same pattern (TODO: bch_grinding.cl, bch_grinding.metal)
