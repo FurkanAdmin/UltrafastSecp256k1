@@ -102,6 +102,65 @@ cmake -S . -B out/release -G Ninja \
 cmake --build out/release -j
 ```
 
+### Coin-Specific Profiles (Minimal Footprint)
+
+Named presets strip unused optional modules to reduce `.text` size and compilation
+time for coin backend deployments. All default to `SECP256K1_BUILD_*=ON`; presets
+override only what that chain does not need.
+
+```bash
+# Bitcoin Core backend (ECDSA+Schnorr+MuSig2+Taproot+BIP-324, no FROST/ZK/Wallet)
+cmake --preset bitcoin-core
+cmake --build --preset bitcoin-core -j
+
+# Litecoin Core backend (same, BIP-324 OFF — LTC has no v2 P2P)
+cmake --preset litecoin
+cmake --build --preset litecoin -j
+
+# Dogecoin Core backend (ECDSA only, no MuSig2/BIP-324)
+cmake --preset dogecoin
+cmake --build --preset dogecoin -j
+
+# BCH wallet (RPA scanning + BIP-32/39 + Pippenger)
+cmake --preset bch-wallet
+cmake --build --preset bch-wallet -j
+
+# Full wallet (BIP-352 + adaptor + HD, no ZK/FROST)
+cmake --preset wallet
+cmake --build --preset wallet -j
+
+# Full audit build — all modules ON (used by CAAS)
+cmake --preset audit
+cmake --build --preset audit -j
+```
+
+### Optional Module Flags
+
+Each optional module can be enabled/disabled individually:
+
+| Flag | Default | Content |
+|---|---|---|
+| `SECP256K1_BUILD_MUSIG2` | ON | MuSig2 multi-signatures (BIP-327) |
+| `SECP256K1_BUILD_FROST` | ON | FROST threshold signatures |
+| `SECP256K1_BUILD_ZK` | ON | ZK proofs (Bulletproofs, Pedersen, DLEQ) |
+| `SECP256K1_BUILD_ECIES` | ON | ECIES authenticated encryption |
+| `SECP256K1_BUILD_BIP352` | ON | BIP-352 Silent Payments |
+| `SECP256K1_BUILD_ADAPTOR` | ON | Adaptor signatures |
+| `SECP256K1_BUILD_WALLET` | ON | HD wallet (BIP-32/39, coin types) |
+| `SECP256K1_BUILD_PIPPENGER` | ON | Pippenger MSM + comb generator |
+| `SECP256K1_BUILD_BIP324` | ON | BIP-324 v2 encrypted P2P |
+| `SECP256K1_BUILD_ETHEREUM` | OFF | Ethereum (Keccak-256, EIP-55/155) |
+| `SECP256K1_BUILD_BCH` | OFF | BCH RPA + CashAddr module |
+| `SECP256K1_BUILD_LTC_SP` | ON | LTC Silent Payments (ltcsp1... paycodes) |
+
+Downstream code can check availability via the generated header:
+```cpp
+#include "secp256k1/secp256k1_features.h"
+#if SECP256K1_HAS_FROST
+  // FROST code
+#endif
+```
+
 ### Canonical GPU Audit Build
 
 Use the preset-based path below when you want the GPU C ABI tests to appear in

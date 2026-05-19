@@ -1,8 +1,34 @@
 # UltrafastSecp256k1 — Product Profiles and Surface Taxonomy
 
-**Version:** 1.0 · **Last Updated:** 2026-05-01
+**Version:** 1.1 · **Last Updated:** 2026-05-19
 
-## Profiles
+## CMake Build Presets
+
+Named presets in `CMakePresets.json` select optional module combinations for
+coin-specific deployments. All presets default modules to ON; coin presets
+strip only what that chain does not need to reduce `.text` size and I-cache pressure.
+
+| Preset | Modules ON | Modules OFF | Use case |
+|---|---|---|---|
+| `bitcoin-core` | MuSig2, BIP-324, Pippenger | FROST, ZK, ECIES, BIP352, Adaptor, Wallet | Bitcoin Core shim backend |
+| `litecoin` | MuSig2, Pippenger | FROST, ZK, ECIES, BIP352, Adaptor, Wallet, BIP324 | Litecoin Core shim backend |
+| `dogecoin` | Pippenger | FROST, ZK, ECIES, BIP352, Adaptor, Wallet, MuSig2, BIP324 | Dogecoin Core shim backend |
+| `bch-wallet` | Wallet, BCH, Pippenger | FROST, ZK, MuSig2 | BCH RPA scanning + HD wallet |
+| `wallet` | MuSig2, ECIES, BIP352, Adaptor, Wallet, Pippenger | FROST, ZK, BIP324 | Full wallet with Silent Payments |
+| `audit` | ALL | — | CAAS full audit build |
+| `cpu-release` | ALL (default) | — | Development / CI default |
+
+### Generated Feature Header
+
+After `cmake`, the build generates `secp256k1_features.h` with module availability flags:
+```cpp
+#include "secp256k1/secp256k1_features.h"
+#if SECP256K1_HAS_FROST  // 1 or 0 based on SECP256K1_BUILD_FROST
+  // threshold sig code
+#endif
+```
+
+## CAAS Product Profiles
 
 | Profile ID | Description | CAAS Runner |
 |---|---|---|
