@@ -2,7 +2,7 @@
 
 ## What this PR does
 
-Adds `-DSECP256K1_BACKEND=ultrafast` CMake option (default: **bundled**).
+Adds `-DSECP256K1_USE_ULTRAFAST=ON` CMake option (default: **bundled**).
 When bundled, Bitcoin Core builds identically to today — no changes to the
 existing `src/secp256k1/` path.
 
@@ -72,7 +72,7 @@ library in production for Silent Payments (BIP-352) GPU scanning.
 
 ## What is NOT changed
 
-- Default build path is untouched (`-DSECP256K1_BACKEND` defaults to `bundled`)
+- Default build path is untouched (`-DSECP256K1_USE_ULTRAFAST` defaults to `OFF`)
 - No changes to `src/secp256k1/` or libsecp256k1 source
 - No new mandatory dependencies
 - No changes to Bitcoin Core's test suite or CI configuration

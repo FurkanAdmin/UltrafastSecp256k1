@@ -75,9 +75,11 @@
     "ct_schnorr_keypair_create": 35961.8
   },
   "ct_vs_libsecp_ratios": {
-    "_note": "Co-measured in same bench run (TSC-independent). Ultra CT faster = ratio > 1.0",
-    "ct_ecdsa_sign_ratio": 1.3,
-    "ct_schnorr_sign_ratio": 1.28,
+    "_note": "INTERNAL INCONSISTENCY DETECTED (2026-05-20): ratio fields were hand-entered and do not match the ns values in this file. Derived from ns: ct_ecdsa = 59669/21643 = 2.76×, ct_schnorr = 46543/18128 = 2.57×. This file must be REGENERATED from actual bench_unified --json output. Do not use ratio fields until regenerated.",
+    "ct_ecdsa_sign_ratio_STALE": 1.3,
+    "ct_schnorr_sign_ratio_STALE": 1.28,
+    "ct_ecdsa_sign_ratio_DERIVED": 2.76,
+    "ct_schnorr_sign_ratio_DERIVED": 2.57,
     "libsecp_ecdsa_sign_ns": 59669.4,
     "libsecp_schnorr_sign_ns": 46543.2
   },

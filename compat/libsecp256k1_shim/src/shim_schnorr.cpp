@@ -358,6 +358,14 @@ int secp256k1_schnorrsig_verify(
         const uint8_t* xb = pubkey->data;
         const uint8_t* yb = pubkey->data + 32;
 
+        // SHIM-004 fix: when msglen != 32, use the varlen overload which forwards the
+        // full message length to the BIP-340 challenge hash. All optimized code paths
+        // below use 32-byte fixed overloads and are only correct for msglen == 32.
+        if (msglen != 32) {
+            return secp256k1::schnorr_verify(xb, msg, msglen, sig) ? 1 : 0;
+        }
+
+        // msglen == 32: use optimized paths with caching and prebuilt GLV tables.
         // T-11: GLV table cache hit → use prebuilt tables (~1,954 ns saved vs Point path).
         if (const secp256k1::SchnorrXonlyPubkey* cached = s_schnorr_cache.get(xb)) {
             return secp256k1::schnorr_verify(*cached, msg, sig) ? 1 : 0;

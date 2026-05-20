@@ -1,9 +1,9 @@
 {
   "_schema": 1,
   "_note": "Single source of truth for all numeric claims used across multiple documents. Update values HERE; run ci/sync_canonical_numbers.py to propagate. Agents must never hand-edit README.md / PR_DESCRIPTION.md / BACKEND_EVIDENCE.md numbers directly \u2014 always update this file first.",
-  "_canonical_bench_artifact": "docs/bench_unified_2026-05-16_gcc14_x86-64.json",
+  "_canonical_bench_artifact": "docs/bench_unified_2026-05-11_gcc14_x86-64.json",
   "_canonical_btc_artifact": "docs/BITCOIN_CORE_BENCH_RESULTS.json",
-  "_generated": "2026-05-16 \u2014 verified by fresh controlled run (intel_pstate/no_turbo=1, governor=performance, taskset -c 0, nice -20, GCC 14.2.0, 5 runs, R3-R5 stable <1% variance)",
+  "_generated": "2026-05-11 \u2014 verified controlled run. NOTE: 2026-05-16 JSON has internal ratio/ns inconsistency (ct_ecdsa_sign_ratio=1.30 but 59669/21643=2.76\u00d7) and must be regenerated from actual bench_unified --json output before use.",
   "bitcoin_core_compat": {
     "pass": 749,
     "total": 749,
@@ -84,13 +84,13 @@
     "wording": "CT signing Clang 19 (archived 2026-03-24): 1.20\u20131.33\u00d7 faster than libsecp256k1 (CT-vs-CT, not a current controlled run)."
   },
   "ct_signing_gcc": {
-    "speedup_min_x": 1.28,
-    "speedup_max_x": 1.3,
+    "speedup_min_x": 1.09,
+    "speedup_max_x": 1.24,
     "compiler": "GCC 14.2.0",
-    "wording": "CT signing GCC 14.2.0: 1.28\u20131.30\u00d7 faster than libsecp256k1 (CT Schnorr 1.28\u00d7; CT ECDSA 1.30\u00d7; CT-vs-CT co-measured, bench_unified_2026-05-16_gcc14_x86-64.json).",
-    "ecdsa_ratio": 1.3,
-    "schnorr_ratio": 1.28,
-    "artifact": "docs/bench_unified_2026-05-16_gcc14_x86-64.json"
+    "wording": "CT signing GCC 14.2.0: 1.09\u20131.24\u00d7 faster than libsecp256k1 (CT Schnorr 1.09\u00d7; CT ECDSA 1.24\u00d7; CT-vs-CT co-measured, bench_unified_2026-05-11_gcc14_x86-64.json).",
+    "ecdsa_ratio": 1.24,
+    "schnorr_ratio": 1.09,
+    "artifact": "docs/bench_unified_2026-05-11_gcc14_x86-64.json"
   },
   "hardware": {
     "cpu": "Intel i5-14400F",

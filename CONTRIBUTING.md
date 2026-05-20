@@ -91,36 +91,24 @@ cmake --build out/dev -j
 ## 🔄 Development Process
 
 1. **Fork** the repository
-2. **Create** a feature branch: `git checkout -b feature/amazing-feature`
-3. **Commit** your changes: `git commit -m 'Add amazing feature'`
-4. **Push** to the branch: `git push origin feature/amazing-feature`
-5. **Open** a Pull Request
+2. **Commit** your changes directly to `dev`: `git commit -m 'Add amazing feature'`
+3. **Push** to `dev`: `git push origin dev`
+4. **Open** a Pull Request against `dev`
 
 ### Strict Branch Governance (Mandatory)
 
-This repository follows a strict two-branch model.
+This repository has exactly **two long-lived branches**:
 
-1. `dev` is the only integration branch for active development.
-2. `main` is release-only and must remain stable.
-3. Direct feature work on `main` is not allowed.
-4. Release flow is always: `dev` -> `main` -> full CI -> release tag.
-5. If CI is red after merging `dev` into `main`, release is blocked until green.
-6. Emergency hotfixes on `main` must be merged/cherry-picked back into `dev` immediately after the fix.
+| Branch | Purpose |
+|--------|---------|
+| `dev` | All development work — every feature, fix, optimization, and experiment |
+| `main` | Release branch only — merged from `dev` at release time only |
 
-Operationally:
+**Do not create feature branches.** All work goes directly to `dev`. There are no
+`feature/*`, `fix/*`, `perf/*`, or any other sub-branches. Any branch other than
+`dev`, `main`, or `gh-pages` will be deleted immediately.
 
-1. Work is done in short-lived branches from `dev` (`feature/*`, `fix/*`, `perf/*`, `docs/*`).
-2. Those branches merge into `dev` only after checks pass.
-3. At release time, current `dev` state is merged into `main`.
-4. Release artifacts are created only from `main` after CI passes.
-
-### Branch Naming
-
-- `feature/` - New features
-- `fix/` - Bug fixes
-- `perf/` - Performance improvements
-- `docs/` - Documentation updates
-- `refactor/` - Code refactoring
+Release flow: `dev` → CI green → owner authorization → merge to `main` → release tag.
 
 ## 📝 Coding Standards
 
