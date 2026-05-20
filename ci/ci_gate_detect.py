@@ -93,6 +93,9 @@ PROFILE_PATTERNS: dict[str, list[str]] = {
         "docs/ATTACK_GUIDE.md",
         "docs/API_REFERENCE.md",
         "docs/SHIM_KNOWN_DIVERGENCES.md",
+        # P1-008: BENCHMARKS.md changes can falsify benchmark claims without triggering
+        # CAAS (it was classified as docs-only). Promote to security-evidence.
+        "docs/BENCHMARKS.md",
         # CI-005: any new JSON in docs/ (evidence artifacts) also triggers CAAS.
         "docs/*.json",
     ],

@@ -17,7 +17,7 @@ The security model is CAAS-first: claims are strengthened by executable
 evidence and permanent regression tests.
 Internal audit is part of normal development and is expected to run on every build and every commit through the CI and local audit workflow.
 
-### What It Tests (60 non-exploit modules + 263 exploit PoCs tests + standalone audit surfaces)
+### What It Tests (108 non-exploit modules + 263 exploit PoC tests + standalone audit surfaces)
 
 | Section | Modules | Focus |
 |---------|---------|-------|
@@ -29,7 +29,7 @@ Internal audit is part of normal development and is expected to run on every bui
 | 6. Zero-Knowledge | 6 | knowledge, DLEQ, range proof, serialization, rejection |
 | 7. Parse Strictness | 1 | public parse path strictness |
 | 8. Cross-Platform Evidence | separate standalone tests | Wycheproof, Fiat-Crypto, differential, FFI, protocol vectors |
-| **Exploit PoC Suite** | **189 standalone exploit tests** | ECDSA malleability, ECDH degenerate, GLV decomposition, BIP-32 overflow, MuSig2 nonce reuse, FROST Byzantine, AEAD integrity, Taproot, ElligatorSwift, CT systematic, and more (14 categories) |
+| **Exploit PoC Suite** | **263 exploit PoC modules** | ECDSA malleability, ECDH degenerate, GLV decomposition, BIP-32 overflow, MuSig2 nonce reuse, FROST Byzantine, AEAD integrity, Taproot, ElligatorSwift, CT systematic, and more (14 categories) |
 
 ### Platform Validation Matrix
 

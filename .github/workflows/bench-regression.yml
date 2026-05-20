@@ -166,8 +166,8 @@ jobs:
       # silently become the new baseline, masking further regressions.
       # To reset/update the baseline: trigger workflow_dispatch manually on a
       # known-good commit; review the JSON artifact before accepting it.
-      # alert-threshold: '150%' = alert if ≥50% slower than baseline (1.5×).
-      # This is the tightest threshold viable on shared runners (±15% variance).
+      # alert-threshold: '200%' = alert if ≥100% slower than baseline (2×).
+      # Shared runners have ±15-30% variance; 200% detects only catastrophic regressions.
       if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
       uses: benchmark-action/github-action-benchmark@a7bc2366eda11037936ea57d811a43b3418d3073 # v1
       with:

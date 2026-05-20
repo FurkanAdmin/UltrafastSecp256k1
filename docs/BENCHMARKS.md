@@ -15,11 +15,11 @@ Benchmark results for UltrafastSecp256k1 across all supported platforms.
 
 ## Summary
 
-> **x86-64 (i5-14400F): 2026-05-16** GCC 14.2.0, turbo disabled, core 0 pinned, 11-pass IQR median  
-> Canonical JSON: `docs/bench_unified_2026-05-16_gcc14_x86-64.json`  
+> **x86-64 (i5-14400F): 2026-05-11** GCC 14.2.0, turbo disabled (intel_pstate/no_turbo=1), core 0 pinned, 500 warmup/op, 11-pass IQR median  
+> Canonical JSON: `docs/bench_unified_2026-05-11_gcc14_x86-64.json` (SHA: see artifact)  
 > Other platforms: pending fresh controlled runs.
 
-x86-64: GCC 14.2.0 · i5-14400F · 2.496 GHz · turbo off · core 0 pinned · **11-pass IQR** · 2026-05-16
+x86-64: GCC 14.2.0 · i5-14400F · 2.496 GHz · turbo off · core 0 pinned · **11-pass IQR** · 2026-05-11
 
 | Platform | Field Mul | Generator Mul | Scalar Mul (k·P) | ECDSA Verify | Verify vs lib (warm-cache) | CT Sign vs lib |
 |----------|-----------|---------------|------------|-------------|---------------|----------------|

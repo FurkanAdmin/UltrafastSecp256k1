@@ -240,8 +240,11 @@ Scalar frost_lagrange_coefficient(ParticipantId i,
     for (ParticipantId const j : signer_ids) {
         if (j == i) continue;
         Scalar const x_j = Scalar::from_uint64(j);
-        num = num * x_j;                  // num *= j
-        den = den * (x_j - x_i);          // den *= (j - i)
+        // P1-002: participant IDs are public data, but use CT arithmetic for
+        // defensive consistency: if a regression introduces a secret into this
+        // loop, CT already protects it. Same pattern as the final mul/inv below.
+        num = ct::scalar_mul(num, x_j);
+        den = ct::scalar_mul(den, x_j - x_i);
     }
 
     if (secp256k1::ct::scalar_is_zero(den)) return Scalar::zero();
