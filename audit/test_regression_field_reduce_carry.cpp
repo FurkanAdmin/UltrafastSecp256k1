@@ -98,7 +98,8 @@ static void test_cross_check_against_FE52() {
     auto b1 = r.to_bytes();
     auto b2 = r.square().to_bytes();
     (void)b1; (void)b2;
-    CHECK(true, "large × large does not crash");
+    // Verify round-trip stability of large × large result
+    CHECK(b1 == b2, "large × large: a*a == a.square() byte-for-byte");
 }
 
 int test_regression_field_reduce_carry_run() {

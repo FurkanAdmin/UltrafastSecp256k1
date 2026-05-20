@@ -320,10 +320,10 @@ static void test_batch_serialization() {
     CHECK(mixed_comp[2] == G.add(G).to_compressed(), "batch mixed[2]=2G correct");
     CHECK(is_zero_33(mixed_comp[3]), "batch mixed[3]=inf -> zeros");
 
-    // Edge: empty batch (should not crash)
+    // Edge: empty batch (should not crash — reaching here without crash is the test)
     Point::batch_to_compressed(nullptr, 0, nullptr);
     Point::batch_x_only_bytes(nullptr, 0, nullptr);
-    CHECK(true, "empty batch calls do not crash");
+    ++g_pass;  // crash-free execution of the above is the assertion
 }
 
 // ============================================================================
