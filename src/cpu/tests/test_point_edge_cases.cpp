@@ -323,7 +323,7 @@ static void test_batch_serialization() {
     // Edge: empty batch (should not crash — reaching here without crash is the test)
     Point::batch_to_compressed(nullptr, 0, nullptr);
     Point::batch_x_only_bytes(nullptr, 0, nullptr);
-    ++g_pass;  // crash-free execution of the above is the assertion
+    ++tests_run; ++tests_passed;  // crash-free execution is the assertion
 }
 
 // ============================================================================

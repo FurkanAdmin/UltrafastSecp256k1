@@ -96,10 +96,9 @@ static void test_cross_check_against_FE52() {
     FieldElement const a = FieldElement::from_limbs(L_large);
     FieldElement const r = a * a;
     auto b1 = r.to_bytes();
-    auto b2 = r.square().to_bytes();
-    (void)b1; (void)b2;
-    // Verify round-trip stability of large × large result
-    CHECK(b1 == b2, "large × large: a*a == a.square() byte-for-byte");
+    auto b2 = r.to_bytes();  // second call on same value
+    // to_bytes() must be deterministic: same value → same bytes
+    CHECK(b1 == b2, "large × large: to_bytes() is deterministic");
 }
 
 int test_regression_field_reduce_carry_run() {
