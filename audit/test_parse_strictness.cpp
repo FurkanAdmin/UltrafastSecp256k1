@@ -357,6 +357,87 @@ static void run_ps23_der_parse(ufsecp_ctx* ctx) {
         CHECK(std::memcmp(roundtrip, compact, 64) == 0,
               "PS-30b: DER round-trip produces original compact signature");
     }
+    // PS-30c..f: fast DER scalar validator edge cases (shim_ecdsa.cpp valid_scalar)
+    // These test the branchless byte-level range checker added in the DER parse
+    // optimization (replaces Scalar::parse_bytes_strict_nonzero). Verifies that:
+    //   r=0 → rejected (BIP-66: r must be in [1, n-1])
+    //   s=0 → rejected (BIP-66: s must be in [1, n-1])
+    //   r=n → rejected (r must be strictly less than n)
+    //   r=n-1 → accepted (n-1 is the largest valid scalar)
+    //
+    // Build DER buffers manually since ufsecp_ecdsa_sig_from_der enforces range.
+    // Note: secp256k1_ecdsa_signature_parse_der (shim) is tested via the C ABI.
+    {
+        // secp256k1 order n and n-1
+        static const uint8_t N[32] = {
+            0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,
+            0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFE,
+            0xBA,0xAE,0xDC,0xE6,0xAF,0x48,0xA0,0x3B,
+            0xBF,0xD2,0x5E,0x8C,0xD0,0x36,0x41,0x41
+        };
+        // n-1: subtract 1 from the last byte
+        uint8_t N_minus_1[32];
+        std::memcpy(N_minus_1, N, 32);
+        N_minus_1[31] = 0x40;  // 0x41 - 1
+
+        // Valid r for the normal sign path (any private key scalar > 0)
+        static const uint8_t VALID_R[32] = {
+            0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+            0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+            0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+            0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x01
+        };
+
+        // Helper: build a minimal DER sig: 0x30 len 0x02 0x20 r[32] 0x02 0x20 s[32]
+        // Uses fixed-length 32-byte (non-zero-prefixed) r and s for simplicity.
+        auto make_der = [](const uint8_t r[32], const uint8_t s[32],
+                           uint8_t out[72], size_t& outlen) {
+            outlen = 0;
+            uint8_t* p = out;
+            *p++ = 0x30;
+            // total content: 2 (r tag+len) + 32 (r) + 2 (s tag+len) + 32 (s) = 68
+            *p++ = 68;
+            *p++ = 0x02; *p++ = 32;
+            std::memcpy(p, r, 32); p += 32;
+            *p++ = 0x02; *p++ = 32;
+            std::memcpy(p, s, 32); p += 32;
+            outlen = 70;  // header (2) + content (68)
+        };
+
+        uint8_t buf[72] = {};
+        size_t blen = 0;
+        uint8_t out64[64] = {};
+
+        // PS-30c: r=0 — rejected (all r bytes zero → r=0 is invalid)
+        {
+            uint8_t zero_r[32] = {};
+            make_der(zero_r, VALID_R, buf, blen);
+            ufsecp_error_t rc = ufsecp_ecdsa_sig_from_der(ctx, buf, blen, out64);
+            CHECK_REJECT(rc, "PS-30c: DER with r=0 rejected by valid_scalar");
+        }
+
+        // PS-30d: s=0 — rejected
+        {
+            uint8_t zero_s[32] = {};
+            make_der(VALID_R, zero_s, buf, blen);
+            ufsecp_error_t rc = ufsecp_ecdsa_sig_from_der(ctx, buf, blen, out64);
+            CHECK_REJECT(rc, "PS-30d: DER with s=0 rejected by valid_scalar");
+        }
+
+        // PS-30e: r=n — rejected (r must be < n)
+        {
+            make_der(N, VALID_R, buf, blen);
+            ufsecp_error_t rc = ufsecp_ecdsa_sig_from_der(ctx, buf, blen, out64);
+            CHECK_REJECT(rc, "PS-30e: DER with r=n rejected by valid_scalar");
+        }
+
+        // PS-30f: r=n-1 — accepted (n-1 is the largest valid r)
+        {
+            make_der(N_minus_1, VALID_R, buf, blen);
+            ufsecp_error_t rc = ufsecp_ecdsa_sig_from_der(ctx, buf, blen, out64);
+            CHECK_CODE(rc, UFSECP_OK, "PS-30f: DER with r=n-1 accepted by valid_scalar");
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

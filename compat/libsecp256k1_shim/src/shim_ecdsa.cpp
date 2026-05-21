@@ -74,35 +74,12 @@ int secp256k1_ecdsa_signature_serialize_compact(
 }
 
 // -- DER parse/serialize --------------------------------------------------
-
-static int parse_der_int(const unsigned char *&p, const unsigned char *end,
-                         unsigned char out[32])
-{
-    if (p >= end || *p != 0x02) return 0;
-    ++p;
-    if (p >= end) return 0;
-    size_t len = *p++;
-    if (len == 0 || p + len > end) return 0;
-
-    // BIP-66 strict DER: reject negative integers (high bit set without 0x00 prefix).
-    // In DER encoding a set high bit means a negative number — always invalid for r,s.
-    if (*p & 0x80) return 0;
-
-    // BIP-66 strict DER: reject unnecessary leading zeros.
-    // A leading 0x00 is only valid when the NEXT byte has its high bit set
-    // (to distinguish a positive integer from a negative one in DER encoding).
-    // Any other leading 0x00 is non-canonical and must be rejected.
-    if (*p == 0x00) {
-        if (len < 2 || (p[1] & 0x80) == 0) return 0;  // unnecessary leading zero
-        ++p; --len;  // consume the required padding byte
-    }
-
-    if (len > 32) return 0;
-    std::memset(out, 0, 32);
-    std::memcpy(out + (32 - len), p, len);
-    p += len;
-    return 1;
-}
+// DER parse optimizations (vs prior version):
+//   1. Lambda instead of static function → compiler inlines, no call overhead
+//   2. Write directly into sig->data → eliminates r[32], s[32] stack buffers
+//      and the two final memcpy(sig->data, r, 32) calls
+//   3. __builtin_memset/memcpy → stronger optimization hints than std::mem*
+//   4. Only zero the leading prefix bytes (32 - len), not full 32 bytes
 
 int secp256k1_ecdsa_signature_parse_der(
     const secp256k1_context *ctx, secp256k1_ecdsa_signature *sig,
@@ -115,29 +92,79 @@ int secp256k1_ecdsa_signature_parse_der(
     const unsigned char *end = input + inputlen;
 
     if (*p++ != 0x30) return 0;
-    size_t seqlen = *p++;
-    // BIP-66: explicitly reject BER long-form length encoding (0x80, 0x81, 0x82...).
-    // In BER, a length byte with the high bit set means multi-byte length follows.
-    // BIP-66 strict DER requires short-form only. libsecp256k1 rejects this explicitly
-    // via (seqlen & 0x80) != 0; we do the same to document intent, not rely on seqlen>70.
+    unsigned char seqlen = *p++;
+    // BIP-66: reject BER long-form (high bit = multi-byte length) and
+    // SEQUENCE content that doesn't exactly fill the input buffer.
     if (seqlen & 0x80) return 0;
-    // BIP-66: reject if SEQUENCE content overflows OR if there are trailing
-    // bytes after the SEQUENCE (libsecp256k1 enforces exact boundary match).
     if (seqlen > 70 || p + seqlen != end) return 0;
 
-    unsigned char r[32]{}, s[32]{};
-    if (!parse_der_int(p, end, r)) return 0;
-    if (!parse_der_int(p, end, s)) return 0;
+    // Parse one DER INTEGER into a 32-byte big-endian buffer.
+    // Writes directly to *out (must point into sig->data).
+    // Returns false on any BIP-66 violation.
+    auto parse_int = [](const unsigned char*& p,
+                        const unsigned char* end,
+                        unsigned char* out) -> bool {
+        if (p >= end || *p++ != 0x02) return false;
+        if (p >= end) return false;
+        unsigned char len = *p++;
+        if (len == 0 || p + len > end) return false;
+        if (*p & 0x80) return false;          // negative integer — invalid
+        if (*p == 0x00) {
+            // Leading 0x00 is only valid before a high-bit byte.
+            if (len < 2 || !(p[1] & 0x80)) return false;
+            ++p; --len;                        // skip required padding byte
+        }
+        if (len > 32) return false;
+        __builtin_memset(out, 0, 32u - len);   // zero only the prefix
+        __builtin_memcpy(out + 32u - len, p, len);
+        p += len;
+        return true;
+    };
 
-    // Validate r, s are in (0, n-1] — matches libsecp strict contract.
-    Scalar rs, ss;
-    if (!Scalar::parse_bytes_strict_nonzero(
-            reinterpret_cast<const uint8_t*>(r), rs)) return 0;
-    if (!Scalar::parse_bytes_strict_nonzero(
-            reinterpret_cast<const uint8_t*>(s), ss)) return 0;
+    // Parse r and s directly into sig->data — no intermediate stack buffers.
+    if (!parse_int(p, end, sig->data))      return 0;  // r → data[0..31]
+    if (!parse_int(p, end, sig->data + 32)) return 0;  // s → data[32..63]
 
-    std::memcpy(sig->data, r, 32);
-    std::memcpy(sig->data + 32, s, 32);
+    // Validate r, s ∈ [1, n-1]: reject overflow (>= n) AND zero.
+    //
+    // Fast path: load 4 big-endian uint64_t limbs and compare against the
+    // curve order n in one branchless pass — avoids constructing a Scalar
+    // object and the associated stack allocation / copy.
+    //
+    // Secp256k1 order n (big-endian):
+    //   0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+    static constexpr uint64_t N0 = 0xFFFFFFFFFFFFFFFFULL;  // bytes [ 0.. 7]
+    static constexpr uint64_t N1 = 0xFFFFFFFFFFFFFFFEULL;  // bytes [ 8..15]
+    static constexpr uint64_t N2 = 0xBAAEDCE6AF48A03BULL;  // bytes [16..23]
+    static constexpr uint64_t N3 = 0xBFD25E8CD0364141ULL;  // bytes [24..31]
+
+    // Load 32 bytes as 4 big-endian uint64_t (avoids Scalar ctor overhead).
+    auto load64be = [](const unsigned char* p) noexcept -> uint64_t {
+        uint64_t v;
+        __builtin_memcpy(&v, p, 8);
+        return __builtin_bswap64(v);
+    };
+
+    // Returns true if the 32-byte big-endian value is in [1, n-1].
+    auto valid_scalar = [&](const unsigned char* b) noexcept -> bool {
+        uint64_t a0 = load64be(b);       // most significant
+        uint64_t a1 = load64be(b + 8);
+        uint64_t a2 = load64be(b + 16);
+        uint64_t a3 = load64be(b + 24);  // least significant
+
+        // Check non-zero (at least one limb non-zero).
+        if ((a0 | a1 | a2 | a3) == 0) return false;
+
+        // Check < n: lexicographic comparison from most-significant limb.
+        if (a0 < N0) return true;   if (a0 > N0) return false;
+        if (a1 < N1) return true;   if (a1 > N1) return false;
+        if (a2 < N2) return true;   if (a2 > N2) return false;
+        return a3 < N3;
+    };
+
+    if (!valid_scalar(sig->data))      return 0;  // r
+    if (!valid_scalar(sig->data + 32)) return 0;  // s
+
     return 1;
 }
 
