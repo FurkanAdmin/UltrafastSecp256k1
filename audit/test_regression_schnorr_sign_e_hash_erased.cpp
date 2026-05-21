@@ -60,7 +60,7 @@ static void test_sign_verify_roundtrip() {
 
     // Build xonly pubkey for verification
     auto px = kp.px;
-    bool ok = secp256k1::schnorr_verify(sig, msg, px);
+    bool ok = secp256k1::schnorr_verify(px, msg, sig);
     CHECK(ok, "SHE-1: verify succeeds after sign with e_hash erasure");
 }
 
@@ -82,7 +82,7 @@ static void test_many_roundtrips() {
         aux[31] = static_cast<uint8_t>(i);
 
         auto sig = secp256k1::schnorr_sign(kp, msg, aux);
-        if (!sig.s.is_zero() && secp256k1::schnorr_verify(sig, msg, px))
+        if (!sig.s.is_zero() && secp256k1::schnorr_verify(px, msg, sig))
             ++ok_count;
     }
     CHECK(ok_count == 50, "SHE-2: all 50 sign+verify round-trips pass");

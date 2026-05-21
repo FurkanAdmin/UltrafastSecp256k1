@@ -16,6 +16,7 @@
 #include "secp256k1/point.hpp"
 #include "secp256k1/precompute.hpp"
 #include "secp256k1/ct/point.hpp"
+#include "secp256k1/detail/secure_erase.hpp"
 
 using secp256k1::fast::Point;
 using secp256k1::fast::Scalar;

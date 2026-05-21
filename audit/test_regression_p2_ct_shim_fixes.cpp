@@ -52,15 +52,20 @@ static void test_musig2_agg_ct_correctness() {
     secp256k1::fast::Scalar::parse_bytes_strict_nonzero(kSk2, sk2);
 
     // Build 2-of-2 key aggregation
-    auto pk1 = secp256k1::ct::generator_mul(sk1);
-    auto pk2 = secp256k1::ct::generator_mul(sk2);
-    auto kagg = secp256k1::musig2_key_agg({pk1, pk2});
+    // musig2_key_agg requires 33-byte compressed pubkeys
+    auto pt1 = secp256k1::ct::generator_mul(sk1);
+    auto pt2 = secp256k1::ct::generator_mul(sk2);
+    auto cpk1 = pt1.to_compressed();
+    auto cpk2 = pt2.to_compressed();
+    std::vector<std::array<uint8_t,33>> pks = {cpk1, cpk2};
+    auto kagg = secp256k1::musig2_key_agg(pks);
 
     std::array<uint8_t,32> msg = {0xDE,0xAD,0xBE,0xEF};
     std::array<uint8_t,32> seed1 = {0xAA}, seed2 = {0xBB};
     auto [n1, pn1] = secp256k1::musig2_nonce_gen(sk1, kagg.Q_x, kagg.Q_x, seed1, nullptr);
     auto [n2, pn2] = secp256k1::musig2_nonce_gen(sk2, kagg.Q_x, kagg.Q_x, seed2, nullptr);
-    auto agg_nonce = secp256k1::musig2_nonce_agg({pn1, pn2});
+    std::vector<secp256k1::MuSig2PubNonce> pns = {pn1, pn2};
+    auto agg_nonce = secp256k1::musig2_nonce_agg(pns);
     auto sess = secp256k1::musig2_start_sign_session(agg_nonce, kagg, msg);
 
     auto psig1 = secp256k1::musig2_partial_sign(n1, sk1, kagg, sess, 0);
@@ -69,19 +74,20 @@ static void test_musig2_agg_ct_correctness() {
     CHECK(!psig1.is_zero(), "MSAGG-CT: psig1 non-zero");
     CHECK(!psig2.is_zero(), "MSAGG-CT: psig2 non-zero");
 
-    auto sig64 = secp256k1::musig2_partial_sig_agg({psig1, psig2}, sess);
+    std::vector<secp256k1::fast::Scalar> psigs = {psig1, psig2};
+    auto sig64 = secp256k1::musig2_partial_sig_agg(psigs, sess);
     bool all_zero = true;
     for (auto b : sig64) { if (b) { all_zero = false; break; } }
     CHECK(!all_zero, "MSAGG-CT: aggregated sig non-zero");
 
-    // Verify the aggregate signature
+    // Verify the aggregate signature — correct arg order: (pubkey_x, msg, sig)
     secp256k1::SchnorrSignature sig{};
     std::memcpy(sig.r.data(), sig64.data(), 32);
-    secp256k1::fast::Scalar s;
-    secp256k1::fast::Scalar::from_bytes_raw(sig64.data() + 32, s);
-    sig.s = s;
+    std::array<uint8_t,32> s_bytes{};
+    std::memcpy(s_bytes.data(), sig64.data() + 32, 32);
+    sig.s = secp256k1::fast::Scalar::from_bytes(s_bytes);
     std::array<uint8_t,32> Q_x = kagg.Q_x;
-    CHECK(secp256k1::schnorr_verify(sig, msg, Q_x), "MSAGG-CT: aggregated sig verifies");
+    CHECK(secp256k1::schnorr_verify(Q_x, msg, sig), "MSAGG-CT: aggregated sig verifies");
 }
 
 // ── CT-001: rfc6979_nonce_hedged correctness ──────────────────────────────
@@ -112,8 +118,11 @@ static void test_hedged_nonce_correctness() {
     CHECK(r_different, "HEDGE-CT: different aux → different R (nonce varies)");
 }
 
-// ── Shim-dependent tests (require secp256k1_shim) ────────────────────────
-#if defined(SECP256K1_BUILD_COMPAT_SHIM) || defined(UNIFIED_AUDIT_RUNNER)
+// ── Shim-dependent tests (require secp256k1_shim linked with shim include path) ────────────────────────
+// SECP256K1_BUILD_COMPAT_SHIM is defined by CMakeLists when TARGET secp256k1_shim exists
+// and the shim include path is available. UNIFIED_AUDIT_RUNNER alone is insufficient
+// because the shim include path is not always provided.
+#if defined(SECP256K1_BUILD_COMPAT_SHIM)
 
 #include "secp256k1.h"
 #include "secp256k1_musig.h"

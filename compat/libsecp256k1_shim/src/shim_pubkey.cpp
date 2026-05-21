@@ -164,13 +164,15 @@ int secp256k1_ec_pubkey_cmp(
             "secp256k1_ec_pubkey_cmp: invalid pubkey argument");
         return 0;
     }
-    // Compare compressed serializations lexicographically.
-    // Zero-initialize so unwritten bytes don't produce UB in memcmp.
-    unsigned char c1[33]{}, c2[33]{};
-    size_t len1 = 33, len2 = 33;
-    secp256k1_ec_pubkey_serialize(ctx, c1, &len1, pubkey1, SECP256K1_EC_COMPRESSED);
-    secp256k1_ec_pubkey_serialize(ctx, c2, &len2, pubkey2, SECP256K1_EC_COMPRESSED);
-    return std::memcmp(c1, c2, 33);
+    // Compare compressed representations directly from the internal layout.
+    // secp256k1_pubkey.data[0..31] = X coordinate (big-endian).
+    // secp256k1_pubkey.data[63] & 1 = Y parity bit (0=even → 0x02, 1=odd → 0x03).
+    // This avoids two full serialize calls (flag validation, outputlen check, Y-parity
+    // extraction) and produces an identical lexicographic result.
+    unsigned char p1 = (pubkey1->data[63] & 1u) ? 0x03u : 0x02u;
+    unsigned char p2 = (pubkey2->data[63] & 1u) ? 0x03u : 0x02u;
+    if (p1 != p2) return static_cast<int>(p1) - static_cast<int>(p2);
+    return std::memcmp(pubkey1->data, pubkey2->data, 32);
 }
 
 int secp256k1_ec_pubkey_create(

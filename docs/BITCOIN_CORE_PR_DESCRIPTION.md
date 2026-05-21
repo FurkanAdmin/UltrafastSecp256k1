@@ -81,7 +81,7 @@ library in production for Silent Payments (BIP-352) GPU scanning.
 
 ### CT signing throughput (GCC 14.2.0 — CT-vs-CT, production-equivalent)
 
-All numbers from `docs/bench_unified_2026-05-11_gcc14_x86-64.json`
+All numbers from `docs/bench_unified_2026-05-21_gcc14_x86-64.json`
 (Intel i5-14400F, turbo disabled, core pinned, 500 warmup, 11 passes, IQR trimming):
 
 | Compiler | CT ECDSA sign | CT Schnorr sign | Notes |
@@ -90,7 +90,7 @@ All numbers from `docs/bench_unified_2026-05-11_gcc14_x86-64.json`
 | Clang 19 (archived, 2026-03-24) | +33% vs libsecp | ~+9% vs libsecp | Archived; not a current controlled run |
 
 Bitcoin Core Linux CI uses GCC; the GCC 14 row is the relevant metric.
-Full raw data: `docs/bench_unified_2026-05-11_gcc14_x86-64.json`.
+Full raw data: `docs/bench_unified_2026-05-21_gcc14_x86-64.json`.
 
 ### ConnectBlock Schnorr: −17% regression (native C++ API, unique pubkeys)
 
@@ -128,7 +128,7 @@ The ABI layer is the production-safe surface.
 
 ### Benchmark methodology note
 
-All controlled results were collected with: turbo disabled (`echo 1 > /sys/devices/system/cpu/intel_pstate/no_turbo`, governor=performance), CPU pinned (`taskset -c 0`), `nice -20`, 500 warmup/op, 11 passes, IQR outlier removal. Compiler: GCC 14.2.0, Release + LTO. Canonical data: `docs/bench_unified_2026-05-11_gcc14_x86-64.json`. Bitcoin Core integration data: `docs/BITCOIN_CORE_BENCH_RESULTS.json`.
+All controlled results were collected with: turbo disabled (`echo 1 > /sys/devices/system/cpu/intel_pstate/no_turbo`, governor=performance), CPU pinned (`taskset -c 0`), `nice -20`, 500 warmup/op, 11 passes, IQR outlier removal. Compiler: GCC 14.2.0, Release + LTO. Canonical data: `docs/bench_unified_2026-05-21_gcc14_x86-64.json`. Bitcoin Core integration data: `docs/BITCOIN_CORE_BENCH_RESULTS.json`.
 
 ### Scope of this PR
 

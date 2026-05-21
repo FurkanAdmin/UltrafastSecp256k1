@@ -73,7 +73,7 @@ static int g_pass = 0, g_fail = 0;
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-static std::mt19937_64 rng(0xFEED'DEAD'C0DE'CAFE_u64);  // NOLINT
+static std::mt19937_64 rng(UINT64_C(0xFEEDDEADC0DECAFE));  // NOLINT
 
 static Scalar random_nonzero_scalar() {
     for (;;) {

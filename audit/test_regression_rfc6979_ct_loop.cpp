@@ -73,7 +73,7 @@ static void test_rfc1_sign_verify_roundtrip() {
         if (sig.r.is_zero() || sig.s.is_zero()) continue;  // degenerate (negligible prob)
 
         Point pubkey = ct::generator_mul(sk);
-        bool verified = ecdsa_verify(sig, msg, pubkey);
+        bool verified = ecdsa_verify(msg, pubkey, sig);
         if (verified) ++ok_count;
     }
     CHECK(ok_count >= 195, "[RFC-1] >=195/200 round-trips verified");

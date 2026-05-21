@@ -30,7 +30,11 @@ int secp256k1_ec_seckey_negate(
     if (!seckey) return 0;
     Scalar k;
     if (!Scalar::parse_bytes_strict_nonzero(seckey, k)) return 0;
-    auto neg = k.negate();
+    // CT-SECKEY-NEGATE: use scalar_cneg with always-negate mask (all-ones) so
+    // that the negate is unconditional and branchless on the secret key value.
+    // k.negate() is variable-time (data-dependent branch on is_zero) — banned
+    // on secret key material per CT signing guardrail.
+    auto neg = secp256k1::ct::scalar_cneg(k, ~std::uint64_t(0));
     auto out = neg.to_bytes();
     std::memcpy(seckey, out.data(), 32);
     return 1;

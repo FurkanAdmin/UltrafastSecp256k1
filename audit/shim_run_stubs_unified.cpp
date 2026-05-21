@@ -28,3 +28,5 @@ int test_shim_security_edge_cases_run()              { return ADVISORY_SKIP_CODE
 int test_exploit_musig2_infinity_pubnonce_run()      { return ADVISORY_SKIP_CODE; }
 int test_regression_musig2_nonce_gen_seckey_run()    { return ADVISORY_SKIP_CODE; }
 int test_regression_shim_ndata_rgrind_run()          { return ADVISORY_SKIP_CODE; }
+int test_regression_schnorr_varlen_ct_fixes_run()    { return ADVISORY_SKIP_CODE; }
+// test_regression_p2_ct_shim_fixes_run is always provided by test_regression_p2_ct_shim_fixes.cpp

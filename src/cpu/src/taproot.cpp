@@ -185,6 +185,11 @@ Scalar taproot_tweak_privkey(
     auto tweaked = ct::scalar_add(d, t);
 
     detail::secure_erase(&d, sizeof(d));
+    // TAPROOT-TWEAK-ERASE: t is derived from H_TapTweak(internal_key || merkle_root)
+    // and is combined with the private key. Although t is technically derived from
+    // public data (the tweak hash), it participates in key material arithmetic and
+    // must be erased to limit private-key reconstruction window.
+    detail::secure_erase(&t, sizeof(t));
 
     if (tweaked.is_zero_ct()) return Scalar::zero();
 

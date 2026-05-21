@@ -198,7 +198,7 @@ static void test_sec002_ct_scalar_ops_correct() {
 // Source-scan helpers and new sub-tests for 2026-05-21 code fixes
 // ---------------------------------------------------------------------------
 
-static std::mt19937_64 g_rng(0xFEED'DEAD'C0DE'CAFE_u64);  // NOLINT
+static std::mt19937_64 g_rng(UINT64_C(0xFEEDDEADC0DECAFE));  // NOLINT
 
 static Scalar random_nonzero_scalar_() {
     for (;;) {
@@ -385,7 +385,11 @@ static void test_sec002_frost_lagrange() {
 
 // ---------------------------------------------------------------------------
 // Entry point
+// When compiled into unified_audit_runner, test_regression_ct_ops_2026_05_21.cpp
+// provides test_regression_ct_ops_run() (it supersedes this file's version).
+// This version only runs standalone.
 // ---------------------------------------------------------------------------
+#ifndef UNIFIED_AUDIT_RUNNER
 int test_regression_ct_ops_run() {
     g_pass = 0;
     g_fail = 0;
@@ -415,3 +419,4 @@ int test_regression_ct_ops_run() {
 #ifdef STANDALONE_TEST
 int main() { return test_regression_ct_ops_run(); }
 #endif
+#endif // !UNIFIED_AUDIT_RUNNER

@@ -126,6 +126,7 @@ int test_exploit_adaptor_parity_run()               { return ADVISORY_SKIP_CODE;
 int test_exploit_adaptor_extraction_soundness_run() { return ADVISORY_SKIP_CODE; }
 int test_regression_adaptor_binding_domain_run()    { return ADVISORY_SKIP_CODE; }
 int test_regression_adaptor_degenerate_v7_run()     { return ADVISORY_SKIP_CODE; }
+int test_regression_ct_secret_is_zero_run()         { return ADVISORY_SKIP_CODE; }
 #endif // !SECP256K1_HAS_ADAPTOR
 
 // ============================================================================

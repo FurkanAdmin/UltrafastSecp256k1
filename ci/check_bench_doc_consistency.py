@@ -233,12 +233,12 @@ BANNED: list[tuple[str, str, str | None]] = [
 REQUIRED_REFS: list[tuple[str, str, str]] = [
     (
         "docs/BITCOIN_CORE_PR_DESCRIPTION.md",
-        r"bench_unified_2026-05-1[16]_gcc14_x86-64\.json",
+        r"bench_unified_2026-05-\d{2}_gcc14_x86-64\.json",
         "PR description must cite the canonical bench_unified artifact",
     ),
     (
         "docs/BITCOIN_CORE_BACKEND_EVIDENCE.md",
-        r"bench_unified_2026-05-1[16]_gcc14_x86-64\.json",
+        r"bench_unified_2026-05-\d{2}_gcc14_x86-64\.json",
         "Evidence doc must cite the canonical bench_unified artifact",
     ),
     (
@@ -485,12 +485,28 @@ def check_required_refs(verbose: bool) -> list[str]:
         if not doc.exists():
             continue
         text = doc.read_text(encoding="utf-8")
-        if not re.search(pattern, text):
+        m = re.search(pattern, text)
+        if not m:
             violations.append(
                 f"  MISSING REF [{rel_path}]\n"
                 f"    Pattern : {pattern}\n"
                 f"    Reason  : {reason}"
             )
+        else:
+            # Verify that any referenced JSON artifact file actually exists on disk.
+            # Extract filenames matching the bench_unified_*.json pattern from all matches.
+            for match in re.finditer(pattern, text):
+                matched_text = match.group()
+                # Only perform file-existence check for bench_unified artifact refs
+                if matched_text.startswith("bench_unified_") and matched_text.endswith(".json"):
+                    artifact_path = ROOT / "docs" / matched_text
+                    if not artifact_path.exists():
+                        violations.append(
+                            f"  ARTIFACT NOT FOUND [{rel_path}]\n"
+                            f"    Referenced : docs/{matched_text}\n"
+                            f"    Reason  : {reason}\n"
+                            f"    Fix     : ensure docs/{matched_text} exists or update the reference"
+                        )
     return violations
 
 

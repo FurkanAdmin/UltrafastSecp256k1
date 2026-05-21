@@ -30,20 +30,25 @@ using detail::cached_tagged_hash;
 // Probability of needing retry is < 2^-127; loop terminates in 1 iteration
 // for all practical purposes.
 static Scalar derive_scalar_from_hash(std::array<std::uint8_t, 32> hash) {
-    Scalar result;
-    for (std::uint32_t counter = 0; ; ++counter) {
-        if (Scalar::parse_bytes_strict_nonzero(hash.data(), result)) break;
-        // hash == 0 mod n or >= n (P < 2^-127): rehash with counter and retry.
-        SHA256 retry_h;
-        std::uint8_t c_be[4] = {
-            std::uint8_t(counter >> 24), std::uint8_t(counter >> 16),
-            std::uint8_t(counter >> 8),  std::uint8_t(counter)
-        };
-        retry_h.update(hash.data(), 32);
-        retry_h.update(c_be, 4);
-        hash = retry_h.finalize();
-    }
+    // CT: fixed 2-iteration approach — the original data-dependent retry loop is
+    // structurally non-CT because the iteration count leaks whether the hash is
+    // >= n or == 0. Both are functions of secret polynomial coefficients. Fix:
+    // always compute exactly 2 candidates and use ct::scalar_select (same pattern
+    // as rfc6979_nonce fix). Probability of needing the second: ~2^-128.
+    Scalar cand1{}, cand2{};
+    bool const ok1 = Scalar::parse_bytes_strict_nonzero(hash.data(), cand1);
+    // Compute second candidate unconditionally via SHA256(hash || 0x00000000).
+    SHA256 h2;
+    std::uint8_t zero_ctr[4] = {0, 0, 0, 0};
+    h2.update(hash.data(), 32);
+    h2.update(zero_ctr, 4);
+    auto hash2 = h2.finalize();
+    (void)Scalar::parse_bytes_strict_nonzero(hash2.data(), cand2);
+    std::uint64_t const mask = static_cast<std::uint64_t>(
+        -static_cast<std::int64_t>(static_cast<int>(ok1)));
+    Scalar const result = ct::scalar_select(cand1, cand2, mask);
     secure_erase(hash.data(), hash.size());
+    secure_erase(hash2.data(), hash2.size());
     return result;
 }
 

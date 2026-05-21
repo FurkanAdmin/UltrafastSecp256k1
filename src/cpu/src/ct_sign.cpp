@@ -261,6 +261,8 @@ SchnorrSignature schnorr_sign(const SchnorrKeypair& kp,
     secure_erase(nonce_input, sizeof(nonce_input));
     secure_erase(rand_hash.data(), rand_hash.size());
     secure_erase(challenge_input, sizeof(challenge_input));
+    secure_erase(e_hash.data(), e_hash.size());
+    secure_erase(&e, sizeof(e));
     // Erase secret nonce scalars. Scalar is a POD-like 32-byte struct (4x uint64_t).
     secure_erase(&k_prime, sizeof(k_prime));
     secure_erase(&k, sizeof(k));

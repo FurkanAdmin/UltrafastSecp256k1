@@ -315,7 +315,7 @@ cmake -S . -B out/release -G Ninja -DCMAKE_BUILD_TYPE=Release \
   -DSECP256K1_BUILD_PROTOCOL_TESTS=ON
 cmake --build out/release -j
 
-# === ONE-COMMAND FULL AUDIT ( 385 modules, 9 failure classes, ~10 min) ===
+# === ONE-COMMAND FULL AUDIT ( 386 modules, 9 failure classes, ~10 min) ===
 ./build/audit/unified_audit_runner
 
 # === Individual verification paths ===
@@ -332,7 +332,7 @@ ctest --test-dir build -R test_cross_libsecp256k1 -V
 # dudect side-channel (smoke)
 ctest --test-dir build -R ct_sidechannel_smoke -V
 
-# Exploit PoC security probes (265 probes)
+# Exploit PoC security probes (269 probes)
 ctest --test-dir build -R exploit -V
 
 # Machine-readable assurance artifact

@@ -235,4 +235,6 @@ int test_shim_recovery_and_noncefp_run() {
     return (g_fail == 0) ? 0 : 1;
 }
 
+#ifdef STANDALONE_TEST
 int main() { return test_shim_recovery_and_noncefp_run(); }
+#endif

@@ -3499,6 +3499,7 @@ add_executable(unified_audit_runner
     # -- Exploit PoC tests (Section 9) --
     $<$<BOOL:${SECP256K1_BUILD_ADAPTOR}>:test_exploit_adaptor_extended.cpp>
     $<$<BOOL:${SECP256K1_BUILD_ADAPTOR}>:test_exploit_adaptor_parity.cpp>
+    $<$<BOOL:${SECP256K1_BUILD_ADAPTOR}>:test_regression_ct_secret_is_zero.cpp>
     test_exploit_address_encoding.cpp
     test_exploit_address_generation.cpp
     test_exploit_bech32_underflow.cpp
@@ -3875,7 +3876,7 @@ target_sources(unified_audit_runner PRIVATE
     test_regression_musig2_abi_signer_index.cpp
     # P1-SEC-002: schnorr_sign e_hash erasure (no special dependency)
     test_regression_schnorr_sign_e_hash_erased.cpp
-    # P2: CT-001/002/003 + SHIM-002/003/004 fixes
+    # P2: CT-001/002/003 + SHIM-002/003/004 fixes (includes secp256k1.h — needs shim include path)
     test_regression_p2_ct_shim_fixes.cpp
     # P1-SEC-001: FROST frost_sign absent signer ID (real impl when FROST built)
     $<$<BOOL:${SECP256K1_BUILD_FROST}>:test_exploit_frost_absent_signer_id.cpp>
@@ -3911,7 +3912,10 @@ if(TARGET secp256k1_shim)
         # 2026-05-21 P2-SEC-002/003: musig_nonce_gen seckey null + sk erase
         test_regression_musig2_nonce_gen_seckey.cpp
         # 2026-05-21 SHIM-010: ndata R-grind bounded termination
-        test_regression_shim_ndata_rgrind.cpp)
+        test_regression_shim_ndata_rgrind.cpp
+        # 2026-05-21 review v8: varlen sign_custom CT fixes (VCS-1..6)
+        test_regression_schnorr_varlen_ct_fixes.cpp
+)
     target_compile_definitions(unified_audit_runner PRIVATE SECP256K1_BUILD_COMPAT_SHIM)
     target_link_libraries(unified_audit_runner PRIVATE secp256k1_shim)
     target_include_directories(unified_audit_runner PRIVATE
@@ -3935,6 +3939,19 @@ if(TARGET secp256k1_shim)
         COMMAND test_regression_shim_security_v8_standalone)
     set_tests_properties(regression_shim_security_v8 PROPERTIES
         TIMEOUT 60 LABELS "audit;regression;shim;security;ecdh;ecdsa")
+
+    # -- 2026-05-21 review v8: varlen sign_custom CT fixes (VCS-1..6) --
+    add_executable(test_regression_schnorr_varlen_ct_fixes_standalone
+        test_regression_schnorr_varlen_ct_fixes.cpp)
+    audit_target_defaults(test_regression_schnorr_varlen_ct_fixes_standalone)
+    target_link_libraries(test_regression_schnorr_varlen_ct_fixes_standalone PRIVATE secp256k1_shim)
+    target_include_directories(test_regression_schnorr_varlen_ct_fixes_standalone PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../compat/libsecp256k1_shim/include)
+    target_compile_definitions(test_regression_schnorr_varlen_ct_fixes_standalone PRIVATE STANDALONE_TEST)
+    add_test(NAME regression_schnorr_varlen_ct_fixes
+        COMMAND test_regression_schnorr_varlen_ct_fixes_standalone)
+    set_tests_properties(regression_schnorr_varlen_ct_fixes PROPERTIES
+        TIMEOUT 60 LABELS "audit;regression;shim;schnorr;ct;varlen")
 
     # -- CA-001: curve membership check in large-batch ECDSA --
     add_executable(test_regression_ecdsa_batch_curve_check_standalone

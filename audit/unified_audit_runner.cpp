@@ -624,6 +624,11 @@ int test_regression_schnorr_sign_e_hash_erased_run(); // P1-SEC-002: schnorr_sig
 int test_exploit_musig2_infinity_pubnonce_run();      // P1-SEC-003: pubnonce_parse infinity rejection
 
 // ============================================================================
+// Forward declarations -- 2026-05-21 varlen sign_custom CT fixes (review v8)
+// ============================================================================
+int test_regression_schnorr_varlen_ct_fixes_run();   // VCS-1..6: varlen sign_custom CT: blinding, is_zero_ct, full erasure
+
+// ============================================================================
 // Forward declarations -- 2026-05-21 P2 CT/shim fixes
 // ============================================================================
 int test_regression_p2_ct_shim_fixes_run();              // CT-001/002/003 + SHIM-002/003/004
@@ -1307,6 +1312,9 @@ static const AuditModule ALL_MODULES[] = {
     // === 2026-05-21 PASS3-001/002: recovery parse compat + noncefp callback ===
     // advisory=true: depends on libsecp256k1 shim being linked.
     { "shim_recovery_and_noncefp", "PASS3-001/002: recoverable sig parse accepts r==0/s==0 (REC-1..4); ecdsa_sign/recoverable/schnorr_sign_custom fire illegal_callback for custom noncefp before returning 0 (NFP-1..3)", "exploit_poc", test_shim_recovery_and_noncefp_run, true },
+    // === 2026-05-21 review v8: varlen sign_custom CT fixes ===
+    // advisory=true: depends on libsecp256k1 shim (returns ADVISORY_SKIP_CODE when absent).
+    { "regression_schnorr_varlen_ct_fixes", "VCS-1..6: sign_custom varlen path CT fixes — generator_mul_blinded, is_zero_ct on nonce/s, full stack erasure (e_hash/e/nonce_input/rand_hash/challenge_input/t_hash); correctness guard: 33/64/256/300-byte msgs, determinism, fast-path delegation", "ct_analysis", test_regression_schnorr_varlen_ct_fixes_run, true },
 };
 
 static constexpr int NUM_MODULES = sizeof(ALL_MODULES) / sizeof(ALL_MODULES[0]);

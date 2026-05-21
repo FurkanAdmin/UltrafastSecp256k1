@@ -68,9 +68,21 @@ int secp256k1_schnorrsig_verify_batch(
             // zero-init + memcpy per iteration (saves ~128 bytes of stack traffic/sig).
             secp256k1::SchnorrSignature sig;
             if (!secp256k1::SchnorrSignature::parse_strict(sigs64[i], sig)) return 0;
-            // Pass raw pointers directly to schnorr_verify — avoids two 32-byte
-            // stack copies (pk_bytes, msg32) that were an avoidable memcpy per call.
-            if (!secp256k1::schnorr_verify(pubkeys[i]->data, msgs[i], sig)) return 0;
+            // PERF-007: use Y-stored Point overload — avoids lift_x sqrt per call.
+            // secp256k1_xonly_pubkey.data[0..31]=X, data[32..63]=Y (cached by parse).
+            // Matches the optimization in secp256k1_schnorrsig_verify's cache-miss path.
+            {
+                const uint8_t* xb = pubkeys[i]->data;
+                const uint8_t* yb = pubkeys[i]->data + 32;
+                secp256k1::fast::FieldElement x_fe, y_fe;
+                if (!secp256k1::fast::FieldElement::parse_bytes_strict(xb, x_fe)) return 0;
+                if (secp256k1::fast::FieldElement::parse_bytes_strict(yb, y_fe)) {
+                    auto P = secp256k1::fast::Point::from_affine(x_fe, y_fe);
+                    if (!secp256k1::schnorr_verify(P, xb, msgs[i], sig)) return 0;
+                } else {
+                    if (!secp256k1::schnorr_verify(xb, msgs[i], sig)) return 0;
+                }
+            }
         }
         return 1;
     }

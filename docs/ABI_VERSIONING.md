@@ -68,10 +68,11 @@ Actions on PATCH bump:
 ## 3. ABI Version (`UFSECP_ABI_VERSION`)
 
 The ABI version is a monotonically increasing integer that **only** increments on
-binary-incompatible changes. It is independent of the release version:
+binary-incompatible changes. It equals `PROJECT_VERSION_MAJOR` and is propagated
+automatically by CMake into `include/ufsecp/ufsecp_version.h.in`:
 
 ```
-UFSECP_ABI_VERSION = 1    // since initial stable release
+UFSECP_ABI_VERSION = 4    // equals PROJECT_VERSION_MAJOR; increments on every breaking release
 ```
 
 ### Runtime Check

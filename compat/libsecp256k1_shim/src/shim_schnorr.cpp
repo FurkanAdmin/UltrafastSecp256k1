@@ -270,13 +270,18 @@ int secp256k1_schnorrsig_sign_custom(
     // The for-loop alternative (parse_bytes_strict_nonzero + retry) creates a
     // data-dependent branch that dudect detects as a timing leak — do not use.
     auto k_prime = Scalar::from_bytes(rand_hash);
-    if (k_prime.is_zero()) {
+    if (k_prime.is_zero_ct()) {
         secp256k1::detail::secure_erase(&kp.d, sizeof(kp.d));
+        secp256k1::detail::secure_erase(t_hash.data(), t_hash.size());
+        secp256k1::detail::secure_erase(t, sizeof(t));
+        secp256k1::detail::secure_erase(aux32, sizeof(aux32));
+        secp256k1::detail::secure_erase(nonce_input, 64 + msglen);
+        secp256k1::detail::secure_erase(rand_hash.data(), rand_hash.size());
         return 0;
     }
 
-    // R = k' * G (CT path)
-    auto R = secp256k1::ct::generator_mul(k_prime);
+    // R = k' * G (CT path — blinded for DPA defence matching sign32 fast path)
+    auto R = secp256k1::ct::generator_mul_blinded(k_prime);
     auto [rx, r_y_odd] = R.x_bytes_and_parity();
     // CT: branchless conditional negate — r_y_odd is derived from secret nonce.
     auto k = secp256k1::ct::scalar_cneg(k_prime, secp256k1::ct::bool_to_mask(r_y_odd));
@@ -300,10 +305,16 @@ int secp256k1_schnorrsig_sign_custom(
     secp256k1::detail::secure_erase(&k,      sizeof(k));
     secp256k1::detail::secure_erase(&kp.d,   sizeof(kp.d));
     secp256k1::detail::secure_erase(d_bytes.data(), d_bytes.size());
+    secp256k1::detail::secure_erase(t_hash.data(), t_hash.size());
     secp256k1::detail::secure_erase(t, sizeof(t));
     secp256k1::detail::secure_erase(aux32, sizeof(aux32));
+    secp256k1::detail::secure_erase(nonce_input,     64 + msglen);
+    secp256k1::detail::secure_erase(rand_hash.data(), rand_hash.size());
+    secp256k1::detail::secure_erase(challenge_input, 64 + msglen);
+    secp256k1::detail::secure_erase(e_hash.data(), e_hash.size());
+    secp256k1::detail::secure_erase(&e, sizeof(e));
 
-    if (s.is_zero()) return 0;
+    if (s.is_zero_ct()) return 0;
     // SEC-006: CT OR accumulator — visits all 32 bytes, no early exit on signing output.
     {
         std::uint32_t r_nonzero = 0;
@@ -419,8 +430,9 @@ int secp256k1_xonly_pubkey_parse_precomp(
 {
     if (!out || !pubkey_x32) return 0;
     auto* epk = reinterpret_cast<secp256k1::SchnorrXonlyPubkey*>(out);
-    // Two-call protocol: 1st call sets seen_once, 2nd call builds tables.
-    secp256k1::schnorr_xonly_pubkey_parse(*epk, pubkey_x32);  // primes seen_once
+    // Single call: schnorr_xonly_pubkey_parse now builds GLV tables on first call.
+    // The old two-call protocol was needed when tables were built on the second call;
+    // that has been superseded — the first call is sufficient.
     return secp256k1::schnorr_xonly_pubkey_parse(*epk, pubkey_x32) ? 1 : 0;
 }
 

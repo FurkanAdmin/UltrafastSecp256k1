@@ -195,6 +195,11 @@ int secp256k1_keypair_xonly_pub(
 // -- Taproot tweak operations -----------------------------------------------
 
 // Helper: reconstruct a Point from an xonly_pubkey using cached X||Y — no sqrt.
+// SHIM-CURVE-CHECK-XONLY: validate y²=x³+7 before use. A hostile caller could
+// write arbitrary bytes into secp256k1_xonly_pubkey.data[32..63], bypassing
+// secp256k1_xonly_pubkey_from_pubkey / secp256k1_xonly_pubkey_parse.
+// Off-curve input → Point::infinity(); callers (tweak_add, tweak_add_check)
+// check is_infinity() and return 0.
 static Point xonly_to_point(const secp256k1_xonly_pubkey *xp)
 {
     std::array<uint8_t, 32> xb{}, yb{};
@@ -202,6 +207,8 @@ static Point xonly_to_point(const secp256k1_xonly_pubkey *xp)
     std::memcpy(yb.data(), xp->data + 32, 32);
     auto x = FieldElement::from_bytes(xb);
     auto y = FieldElement::from_bytes(yb);
+    auto b7 = FieldElement::from_uint64(7);
+    if (y * y != x * x * x + b7) return Point::infinity();
     return Point::from_affine(x, y);
 }
 
