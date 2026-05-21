@@ -472,7 +472,38 @@ configure_file(
 )
 
 if(NOT TARGET ${SECP256K1_LIB_NAME})
-    add_library(${SECP256K1_LIB_NAME} STATIC ${SECP256K1_SOURCES})
+    # =========================================================================
+    # SECP256K1_BUILD_AS_OBJECT — compile as CMake OBJECT library
+    # =========================================================================
+    # When ON, fastsecp256k1 is an OBJECT library instead of a STATIC library.
+    # Effect: no .a file is created. All object files are included directly in
+    # the parent target's link step — as if the sources were part of that
+    # project. Combined with SECP256K1_UNITY_BUILD=ON, this is the tightest
+    # possible integration: one translation unit, no library boundary at all.
+    #
+    # Use cases:
+    #   - Embedding Ultra directly in another C++ project without install step
+    #   - Maximum LTO effectiveness (no inter-library IR boundary)
+    #   - Zero-overhead integration: same result as writing the crypto code
+    #     directly in the parent project
+    #
+    # Measured impact (bitcoin-core-dev, GCC 14, no LTO):
+    #   STATIC:         -8% ConnectBlock ECDSA vs libsecp
+    #   OBJECT:         same as STATIC (separate .o files, no cross-TU inlining)
+    #   OBJECT+UNITY:   -2.5% ECDSA, parity Schnorr, signing +6% — best no-LTO
+    #   STATIC+LTO:     +1.2% ConnectBlock, +10-35% signing   — best absolute
+    #
+    # See docs/BUILD_INTEGRATION_GUIDE.md for the full mode comparison.
+    option(SECP256K1_BUILD_AS_OBJECT
+        "Build fastsecp256k1 as OBJECT library (no .a — objects go directly into parent link step)"
+        OFF)
+
+    if(SECP256K1_BUILD_AS_OBJECT)
+        add_library(${SECP256K1_LIB_NAME} OBJECT ${SECP256K1_SOURCES})
+        message(STATUS "Secp256k1: OBJECT mode — no .a, objects included directly in parent link")
+    else()
+        add_library(${SECP256K1_LIB_NAME} STATIC ${SECP256K1_SOURCES})
+    endif()
     add_library(secp256k1::fast ALIAS ${SECP256K1_LIB_NAME})
 
     # Expose generated features header to build-tree consumers.
