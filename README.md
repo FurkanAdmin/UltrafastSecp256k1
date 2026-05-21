@@ -229,7 +229,7 @@ This project: `code → test → execution → evidence → continuous verificat
 We do not rely on trust. We provide reproducible evidence.
 
 - Every exploit attempt becomes a permanent regression test
-- Every commit runs 1,000,000+ assertions across 114 non-exploit audit modules and 267 exploit PoCs ( 382 modules total; count via `python3 ci/sync_module_count.py`; canonical data: `docs/canonical_numbers.json`)
+- Every commit runs 1,000,000+ assertions across 114 non-exploit audit modules and 267 exploit PoCs ( 383 modules total; count via `python3 ci/sync_module_count.py`; canonical data: `docs/canonical_numbers.json`)
 - Every claim maps to a test in [docs/AUDIT_TRACEABILITY.md](docs/AUDIT_TRACEABILITY.md)
 - Every performance number has pinned compiler/driver/toolkit versions and raw logs
 
@@ -383,7 +383,7 @@ This top-level narrative maps directly to the assurance ledger: CT secret-key ro
 | Metric | Value |
 |--------|-------|
 | Internal audit assertions per build | **~1,000,000+** |
-| Audit modules (`unified_audit_runner`) | **115 non-exploit modules + 267 exploit PoCs across 9 sections, 0 failures** |
+| Audit modules (`unified_audit_runner`) | **116 non-exploit modules + 267 exploit PoCs across 9 sections, 0 failures** |
 | Exploit PoC test files | **267 exploit-PoC modules (258 source files), 20+ coverage areas, 0 failures** |
 | CI/CD workflows | **54 GitHub Actions workflows** |
 | Build matrix (arch × config × OS) | **7 × 17 × 5 = 595 combinations** |
@@ -411,11 +411,11 @@ This top-level narrative maps directly to the assurance ledger: CT secret-key ro
 - Performance evidence is tracked through manual/release deep-assurance workflows instead of every-push benchmark fan-out
 - Audit results are logged as **structured artifacts** (JSON reports, per-platform logs), not just pass/fail signals
 - Differential tests run on every push and via manual deep-assurance workflows; no separate nightly schedule
-- All 115 non-exploit audit modules and all 267 exploit PoCs return `AUDIT-READY (self-generated)` status as of the last CAAS gate run. Zero failures — see pinned evidence: [`docs/EXTERNAL_AUDIT_BUNDLE.json`](docs/EXTERNAL_AUDIT_BUNDLE.json).
+- All 116 non-exploit audit modules and all 267 exploit PoCs return `AUDIT-READY (self-generated)` status as of the last CAAS gate run. Zero failures — see pinned evidence: [`docs/EXTERNAL_AUDIT_BUNDLE.json`](docs/EXTERNAL_AUDIT_BUNDLE.json).
 
 ### Exploit PoC Test Suite (267 Tests, 20+ Coverage Areas)
 
-In addition to the 382-module `unified_audit_runner`, UltrafastSecp256k1 ships **267 exploit-style PoC modules files** that actively try to break the library across its highest-risk surfaces. Each `audit/test_exploit_*.cpp` target builds and runs standalone so failures stay easy to attribute and reproduce.
+In addition to the 383-module `unified_audit_runner`, UltrafastSecp256k1 ships **267 exploit-style PoC modules files** that actively try to break the library across its highest-risk surfaces. Each `audit/test_exploit_*.cpp` target builds and runs standalone so failures stay easy to attribute and reproduce.
 
 | Coverage Area | Representative attack focus |
 |---------------|-----------------------------|
@@ -465,12 +465,12 @@ In addition to the 382-module `unified_audit_runner`, UltrafastSecp256k1 ships *
 | Metric | Value | Notes |
 |--------|-------|-------|
 | ECC operations (field/point) | ~2.3 B ops/sec | kernel-only |
-| ECDSA sign | **4.88 M sigs/sec** | RFC 6979, low-S |
-| ECDSA verify | **4.05 M verifies/sec** | Shamir+GLV (+66% vs prev) |
-| Schnorr sign (BIP-340) | **3.66 M sigs/sec** | BIP-340 tagged hash |
-| Schnorr verify (BIP-340) | **5.38 M verifies/sec** | BIP-340+GLV (+91% vs prev) |
-| FROST partial verify | **1.34 M verifies/sec** | ⭐ New — one of the first open-source GPU-accelerated FROST implementations (to our knowledge, as of early 2026) |
-| Batch point compress (J→SEC1) | **97.2 M pts/sec** | New kernel |
+| ECDSA sign | 4.88 M sigs/sec | RFC 6979, low-S [diagnostic — not verified against current build] |
+| ECDSA verify | 4.05 M verifies/sec | Shamir+GLV (+66% vs prev) [diagnostic] |
+| Schnorr sign (BIP-340) | 3.66 M sigs/sec | BIP-340 tagged hash [diagnostic] |
+| Schnorr verify (BIP-340) | 5.38 M verifies/sec | BIP-340+GLV (+91% vs prev) [diagnostic] |
+| FROST partial verify | 1.34 M verifies/sec | GPU-accelerated FROST [diagnostic — not verified against current build] |
+| Batch point compress (J→SEC1) | 97.2 M pts/sec | New kernel [diagnostic] |
 
 ## Architecture
 

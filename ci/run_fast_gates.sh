@@ -43,6 +43,7 @@ SUMMARY=0
 MANDATORY_GATES=(
     "ci/check_exploit_wiring.py"
     "ci/check_security_fix_has_test.py"
+    "ci/check_advisory_skip_returns.sh"  # CI-004: meta-gate must never self-skip
     "ci/check_version_sync.py"
     "ci/build_canonical_data.py"
     "ci/sync_docs_from_canonical.py"
@@ -130,8 +131,7 @@ run "Nonce erase coverage (BIP-327)"           ci/check_nonce_erase_coverage.py
 run "Doc drift (badges, removed files)"        ci/check_doc_drift.py
 run "Bench/doc consistency (banned patterns)" ci/check_bench_doc_consistency.py
 
-# Advisory gates — rc=77 means infrastructure absent (GPU etc.), not a failure
-run_sh "Advisory skip codes"  ci/check_advisory_skip_returns.sh
+# (check_advisory_skip_returns.sh moved to MANDATORY_GATES — CI-004 fix)
 
 if [[ "${FAILED}" -gt 0 ]]; then
     echo ""

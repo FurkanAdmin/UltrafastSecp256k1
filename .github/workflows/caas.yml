@@ -96,6 +96,12 @@ jobs:
           python3 ci/audit_test_quality_scanner.py --json -o caas_scanner.json
           _scanner_exit=$?
           echo "Exit code: $_scanner_exit"
+          # CI-008 fix: if scanner crashed (exit != 0), fail before checking JSON —
+          # a crash could produce partial output with total_findings=0 (false-green).
+          if [ "$_scanner_exit" -ne 0 ]; then
+            echo "::error::audit_test_quality_scanner.py crashed (exit $_scanner_exit) — scanner output may be incomplete"
+            exit 1
+          fi
           python3 - <<'EOF'
           import json, sys
           with open("caas_scanner.json") as f:

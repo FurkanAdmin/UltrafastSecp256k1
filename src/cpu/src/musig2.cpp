@@ -499,10 +499,13 @@ std::array<uint8_t, 64> musig2_partial_sig_agg(
     const std::vector<Scalar>& partial_sigs,
     const MuSig2Session& session) {
 
-    // s = sum(s_i)
+    // s = sum(s_i) — CT: use ct::scalar_add instead of fast::operator+=
+    // fast::Scalar::operator+= has a data-dependent ge(ORDER) branch in its
+    // final modular reduction. Partial sigs contain signer-secret contributions;
+    // use branchless ct::scalar_add throughout the accumulation (CT-002 fix).
     Scalar s = Scalar::zero();
     for (const auto& si : partial_sigs) {
-        s += si;
+        s = secp256k1::ct::scalar_add(s, si);
     }
 
     // Fail-closed: degenerate aggregated signature is a security failure

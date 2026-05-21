@@ -196,17 +196,23 @@ int secp256k1_context_randomize(secp256k1_context *ctx, const unsigned char *see
         // PERF-005: pre-compute r*G here (once) so ContextBlindingScope can use
         // the cached value rather than calling ct::generator_mul on every sign call.
         // PERF-B4: also cache r itself so ContextBlindingScope skips from_bytes().
+        // CT-003: Scalar::from_bytes does a conditional subtraction of n when
+        // the input is in [n, 2^256). This is variable-time and leaks one bit
+        // about the seed (whether seed >= n). Fix: parse_bytes_strict_nonzero
+        // rejects seed >= n and seed == 0 without branching on the value.
+        // Seeds in [n, 2^256) have probability ~2^-128; disabling blinding for
+        // those seeds (ctx->cached_r_G_valid = false) is the safe fallback.
         std::array<uint8_t, 32> seed_arr{};
         std::memcpy(seed_arr.data(), seed32, 32);
-        Scalar r = Scalar::from_bytes(seed_arr);
-        secp256k1::detail::secure_erase(seed_arr.data(), 32);
-        if (!r.is_zero()) {
+        Scalar r;
+        if (Scalar::parse_bytes_strict_nonzero(seed_arr.data(), r)) {
             ctx->cached_r         = r;
             ctx->cached_r_G       = secp256k1::ct::generator_mul(r);
             ctx->cached_r_G_valid = true;
         } else {
             ctx->cached_r_G_valid = false;
         }
+        secp256k1::detail::secure_erase(seed_arr.data(), 32);
     } else {
         std::memset(ctx->blind, 0, 32);
         ctx->blinded = false;

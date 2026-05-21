@@ -624,6 +624,11 @@ int test_regression_schnorr_sign_e_hash_erased_run(); // P1-SEC-002: schnorr_sig
 int test_exploit_musig2_infinity_pubnonce_run();      // P1-SEC-003: pubnonce_parse infinity rejection
 
 // ============================================================================
+// Forward declarations -- 2026-05-21 P2 CT/shim fixes
+// ============================================================================
+int test_regression_p2_ct_shim_fixes_run(); // CT-001/002/003 + SHIM-002/003/004
+
+// ============================================================================
 // Forward declarations -- 2026-05-21 shim security edge cases
 // ============================================================================
 int test_shim_security_edge_cases_run(); // SHIM-003/004/006/008, SEC-003, PERF-003
@@ -1265,6 +1270,10 @@ static const AuditModule ALL_MODULES[] = {
     { "regression_ct_ops", "SEC-002/007/008/010,CT-004/005: FROST lagrange CT, batch weight non-zero, adaptor fail-closed, bip32 strict nonzero, musig2 blinded nonce, ecdsa_sign_verified direct ct:: call", "ct_analysis", test_regression_ct_ops_run, false },
     // === 2026-05-21 SEC-006 ===
     { "regression_bip324_privkey_lifetime", "SEC-006: Bip324Session privkey_ raw-byte window documented; complete_handshake erases after use (full store-Scalar fix tracked SEC-006)", "memory_safety", test_regression_bip324_privkey_lifetime_run, false },
+    // === 2026-05-21 P2: CT-001/002/003 + SHIM-002/003/004 ===
+    // advisory=true: shim-dependent tests skip gracefully when shim not linked;
+    // pure C++ CT tests (musig2_agg, hedged_nonce) always run.
+    { "regression_p2_ct_shim_fixes", "CT-002: musig2_agg ct::scalar_add; CT-001: hedged_nonce fixed-iter; CT-002b: keypair_xonly is_zero_ct; CT-003: context_randomize strict parse; SHIM-002: pubkey_negate off-curve reject; SHIM-003: musig_ec_tweak_add allows tweak=0", "ct_analysis", test_regression_p2_ct_shim_fixes_run, false },
     // === 2026-05-21 P1-SEC-001: FROST frost_sign absent signer ID ===
     // advisory=false: uses internal C++ FROST API only, no GPU/shim dependency.
     { "exploit_frost_absent_signer_id", "P1-SEC-001: frost_sign returns zero partial sig when caller ID absent from nonce_commitments signing set (FSI-1..3)", "exploit_poc", test_exploit_frost_absent_signer_id_run, false },

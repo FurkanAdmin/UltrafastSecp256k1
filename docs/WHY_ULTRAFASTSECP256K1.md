@@ -80,10 +80,10 @@ These top-level differentiators are claim-keyed in the ledger: exploit-audit sur
 | ABI gate | FFI round-trip stability, C ABI regression detection | Full suite |
 | Performance regression | Micro-benchmark gate available for release/manual deep assurance | Manual / release |
 | **Deep differential** | Random round-trip differential tests against reference implementations | **~1,300,000+ per deep run** |
-| **Total (audit runner)** | **unified_audit_runner** across 115 non-exploit modules + 267 exploit-PoC modules (379 total) | **~1,000,000+** |
+| **Total (audit runner)** | **unified_audit_runner** across 116 non-exploit modules + 267 exploit-PoC modules (379 total) | **~1,000,000+** |
 | **Total (exploit PoC tests)** | **267 exploit-PoC modules** across 20+ coverage categories, all in `audit/test_exploit_*.cpp` | **265 modules, 0 failures** |
 
-All 115 non-exploit audit modules across all tested platforms return **AUDIT-READY**. Zero failures.
+All 116 non-exploit audit modules across all tested platforms return **AUDIT-READY**. Zero failures.
 All 267 exploit PoCs modules pass. Zero failures across all 20+ coverage categories.
 
 ### Self-Audit Documents

@@ -49,8 +49,7 @@ jobs:
 
       - name: Human-readable summary
         if: always()
-        continue-on-error: true
-        run: python3 ci/run_code_quality.py
+        run: python3 ci/run_code_quality.py || true
         env:
           NO_COLOR: "1"
 

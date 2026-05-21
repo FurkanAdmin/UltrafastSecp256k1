@@ -463,44 +463,51 @@ Scalar rfc6979_nonce_hedged(const Scalar& private_key,
     std::memcpy(buf129 + 97, aux_rand.data(), 32);
     hmac.compute_three_block(buf129, 129, K);
 
-    // Steps g+h: V = HMAC(K2, V), generate candidates
+    // Steps g+h: V = HMAC(K2, V), generate candidates — fixed 2-iteration CT.
+    // RFC6979-CT-HEDGED: same fix as rfc6979_nonce (CT-001). The early-exit loop
+    // leaks iteration count via timing when k >= n (probability ~2^-128 per iter).
+    // Fix: always run exactly 2 iterations; ct::scalar_select picks first valid k.
+    // Probability of needing iter 2: ~2^-128. Both failing: ~2^-256 (handled by
+    // returning Scalar::zero(), which the caller will detect and retry the operation).
     hmac.init_key32(K);
     hmac.compute_short(V, 32, V);
 
-    // Hoist t/buf33 outside loop: stack alloc once, reuse each iteration.
     std::array<uint8_t, 32> t;
     uint8_t buf33[33];
-    for (int attempt = 0; attempt < 100; ++attempt) {
-        hmac.compute_short(V, 32, V);
-        std::memcpy(t.data(), V, 32);
-        // RFC 6979 §3.2(h): reject k == 0 or k >= n (no implicit mod-n reduction).
-        // Use parse_bytes_strict_nonzero, matching the standard nonce path above.
-        Scalar candidate;
-        if (Scalar::parse_bytes_strict_nonzero(t.data(), candidate)) {
-            secure_erase(t.data(), t.size());
-            secure_erase(V, sizeof(V));
-            secure_erase(K, sizeof(K));
-            secure_erase(x_bytes.data(), x_bytes.size());
-            secure_erase(buf129, sizeof(buf129));
-            secure_erase(&hmac, sizeof(hmac));
-            return candidate;
-        }
-        std::memcpy(buf33, V, 32);
-        buf33[32] = 0x00;
-        hmac.compute_short(buf33, 33, K);
-        secure_erase(buf33, sizeof(buf33));
-        hmac.init_key32(K);
-        hmac.compute_short(V, 32, V);
-    }
+    Scalar cand1{};
+
+    // Iteration 1
+    hmac.compute_short(V, 32, V);
+    std::memcpy(t.data(), V, 32);
+    bool const ok1 = Scalar::parse_bytes_strict_nonzero(t.data(), cand1);
+
+    // Advance HMAC state unconditionally (CT: must execute regardless of ok1)
+    std::memcpy(buf33, V, 32);
+    buf33[32] = 0x00;
+    hmac.compute_short(buf33, 33, K);
+    secure_erase(buf33, sizeof(buf33));
+    hmac.init_key32(K);
+    hmac.compute_short(V, 32, V);
+
+    // Iteration 2
+    Scalar cand2{};
+    hmac.compute_short(V, 32, V);
+    std::memcpy(t.data(), V, 32);
+    (void)Scalar::parse_bytes_strict_nonzero(t.data(), cand2);
+
+    // CT select: mask = ~0ULL if ok1 (use cand1), else 0ULL (use cand2)
+    std::uint64_t const mask1 = static_cast<std::uint64_t>(
+        -static_cast<std::int64_t>(static_cast<int>(ok1)));
+    Scalar const result = ct::scalar_select(cand1, cand2, mask1);
+
     secure_erase(t.data(), t.size());
     secure_erase(buf33, sizeof(buf33));
-
     secure_erase(V, sizeof(V));
     secure_erase(K, sizeof(K));
     secure_erase(x_bytes.data(), x_bytes.size());
     secure_erase(buf129, sizeof(buf129));
     secure_erase(&hmac, sizeof(hmac));
-    return Scalar::zero();
+    return result;
 }
 
 // -- ECDSA Sign (FAST PATH — NOT FOR PRODUCTION SIGNING WITH REAL PRIVATE KEYS) --------

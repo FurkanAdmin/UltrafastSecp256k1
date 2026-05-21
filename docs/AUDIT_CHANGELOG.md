@@ -1,5 +1,22 @@
 # Audit Changelog
 
+## 2026-05-21 — Fix: P2 CT/shim/CI/doc fixes (CT-001/002/003, SHIM-002/003/004, CI-004/008, PR/packaging)
+
+- **src/cpu/src/musig2.cpp `musig2_partial_sig_agg` (CT-002):** Replaced `s += si` (VT `fast::Scalar::operator+=`) with `s = secp256k1::ct::scalar_add(s, si)`. Partial sigs contain signer-secret contributions; `operator+=` has a data-dependent ge(ORDER) branch.
+- **src/cpu/src/ecdsa.cpp `rfc6979_nonce_hedged` (CT-001):** Replaced VT early-exit loop (100 iterations, data-dependent termination) with the same fixed 2-iteration + `ct::scalar_select` pattern already used in `rfc6979_nonce`. Probability of needing iter 2 is ~2^-128; both failing ~2^-256.
+- **compat/libsecp256k1_shim/src/shim_extrakeys.cpp (CT-002b):** `new_sk.is_zero()` → `new_sk.is_zero_ct()` in `secp256k1_keypair_xonly_tweak_add`. `fast::Scalar::is_zero()` has a data-dependent early-exit on a secret key.
+- **compat/libsecp256k1_shim/src/shim_context.cpp (CT-003):** `Scalar::from_bytes(seed_arr)` → `Scalar::parse_bytes_strict_nonzero(seed_arr.data(), r)` in `secp256k1_context_randomize`. `from_bytes` does a VT conditional subtraction of n when seed >= n (~2^-128 probability). Seeds in [n, 2^256) now disable blinding rather than silently reducing.
+- **compat/libsecp256k1_shim/src/shim_pubkey.cpp `pubkey_data_to_point` (SHIM-002/004):** Added y²=x³+7 curve membership check. Off-curve input (hostile caller bypassing `ec_pubkey_parse`) now returns `Point::infinity()`. `ec_pubkey_negate` updated to check `is_infinity()` before negating. Fixes both SHIM-002 (`ec_pubkey_negate`) and SHIM-004 (`ec_pubkey_combine`).
+- **compat/libsecp256k1_shim/src/shim_musig.cpp `secp256k1_musig_pubkey_ec_tweak_add` (SHIM-003):** `parse_bytes_strict_nonzero` → `parse_bytes_strict` on tweak32. Zero tweak is valid per libsecp256k1 semantics (result = Q unchanged); prior fix incorrectly rejected it.
+- **.github/workflows/caas.yml (CI-008):** Added crash guard: if `audit_test_quality_scanner.py` exits non-zero, fail immediately before reading the JSON output. Prevents a scanner crash with partial `total_findings=0` from producing a false-green.
+- **.github/workflows/code-quality.yml (P2-TEST-004):** Replaced `continue-on-error: true` with `|| true` on the summary step. Broken reporting script now produces a visible failure in step log rather than silently succeeding.
+- **ci/run_fast_gates.sh (CI-004):** `check_advisory_skip_returns.sh` moved from `run_sh` (advisory) to `MANDATORY_GATES`. If the meta-gate returns 77, it now blocks the CI gate instead of silently skipping.
+- **docs/AUDIT_REPORT.md:** Added prominent `⚠ HISTORICAL BASELINE` banner at the top — makes clear that 641,194 checks / cc20253 / Clang 19 are frozen history, not current state.
+- **README.md GPU table:** Removed `**bold**` emphasis from GPU throughput numbers; added `[diagnostic — not verified against current build]` label on all GPU rows. Removed "one of the first open-source GPU-accelerated FROST" superlative.
+- **packaging/nuget/UltrafastSecp256k1.Native.nuspec:** "45 exported C functions" → "41 stable C ABI functions" (matches docs/ABI_VERSIONING.md §5).
+- **CITATION.cff:** `date-released: 2026-05-20` → `2026-05-21`.
+- **audit/test_regression_p2_ct_shim_fixes.cpp (NEW):** 7 sub-tests covering CT-001/002/002b/003 + SHIM-002/003 correctness. Wired as `ct_analysis`, `advisory=false`.
+
 ## 2026-05-21 — Fix: P1 security fixes (SEC-001/002/003), CI hardening (CI-001/002), test quality (TEST-001/002), PR narrative (PR-002/003)
 
 - **src/cpu/src/frost.cpp `frost_sign` (P1-SEC-001):** Added explicit check that `key_pkg.id` is present in `nonce_commitments` before computing the Lagrange coefficient. Without this check, `frost_lagrange_coefficient_from_commitments` returns `Scalar::zero()` for an absent signer, silently producing `z_i = d + rho*ei` — the signing share is not included, and the partial sig is structurally wrong while leaking nonce material. The ABI layer (`ufsecp_frost_sign`) already had this check (line 744-760); the internal C++ API now has it too for defense-in-depth.

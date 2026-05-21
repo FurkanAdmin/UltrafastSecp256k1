@@ -283,7 +283,9 @@ int secp256k1_keypair_xonly_tweak_add(
     if (!Scalar::parse_bytes_strict(tweak32, t)) return 0;
 
     auto new_sk = secp256k1::ct::scalar_add(sk, t);
-    if (new_sk.is_zero()) return 0;
+    // CT-002: is_zero_ct() reads all limbs unconditionally before comparing.
+    // is_zero() (fast::) has a data-dependent early-exit; new_sk is a secret.
+    if (new_sk.is_zero_ct()) return 0;
 
     auto P = secp256k1::ct::generator_mul(new_sk);   // CT: Rule 12 — new_sk is secret
     if (P.is_infinity()) return 0;

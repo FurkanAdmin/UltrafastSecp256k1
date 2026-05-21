@@ -45,6 +45,12 @@ static Point pubkey_data_to_point(const unsigned char data[64]) {
     std::memcpy(yb.data(), data + 32, 32);
     auto x = FieldElement::from_bytes(xb);
     auto y = FieldElement::from_bytes(yb);
+    // SHIM-002/SHIM-004: validate curve membership y²=x³+7 before use.
+    // A hostile caller could write arbitrary bytes into secp256k1_pubkey.data,
+    // bypassing secp256k1_ec_pubkey_parse. Return infinity on off-curve input;
+    // all callers (negate, tweak_add, tweak_mul, combine) check is_infinity().
+    auto b7 = FieldElement::from_uint64(7);
+    if (y * y != x * x * x + b7) return Point::infinity();
     return Point::from_affine(x, y);
 }
 
@@ -188,6 +194,7 @@ int secp256k1_ec_pubkey_negate(
     SHIM_REQUIRE_CTX(ctx);
     if (!pubkey) return 0;
     auto P = pubkey_data_to_point(pubkey->data);
+    if (P.is_infinity()) return 0;  // SHIM-002: off-curve input rejected
     auto neg = P.negate();
     point_to_pubkey_data(neg, pubkey->data);
     return 1;

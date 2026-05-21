@@ -3875,6 +3875,8 @@ target_sources(unified_audit_runner PRIVATE
     test_regression_musig2_abi_signer_index.cpp
     # P1-SEC-002: schnorr_sign e_hash erasure (no special dependency)
     test_regression_schnorr_sign_e_hash_erased.cpp
+    # P2: CT-001/002/003 + SHIM-002/003/004 fixes
+    test_regression_p2_ct_shim_fixes.cpp
     # P1-SEC-001: FROST frost_sign absent signer ID (real impl when FROST built)
     $<$<BOOL:${SECP256K1_BUILD_FROST}>:test_exploit_frost_absent_signer_id.cpp>
     # Feature module stubs: when a module is OFF, these provide advisory-skip
