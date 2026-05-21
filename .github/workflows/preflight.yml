@@ -101,13 +101,13 @@ jobs:
       # -----------------------------------------------------------------------
 
       - name: Install build dependencies (needed by CAAS P0 harnesses)
-        run: sudo apt-get install -y --no-install-recommends ninja-build g++-13
+        run: sudo apt-get install -y --no-install-recommends ninja-build g++-14
 
       - name: Build shared library (needed by CAAS P0 harnesses)
         run: |
           cmake -S . -B build-audit -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_CXX_COMPILER=g++-13 \
+            -DCMAKE_CXX_COMPILER=g++-14 \
             -DBUILD_TESTING=OFF \
             -DSECP256K1_BUILD_PROTOCOL_TESTS=OFF \
             -DSECP256K1_BUILD_FUZZ_TESTS=OFF
@@ -136,7 +136,7 @@ jobs:
         run: |
           cmake -S . -B build-runner -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_CXX_COMPILER=g++-13 \
+            -DCMAKE_CXX_COMPILER=g++-14 \
             -DBUILD_TESTING=ON \
             -DSECP256K1_BUILD_FUZZ_TESTS=OFF \
             -DSECP256K1_BUILD_PROTOCOL_TESTS=OFF

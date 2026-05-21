@@ -1,5 +1,33 @@
 # Audit Changelog
 
+## 2026-05-21 — Fix: CI/audit false-green + hertzbleed semantics + compiler + SHIM-001 callback (TASK-010a/b/c, TASK-011)
+
+- **audit/test_exploit_ecdsa_fast_path_isolation.cpp (TASK-010a):** Added `g_skip` counter incremented in every source-file-not-found skip path. When all 10 sub-checks are skipped (`g_skip >= 10` and no pass/fail), returns `ADVISORY_SKIP_CODE` (77) instead of 0. Previously a build directory with no source files in scope would return 0 = false-green PASS for a mandatory non-advisory module. Added `#ifndef ADVISORY_SKIP_CODE` guard (header-safe, no audit_check.hpp dependency).
+- **audit/test_exploit_hertzbleed_dvfs_timing.cpp (TASK-010b):** Corrected ratio threshold semantics. `ratio >= 3.0` now returns 1 (`advisory_failed` — real Hertzbleed-style leakage concern, triggers AUDIT-READY-DEGRADED). `2.0 <= ratio < 3.0` returns `ADVISORY_SKIP_CODE` (CI noise band). Previously `ratio >= 2.0` unconditionally returned `ADVISORY_SKIP_CODE`, silencing a genuine >=3.0 leakage signal. Final return on CHECK failure changed from `ADVISORY_SKIP_CODE` to 1.
+- **.github/workflows/preflight.yml (TASK-010c):** Changed `g++-13` → `g++-14` in install step and both cmake `-DCMAKE_CXX_COMPILER` flags. Matches `caas.yml` and `gate.yml` compiler; ensures preflight evidence is built with the same compiler as canonical documentation.
+- **compat/libsecp256k1_shim/src/shim_internal.hpp `ctx_can_sign` (TASK-011):** VERIFY-only context now fires `secp256k1_shim_call_illegal_cb(ctx, "sign: context not initialized for signing")` before returning false. Previously returned false silently (SHIM-001). Matches upstream libsecp256k1 behaviour: illegal callback fires, then function returns 0.
+- **docs/SHIM_KNOWN_DIVERGENCES.md (TASK-011):** SHIM-001 entry updated to "Fixed 2026-05-21"; SHIM-MUSIG-CTX-001 entry corrected — `musig_pubkey_ec_tweak_add` and `musig_pubkey_xonly_tweak_add` use `/*ctx*/` (discarded), not `SHIM_REQUIRE_CTX`. Previous entry was factually wrong about which guard is used.
+
+## 2026-05-21 — Fix: documentation correctness + CI gate file-existence check (TASK-002/006)
+
+- **docs/ABI_VERSIONING.md §3 (TASK-006a):** Corrected `UFSECP_ABI_VERSION = 1` to `= 4` (equals `PROJECT_VERSION_MAJOR`; increments on every breaking release). Added note that CMake propagates this automatically.
+- **docs/SHIM_KNOWN_DIVERGENCES.md secp256k1_context_randomize (TASK-006b):** Fixed factually wrong entry claiming shim uses `Scalar::from_bytes` (mod-n reduction). Actual code uses `Scalar::parse_bytes_strict_nonzero`; seeds >= n or == 0 disable blinding rather than reducing. Updated behavior description, reason, and test reference.
+- **README.md (TASK-006c):** Removed hardcoded SHA `48e7c02f` — replaced with pointer to `docs/BITCOIN_CORE_BENCH_RESULTS.json` field `"git_commit"`. Changed "54 GitHub Actions workflows" → "50+ GitHub Actions workflows".
+- **docs/BITCOIN_CORE_PR_DESCRIPTION.md + docs/BITCOIN_CORE_BACKEND_EVIDENCE.md (TASK-002a):** Updated artifact refs from `bench_unified_2026-05-11_gcc14_x86-64.json` to `bench_unified_2026-05-21_gcc14_x86-64.json`.
+- **ci/check_bench_doc_consistency.py (TASK-002b):** Updated `REQUIRED_REFS` date pattern from `2026-05-1[16]` to `2026-05-\d{2}` to accept `-21-` dates. Added file-existence verification in `check_required_refs`: referenced `bench_unified_*.json` filenames are checked for physical existence at `docs/<filename>`; missing artifact emits `ARTIFACT NOT FOUND` violation.
+
+## 2026-05-21 — Fix: TASK-005 xonly_to_point curve check; TASK-007a taproot_tweak_privkey tweak-scalar erasure; TASK-007b secp256k1_ec_seckey_negate CT
+
+- **shim_extrakeys.cpp `xonly_to_point` (TASK-005 / SHIM-CURVE-CHECK-XONLY):** Added y²=x³+7 curve membership check. A hostile caller who writes arbitrary bytes into `secp256k1_xonly_pubkey.data[32..63]` (bypassing parse) could previously supply an off-curve Y coordinate to `secp256k1_xonly_pubkey_tweak_add` and `secp256k1_xonly_pubkey_tweak_add_check`. Off-curve input now returns `Point::infinity()`; both callers already check `is_infinity()` → return 0.
+- **src/cpu/src/taproot.cpp `taproot_tweak_privkey` (TASK-007a / TAPROOT-TWEAK-ERASE):** Added `secure_erase(&t, sizeof(t))` after `ct::scalar_add(d, t)`. The tweak scalar `t = Scalar::from_bytes(H_TapTweak(...))` participates in private-key arithmetic and was left on the stack without erasure.
+- **shim_seckey.cpp `secp256k1_ec_seckey_negate` (TASK-007b / CT-SECKEY-NEGATE):** Replaced `k.negate()` (variable-time; `fast::Scalar::negate()` has a data-dependent is_zero branch) with `secp256k1::ct::scalar_cneg(k, ~std::uint64_t(0))` (always-negate, branchless on secret key value).
+
+## 2026-05-21 — Fix: review v8 CT/security fixes (SEC-003 varlen sign_custom, SEC-001 ct_sign erasure, TASK-005 xonly_to_point, TASK-004 nonce loops, TASK-006 docs, TASK-007 erasure, TASK-011 callback, CI gates, shim perf)
+
+- **shim_schnorr.cpp (SEC-003 varlen):** `generator_mul` → `generator_mul_blinded`; `k_prime.is_zero()` → `is_zero_ct()`; `s.is_zero()` → `is_zero_ct()`; added full erasure of e_hash, e, nonce_input, rand_hash, challenge_input, t_hash in varlen sign_custom path.
+- **ct_sign.cpp (SEC-001):** Added `secure_erase(e_hash)` and `secure_erase(&e)` to schnorr_sign erase list (parallels P1-SEC-002 fix in secp256k1::schnorr_sign).
+- **test_regression_schnorr_varlen_ct_fixes.cpp (NEW):** VCS-1..6: varlen sign_custom CT fixes correctness guard; advisory=true (shim-dependent).
+
 ## 2026-05-21 — Fix: remaining P2+P3 (SEC-002/003, TEST-002/003, CI-005, CLAIM-002/003, P3 doc/CI)
 
 - **shim_musig.cpp (P2-SEC-002):** `secp256k1_musig_nonce_gen` NULL seckey → Scalar::zero() (not session_id32 as HMAC key).

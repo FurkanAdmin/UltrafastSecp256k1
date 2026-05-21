@@ -162,14 +162,20 @@ For the complete compatibility test matrix see `compat/libsecp256k1_shim/tests/`
 ## secp256k1_context_randomize — seed >= n
 
 - **Upstream behavior:** Seeds are treated as opaque bytes for blinding; no range check.
-- **Shim behavior:** Uses `Scalar::from_bytes` (mod-n reduction) on the seed. Seeds with
-  value >= n are silently reduced, so the cached blinding scalar does not correspond to
-  the raw seed bytes.
-- **Reason:** The shim's context blinding uses the seed as a scalar for `r*G` computation;
-  this requires it to be in [0, n-1]. Silent reduction is safe here because the blinding
-  scalar is never derived from or compared against the seed.
-- **Impact:** None for callers using the recommended 32 bytes of fresh randomness from OS.
-- **Test:** Not testable as a divergence — upstream behavior on seeds >= n is unspecified.
+  Upstream libsecp256k1 applies the seed directly as a blinding scalar (with mod-n reduction
+  internally), so seeds >= n are accepted and result in a reduced blinding value.
+- **Shim behavior:** Uses `Scalar::parse_bytes_strict_nonzero` on the seed. Seeds >= n or == 0
+  disable blinding (the blinding scalar is left at its current value) rather than silently
+  reducing mod-n. No conditional subtraction of n is applied to the seed.
+- **Reason:** Rule 11 (CLAUDE.md) requires `parse_bytes_strict_nonzero` for any private-key
+  or secret-scalar input. Seeds >= n are astronomically rare with fresh OS randomness;
+  disabling blinding on such seeds is safe (the call is advisory in libsecp256k1 too — a
+  failed randomization leaves the context operational, just without blinding).
+- **Impact:** A caller passing a seed value in [n, 2^256) will not get a blinding scalar
+  derived from that seed — blinding is left disabled. Callers using the recommended 32 bytes
+  of fresh randomness from the OS are effectively never affected (probability ~2^-128).
+- **Test:** `audit/test_regression_p2_ct_shim_fixes.cpp` covers the `parse_bytes_strict_nonzero`
+  path in `secp256k1_context_randomize` (CT-003).
 
 ---
 
@@ -366,14 +372,16 @@ For the complete compatibility test matrix see `compat/libsecp256k1_shim/tests/`
 
 - **Upstream behavior:** libsecp256k1 fires the illegal callback (default: abort) when a
   VERIFY-only context is passed to a sign function, then returns 0.
-- **Shim behavior:** Returns 0 silently without firing the illegal callback. `ctx_can_sign()`
-  returns false and the function returns 0 immediately.
-- **Reason:** Ultra's context model does not replicate libsecp's callback architecture exactly.
-  Fail-closed (returns error) is maintained; callback notification is absent.
-- **Impact:** Fuzzing harnesses that count illegal-callback invocations will see count=0 from
-  the Ultra shim when context-misuse is tested. Callers relying on callback for error detection
-  will miss the signal. Callers that check only the return value are unaffected.
-- **Test:** Differential test -- pass VERIFY-only ctx to secp256k1_ecdsa_sign, check callback.
+- **Shim behavior:** **Fixed 2026-05-21 (SHIM-001).** `ctx_can_sign()` now fires
+  `secp256k1_shim_call_illegal_cb(ctx, "sign: context not initialized for signing")` before
+  returning false when a VERIFY-only context is detected. The calling sign function then returns 0.
+  This matches libsecp256k1 behaviour exactly: callback fires, then returns error.
+- **Previous shim behavior:** Returned 0 silently without firing the illegal callback.
+- **Reason:** Matches upstream libsecp256k1 contract. Fuzzing harnesses and callers relying
+  on callback invocation for error detection now receive the callback signal correctly.
+- **Impact:** None for correct callers. Callers using a VERIFY-only context with sign functions
+  now trigger the callback (default: abort), matching upstream behaviour.
+- **Test:** Differential test -- pass VERIFY-only ctx to secp256k1_ecdsa_sign, verify callback fires.
 
 ---
 
@@ -574,17 +582,22 @@ For the complete compatibility test matrix see `compat/libsecp256k1_shim/tests/`
 
 ---
 
-## secp256k1_musig_pubkey_ec_tweak_add / secp256k1_musig_pubkey_xonly_tweak_add — NULL ctx silently accepted (SHIM-MUSIG-CTX-001)
+## secp256k1_musig_pubkey_ec_tweak_add / secp256k1_musig_pubkey_xonly_tweak_add — ctx silently discarded (SHIM-MUSIG-CTX-001)
 
-- **Upstream behavior:** NULL ctx fires the illegal callback (default: abort).
+- **Upstream behavior:** NULL ctx fires the illegal callback (default: abort). Non-NULL ctx is
+  validated for context flags before proceeding.
 - **Shim behavior:** Both `secp256k1_musig_pubkey_ec_tweak_add` and
-  `secp256k1_musig_pubkey_xonly_tweak_add` use `SHIM_REQUIRE_CTX(ctx)` which fires the
-  illegal callback on NULL ctx. However, if the callback does not abort (custom callback),
-  the function may proceed with a NULL ctx — the `ctx_can_sign()` call would need a
-  non-NULL ctx for the context flag check.
-- **Reason:** `SHIM_REQUIRE_CTX` is the standard pattern used across the shim for context
-  validation. A non-aborting custom callback is an unusual configuration.
-- **Impact:** Standard usage (default callback = abort on NULL ctx) is unaffected.
-  Callers with a non-aborting custom callback may observe different behavior from upstream
-  if NULL ctx is passed.
+  `secp256k1_musig_pubkey_xonly_tweak_add` declare the ctx parameter as `/*ctx*/` — it is
+  **completely discarded** and never inspected. NULL ctx will NOT fire the illegal callback;
+  it silently proceeds to the `keyagg_cache` / `tweak32` NULL check instead. SHIM_REQUIRE_CTX
+  is NOT used by these functions (contrary to an earlier version of this document).
+- **Reason:** These operations act purely on the `secp256k1_musig_keyagg_cache` state and do
+  not require context flags (no signing, no blinding). The ctx parameter exists only for
+  API symmetry with upstream. The discarding matches the upstream libsecp256k1-zkp pattern
+  for these specific functions (see also `secp256k1_musig_nonce_agg` above).
+- **Impact:** A caller passing NULL ctx will not get a callback/abort. The only guard is the
+  `!keyagg_cache || !tweak32` NULL check. Callers that rely on NULL-ctx abort from these two
+  functions (e.g. fuzzing harnesses) will see silent-return-0 instead.
+- **Open:** Consider adding explicit NULL-ctx guard firing the illegal callback for parity.
+  Tracked as SHIM-MUSIG-CTX-001 (open).
 - **Test:** Covered indirectly by context-flag tests in `test_regression_shim_security_v7_run`.

@@ -43,8 +43,14 @@ inline bool ctx_can_sign(const secp256k1_context* ctx) noexcept {
     unsigned int f = ctx_flags(ctx);
     if (!(f & SECP256K1_FLAGS_TYPE_CONTEXT)) return false;
     // Accept SECP256K1_FLAGS_BIT_CONTEXT_SIGN OR CONTEXT_NONE (libsecp v0.6+ compat)
-    return (f & SECP256K1_FLAGS_BIT_CONTEXT_SIGN) ||
-           ((f & ~SECP256K1_FLAGS_TYPE_MASK) == 0);
+    bool can = (f & SECP256K1_FLAGS_BIT_CONTEXT_SIGN) ||
+               ((f & ~SECP256K1_FLAGS_TYPE_MASK) == 0);
+    if (!can) {
+        // VERIFY-only context passed to a sign function: fire the illegal callback
+        // to match libsecp256k1 behaviour (abort by default). Fixes SHIM-001.
+        secp256k1_shim_call_illegal_cb(ctx, "sign: context not initialized for signing");
+    }
+    return can;
 }
 
 inline bool ctx_can_verify(const secp256k1_context* ctx) noexcept {
