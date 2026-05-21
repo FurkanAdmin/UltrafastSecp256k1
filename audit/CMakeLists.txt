@@ -3193,6 +3193,46 @@ add_test(NAME regression_ct_blinding_nonce_path
 set_tests_properties(regression_ct_blinding_nonce_path PROPERTIES
     TIMEOUT 60 LABELS "audit;regression;ct;signing;blinding;dpa")
 
+# -- P1-SEC-001: FROST frost_sign absent signer ID (FSI-1..3) — 2026-05-21 --
+if(SECP256K1_BUILD_FROST)
+add_executable(test_exploit_frost_absent_signer_id_standalone
+    test_exploit_frost_absent_signer_id.cpp)
+audit_target_defaults(test_exploit_frost_absent_signer_id_standalone)
+target_compile_definitions(test_exploit_frost_absent_signer_id_standalone PRIVATE STANDALONE_TEST)
+add_test(NAME exploit_frost_absent_signer_id
+    COMMAND test_exploit_frost_absent_signer_id_standalone)
+set_tests_properties(exploit_frost_absent_signer_id PROPERTIES
+    TIMEOUT 30 LABELS "audit;exploit;frost;signing;signer_id;p1_sec_001")
+endif() # SECP256K1_BUILD_FROST
+
+# -- P1-SEC-002: schnorr_sign e_hash + e erasure fix (SHE-1..4) — 2026-05-21 -
+add_executable(test_regression_schnorr_sign_e_hash_erased_standalone
+    test_regression_schnorr_sign_e_hash_erased.cpp)
+audit_target_defaults(test_regression_schnorr_sign_e_hash_erased_standalone)
+target_compile_definitions(test_regression_schnorr_sign_e_hash_erased_standalone PRIVATE STANDALONE_TEST)
+add_test(NAME regression_schnorr_sign_e_hash_erased
+    COMMAND test_regression_schnorr_sign_e_hash_erased_standalone)
+set_tests_properties(regression_schnorr_sign_e_hash_erased PROPERTIES
+    TIMEOUT 30 LABELS "audit;regression;schnorr;ct;erasure;p1_sec_002")
+
+# -- P1-SEC-003: MuSig2 pubnonce_parse infinity/invalid rejection (MIP-1..6) — 2026-05-21 -
+if(TARGET secp256k1_shim OR TARGET ufsecp_static)
+add_executable(test_exploit_musig2_infinity_pubnonce_standalone
+    test_exploit_musig2_infinity_pubnonce.cpp)
+audit_target_defaults(test_exploit_musig2_infinity_pubnonce_standalone)
+if(TARGET secp256k1_shim)
+    target_link_libraries(test_exploit_musig2_infinity_pubnonce_standalone PRIVATE secp256k1_shim)
+    target_compile_definitions(test_exploit_musig2_infinity_pubnonce_standalone PRIVATE
+        STANDALONE_TEST SECP256K1_BUILD_COMPAT_SHIM)
+else()
+    target_compile_definitions(test_exploit_musig2_infinity_pubnonce_standalone PRIVATE STANDALONE_TEST)
+endif()
+add_test(NAME exploit_musig2_infinity_pubnonce
+    COMMAND test_exploit_musig2_infinity_pubnonce_standalone)
+set_tests_properties(exploit_musig2_infinity_pubnonce PROPERTIES
+    TIMEOUT 30 LABELS "audit;exploit;musig2;shim;infinity;pubnonce;p1_sec_003")
+endif()
+
 # ===========================================================================
 # Cross-library differential test (vs bitcoin-core/libsecp256k1)
 # ===========================================================================

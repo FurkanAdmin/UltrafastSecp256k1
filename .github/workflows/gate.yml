@@ -62,10 +62,10 @@ jobs:
           if [ "$rc" -gt 1 ]; then
             exit "$rc"
           fi
-          # M-2 fix: if ci_gate_detect.py crashed (exit 1 = Python exception OR
-          # "changes detected"), verify that the expected output keys were actually
-          # written to GITHUB_OUTPUT. A crash producing partial output can leave
-          # run_caas=false, silently skipping security gates on security-critical PRs.
+          # M-2 / P1-CI-002 fix: verify completion sentinel.
+          # ci_gate_detect.py writes gate_detect_complete=true as its LAST line.
+          # If it crashed mid-way, the sentinel is absent even if run_caas=false
+          # was already written — detect this and force run_caas=true (fail-safe).
           for key in gate run_caas; do
             if ! grep -q "^${key}=" "$GITHUB_OUTPUT" 2>/dev/null; then
               echo "::error::ci_gate_detect.py did not write '${key}' to GITHUB_OUTPUT" \
@@ -73,6 +73,10 @@ jobs:
               exit 2
             fi
           done
+          if ! grep -q "^gate_detect_complete=true" "$GITHUB_OUTPUT" 2>/dev/null; then
+            echo "::warning::ci_gate_detect.py crashed before writing completion sentinel — forcing run_caas=true"
+            echo "run_caas=true" >> "$GITHUB_OUTPUT"
+          fi
           echo "## Block 0 / Detect Impact" >> "$GITHUB_STEP_SUMMARY"
           echo '```json' >> "$GITHUB_STEP_SUMMARY"
           cat ci-impact.json >> "$GITHUB_STEP_SUMMARY"

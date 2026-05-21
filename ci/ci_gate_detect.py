@@ -326,6 +326,10 @@ def write_github_outputs(path: str, result: dict) -> None:
     with open(path, "a", encoding="utf-8") as fh:
         for key, value in outputs.items():
             fh.write(f"{key}={value}\n")
+        # P1-CI-002: sentinel written LAST so gate.yml can verify completion.
+        # If ci_gate_detect.py crashes before this line, the sentinel is absent
+        # and gate.yml treats it as run_caas=true (fail-safe: always run CAAS).
+        fh.write("gate_detect_complete=true\n")
 
 
 def main() -> int:

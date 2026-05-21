@@ -493,9 +493,26 @@ int secp256k1_musig_pubnonce_parse(
     if (!nonce || !in66) return 0;
     // SHIM-007: decompress once, cache affine coords. Later users call
     // pn_unpack_points() to get Points in O(1) without re-decompressing.
+    // SEC-003: decompress_to_xy already validates curve membership (y²=x³+7
+    // check) and rejects non-02/03 prefixes, so infinity cannot be stored.
+    // We add an explicit is_infinity() guard for defense-in-depth and to
+    // match upstream libsecp256k1 behaviour which rejects infinity pubnonces.
     uint8_t x1[32], y1[32], x2[32], y2[32];
     if (!decompress_to_xy(in66,      x1, y1)) return 0;
     if (!decompress_to_xy(in66 + 33, x2, y2)) return 0;
+    // Reconstruct points temporarily to verify neither is infinity.
+    {
+        using secp256k1::fast::FieldElement;
+        using secp256k1::fast::Point;
+        FieldElement fx1, fy1, fx2, fy2;
+        if (!FieldElement::parse_bytes_strict(x1, fx1)) return 0;
+        if (!FieldElement::parse_bytes_strict(y1, fy1)) return 0;
+        if (!FieldElement::parse_bytes_strict(x2, fx2)) return 0;
+        if (!FieldElement::parse_bytes_strict(y2, fy2)) return 0;
+        Point const R1 = Point::from_affine(fx1, fy1);
+        Point const R2 = Point::from_affine(fx2, fy2);
+        if (R1.is_infinity() || R2.is_infinity()) return 0;
+    }
     pn_pack_affine(nonce, x1, y1, x2, y2);
     return 1;
 }

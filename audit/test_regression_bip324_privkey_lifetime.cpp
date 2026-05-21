@@ -158,19 +158,34 @@ static void test_pkl5_deterministic_session_ids() {
 
 // ---------------------------------------------------------------------------
 // PKL-6: Destructor is safe after complete_handshake zeroed privkey_
+//        Also verifies that the handshake actually ran (privkey_ was consumed).
 // ---------------------------------------------------------------------------
 static void test_pkl6_destructor_safe_after_handshake() {
     std::printf("  [PKL-6] destructor is safe after complete_handshake erased privkey_\n");
 
+    bool ini_established = false;
+    bool res_established = false;
+    bool h1_ok = false, h2_ok = false;
+    std::array<uint8_t, 32> ini_session_id{};
     {
         secp256k1::Bip324Session ini(true,  kInitiatorPriv);
         secp256k1::Bip324Session res(false, kResponderPriv);
-        ini.complete_handshake(res.our_ellswift_encoding().data());
-        res.complete_handshake(ini.our_ellswift_encoding().data());
+        h1_ok = ini.complete_handshake(res.our_ellswift_encoding().data());
+        h2_ok = res.complete_handshake(ini.our_ellswift_encoding().data());
+        ini_established = ini.is_established();
+        res_established = res.is_established();
+        ini_session_id  = ini.session_id();
         // Sessions go out of scope here — destructor calls secure_erase(privkey_)
-        // on an already-zeroed buffer, which must not crash or invoke UB.
+        // on a buffer that complete_handshake already erased. Must not crash or UB.
     }
-    CHECK(true, "PKL-6: destructor after complete_handshake: no crash");
+    CHECK(h1_ok, "PKL-6: initiator complete_handshake returned true");
+    CHECK(h2_ok, "PKL-6: responder complete_handshake returned true");
+    CHECK(ini_established, "PKL-6: initiator is_established() == true before destruction");
+    CHECK(res_established, "PKL-6: responder is_established() == true before destruction");
+    // Non-zero session ID proves ECDH ran (privkey_ was consumed, not trivially zeroed).
+    bool session_id_nonzero = false;
+    for (uint8_t b : ini_session_id) { if (b) { session_id_nonzero = true; break; } }
+    CHECK(session_id_nonzero, "PKL-6: session ID is non-zero (ECDH ran, privkey_ was consumed)");
 }
 
 // ---------------------------------------------------------------------------

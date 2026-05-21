@@ -452,6 +452,10 @@ SchnorrSignature schnorr_sign(const SchnorrKeypair& kp,
     detail::secure_erase(nonce_input, sizeof(nonce_input));
     detail::secure_erase(rand_hash.data(), rand_hash.size());
     detail::secure_erase(challenge_input, sizeof(challenge_input));
+    // SEC-009: erase e_hash and e — e_hash encodes R.x (secret nonce derivation);
+    // e (Scalar) is derived from e_hash. Both must be erased like other secret intermediates.
+    detail::secure_erase(e_hash.data(), e_hash.size());
+    detail::secure_erase(&e, sizeof(e));
     detail::secure_erase(&k_prime, sizeof(k_prime));
     detail::secure_erase(&k, sizeof(k));
 

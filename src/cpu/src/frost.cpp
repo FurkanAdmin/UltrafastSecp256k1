@@ -485,6 +485,22 @@ frost_sign(const FrostKeyPackage& key_pkg,
         return FrostPartialSig{key_pkg.id, Scalar::zero()};
     }
 
+    // P1-SEC-001: verify caller's own ID is in the signing set.
+    // Without this check, frost_lagrange_coefficient_from_commitments returns 0
+    // for an absent signer, silently producing z_i = d + rho*e (signing share
+    // omitted) — a structurally wrong partial sig that reveals nonce material.
+    {
+        bool self_found = false;
+        for (const auto& nc : nonce_commitments) {
+            if (nc.id == key_pkg.id) { self_found = true; break; }
+        }
+        if (!self_found) {
+            secure_erase(&nonce.hiding_nonce, sizeof(nonce.hiding_nonce));
+            secure_erase(&nonce.binding_nonce, sizeof(nonce.binding_nonce));
+            return FrostPartialSig{key_pkg.id, Scalar::zero()};
+        }
+    }
+
     // My binding factor while computing group commitment in one pass.
     Scalar my_binding = Scalar::zero();
     Point const R = compute_group_commitment_inline_binding(

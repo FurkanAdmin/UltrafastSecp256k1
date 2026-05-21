@@ -617,6 +617,13 @@ int test_regression_adaptor_degenerate_v7_run();          // 2026-05-13 v7: T-09
 int test_regression_shim_security_v8_run();               // advisory=true: shim must be linked
 
 // ============================================================================
+// Forward declarations -- 2026-05-21 P1 security fixes (SEC-001, SEC-002, SEC-003)
+// ============================================================================
+int test_exploit_frost_absent_signer_id_run();       // P1-SEC-001: frost_sign absent signer ID
+int test_regression_schnorr_sign_e_hash_erased_run(); // P1-SEC-002: schnorr_sign e_hash+e erasure
+int test_exploit_musig2_infinity_pubnonce_run();      // P1-SEC-003: pubnonce_parse infinity rejection
+
+// ============================================================================
 // Forward declarations -- 2026-05-21 shim security edge cases
 // ============================================================================
 int test_shim_security_edge_cases_run(); // SHIM-003/004/006/008, SEC-003, PERF-003
@@ -1258,6 +1265,15 @@ static const AuditModule ALL_MODULES[] = {
     { "regression_ct_ops", "SEC-002/007/008/010,CT-004/005: FROST lagrange CT, batch weight non-zero, adaptor fail-closed, bip32 strict nonzero, musig2 blinded nonce, ecdsa_sign_verified direct ct:: call", "ct_analysis", test_regression_ct_ops_run, false },
     // === 2026-05-21 SEC-006 ===
     { "regression_bip324_privkey_lifetime", "SEC-006: Bip324Session privkey_ raw-byte window documented; complete_handshake erases after use (full store-Scalar fix tracked SEC-006)", "memory_safety", test_regression_bip324_privkey_lifetime_run, false },
+    // === 2026-05-21 P1-SEC-001: FROST frost_sign absent signer ID ===
+    // advisory=false: uses internal C++ FROST API only, no GPU/shim dependency.
+    { "exploit_frost_absent_signer_id", "P1-SEC-001: frost_sign returns zero partial sig when caller ID absent from nonce_commitments signing set (FSI-1..3)", "exploit_poc", test_exploit_frost_absent_signer_id_run, false },
+    // === 2026-05-21 P1-SEC-002: schnorr_sign e_hash erasure ===
+    // advisory=false: uses internal C++ Schnorr API only, no GPU/shim dependency.
+    { "regression_schnorr_sign_e_hash_erased", "P1-SEC-002/SEC-009: schnorr_sign now erases e_hash+e (nonce-derived BIP0340/challenge intermediates) — correctness guard: 50 sign+verify round-trips, determinism, distinct-message distinct-sig (SHE-1..4)", "ct_analysis", test_regression_schnorr_sign_e_hash_erased_run, false },
+    // === 2026-05-21 P1-SEC-003: MuSig2 infinity pubnonce rejection ===
+    // advisory=true: depends on libsecp256k1 shim being linked (MuSig2 C API).
+    { "exploit_musig2_infinity_pubnonce", "P1-SEC-003: secp256k1_musig_pubnonce_parse rejects invalid/infinity point encodings — invalid prefix, off-curve x, NULL args (MIP-1..6)", "exploit_poc", test_exploit_musig2_infinity_pubnonce_run, true },
     // === 2026-05-21 SHIM-003/004/006/008, SEC-003, PERF-003 ===
     // advisory=true: depends on libsecp256k1 shim being linked (stub returns ADVISORY_SKIP_CODE when absent).
     { "shim_security_edge_cases", "SHIM-003/004/006/008+SEC-003+PERF-003: NULL msg msglen==0 allowed, context_clone callback, batch msglen illegal, ellswift_xdh NULL hashfp, deprecated from_compact, small-batch raw ptr", "exploit_poc", test_shim_security_edge_cases_run, true },
