@@ -122,7 +122,7 @@ static void test_musig2_nonce_reuse() {
     // Second sign with SAME secnonce -- should fail (nonce was consumed)
     uint8_t psig1_dup[32];
     const ufsecp_error_t rc2 = ufsecp_musig2_partial_sign(ctx, secnonce1, priv1, keyagg, session, 0, psig1_dup);
-    CHECK(rc2 != UFSECP_OK, "reuse of consumed secnonce must fail");
+    CHECK(rc2 == UFSECP_ERR_BAD_INPUT, "reuse of consumed secnonce must return UFSECP_ERR_BAD_INPUT");
 
     ufsecp_ctx_destroy(ctx);
 }

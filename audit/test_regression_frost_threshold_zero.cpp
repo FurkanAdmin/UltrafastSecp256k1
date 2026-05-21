@@ -77,6 +77,7 @@ static void test_threshold_one_passes_guard() {
     std::vector<secp256k1::FrostNonceCommitment> commits = { make_commit(1) };
     auto psig = secp256k1::frost_sign(kp, nonce, msg, commits);
     ASSERT_TRUE(psig.id == 1, "[FTZ-2] threshold=1 must not be blocked by threshold guard");
+    ASSERT_FALSE(psig.z_i.is_zero(), "[FTZ-2] threshold=1 must produce non-zero partial sig");
 }
 
 static void test_threshold_two_one_signer_rejected() {

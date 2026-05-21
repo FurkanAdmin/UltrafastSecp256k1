@@ -397,13 +397,13 @@ static void run_neg4_ecdsa(ufsecp_ctx* ctx, const uint8_t* valid_sig64,
     CHECK_CODE(ufsecp_ecdsa_verify(ctx, MSG32, valid_sig64, nullptr), UFSECP_ERR_NULL_ARG,
                "NEG-4.11: ecdsa_verify(null_pubkey) -> NULL_ARG");
 
-    // verify: zero sig (R=0 is invalid)
-    CHECK_ERR(ufsecp_ecdsa_verify(ctx, MSG32, ZERO_SIG64, pubkey33),
-              "NEG-4.12: ecdsa_verify(zero_sig) -> error");
+    // verify: zero sig (R=0 is invalid — fails compact parse → BAD_SIG)
+    CHECK_CODE(ufsecp_ecdsa_verify(ctx, MSG32, ZERO_SIG64, pubkey33), UFSECP_ERR_BAD_SIG,
+               "NEG-4.12: ecdsa_verify(zero_sig) -> BAD_SIG");
 
-    // verify: bad pubkey (all zeros)
-    CHECK_ERR(ufsecp_ecdsa_verify(ctx, MSG32, valid_sig64, ZERO_PUBKEY33),
-              "NEG-4.13: ecdsa_verify(zero_pubkey) -> error");
+    // verify: bad pubkey (all zeros — fails curve parse → BAD_PUBKEY)
+    CHECK_CODE(ufsecp_ecdsa_verify(ctx, MSG32, valid_sig64, ZERO_PUBKEY33), UFSECP_ERR_BAD_PUBKEY,
+               "NEG-4.13: ecdsa_verify(zero_pubkey) -> BAD_PUBKEY");
 
     // verify: wrong pubkey (KEY2's pubkey, not KEY1's)
     uint8_t pubkey2[33] = {};
