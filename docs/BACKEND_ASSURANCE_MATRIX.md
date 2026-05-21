@@ -15,7 +15,7 @@ Backend trust is measured, not assumed.
 |---------|----------------|-------|
 | CPU (fast path) | **HIGH** | Full audit coverage, all invariants, CI enforced |
 | CPU (CT path) | **HIGH** | Formal CT verification (LLVM + empirical + Valgrind) |
-| CUDA | **HIGH** | Full GPU ABI audit, benchmark validated, CI enforced¹ |
+| CUDA | **HIGH** | Full GPU ABI audit, partially validated (diagnostic runs; no canonical JSON artifact per canonical_numbers.json), CI enforced¹ |
 | OpenCL | **MEDIUM** | ABI-complete, partial differential coverage¹ |
 | Metal | **MEDIUM** | ABI-complete, CI validated, hardware-level CT unprotected¹ |
 | ROCm/HIP | **EXPERIMENTAL** | ABI partial, hardware-backed validation pending |

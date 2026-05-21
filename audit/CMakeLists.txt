@@ -168,6 +168,20 @@ target_compile_definitions(test_batch_randomness PRIVATE STANDALONE_TEST)
 add_test(NAME batch_randomness COMMAND test_batch_randomness)
 set_tests_properties(batch_randomness PROPERTIES TIMEOUT 600)
 
+# -- P2-SEC-002: batch verify CSPRNG-seeded weights regression guard ----------
+add_executable(test_regression_batch_csprng_seed_standalone test_regression_batch_csprng_seed.cpp)
+audit_target_defaults(test_regression_batch_csprng_seed_standalone)
+target_compile_definitions(test_regression_batch_csprng_seed_standalone PRIVATE STANDALONE_TEST)
+add_test(NAME regression_batch_csprng_seed COMMAND test_regression_batch_csprng_seed_standalone)
+set_tests_properties(regression_batch_csprng_seed PROPERTIES TIMEOUT 120)
+
+# -- P2-CT-RT-004: adaptor nonce fixed 2-iteration CT regression guard --------
+add_executable(test_regression_adaptor_ct_nonce_standalone test_regression_adaptor_ct_nonce.cpp)
+audit_target_defaults(test_regression_adaptor_ct_nonce_standalone)
+target_compile_definitions(test_regression_adaptor_ct_nonce_standalone PRIVATE STANDALONE_TEST)
+add_test(NAME regression_adaptor_ct_nonce COMMAND test_regression_adaptor_ct_nonce_standalone)
+set_tests_properties(regression_adaptor_ct_nonce PROPERTIES TIMEOUT 120)
+
 # -- Cross-platform KAT equivalence ---------------------------------------
 add_executable(test_cross_platform_kat test_cross_platform_kat.cpp)
 audit_target_defaults(test_cross_platform_kat)
@@ -4986,3 +5000,25 @@ add_test(NAME regression_rfc6979_ct_loop
 set_tests_properties(regression_rfc6979_ct_loop PROPERTIES TIMEOUT 60
     LABELS "audit;regression;ct;rfc6979;security;rfc6979-ct")
 target_sources(unified_audit_runner PRIVATE test_regression_rfc6979_ct_loop.cpp)
+
+# P2-SEC-002: batch verify CSPRNG-seeded weights regression guard.
+# C++ API only — no shim/GPU dependency. advisory=false (guarded by SECP256K1_HAS_ADAPTOR
+# in unified runner ALL_MODULES; standalone always builds when adaptor header present).
+if(SECP256K1_HAS_ADAPTOR)
+    target_sources(unified_audit_runner PRIVATE test_regression_batch_csprng_seed.cpp)
+endif()
+
+# P2-CT-RT-004: adaptor_nonce fixed 2-iteration CT loop regression guard.
+# C++ API only — no shim/GPU dependency. advisory=false.
+if(SECP256K1_HAS_ADAPTOR)
+    add_executable(test_regression_adaptor_ct_nonce_standalone2
+        test_regression_adaptor_ct_nonce.cpp)
+    audit_target_defaults(test_regression_adaptor_ct_nonce_standalone2)
+    target_compile_definitions(test_regression_adaptor_ct_nonce_standalone2 PRIVATE
+        STANDALONE_TEST SECP256K1_HAS_ADAPTOR=1)
+    add_test(NAME regression_adaptor_ct_nonce_full
+        COMMAND test_regression_adaptor_ct_nonce_standalone2)
+    set_tests_properties(regression_adaptor_ct_nonce_full PROPERTIES TIMEOUT 60
+        LABELS "audit;regression;ct;adaptor;security;p2-ct-rt-004")
+    target_sources(unified_audit_runner PRIVATE test_regression_adaptor_ct_nonce.cpp)
+endif()

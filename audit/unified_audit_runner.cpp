@@ -641,6 +641,16 @@ int test_regression_shim_ndata_rgrind_run();             // SHIM-010: ndata hedg
 int test_shim_security_edge_cases_run(); // SHIM-003/004/006/008, SEC-003, PERF-003
 
 // ============================================================================
+// Forward declarations -- 2026-05-21 P2-SEC-002: batch verify CSPRNG seeding
+// ============================================================================
+int test_regression_batch_csprng_seed_run();   // P2-SEC-002: CSPRNG-seeded batch verify weights
+
+// ============================================================================
+// Forward declarations -- 2026-05-21 P2-CT-RT-004: adaptor nonce CT fix
+// ============================================================================
+int test_regression_adaptor_ct_nonce_run();    // P2-CT-RT-004: adaptor_nonce fixed 2-iter CT
+
+// ============================================================================
 // Report section IDs -- 9 audit categories
 // ============================================================================
 //   1. math_invariants   -- Mathematical Invariants (Fp, Zn, Group Laws)
@@ -1315,6 +1325,16 @@ static const AuditModule ALL_MODULES[] = {
     // === 2026-05-21 review v8: varlen sign_custom CT fixes ===
     // advisory=true: depends on libsecp256k1 shim (returns ADVISORY_SKIP_CODE when absent).
     { "regression_schnorr_varlen_ct_fixes", "VCS-1..6: sign_custom varlen path CT fixes — generator_mul_blinded, is_zero_ct on nonce/s, full stack erasure (e_hash/e/nonce_input/rand_hash/challenge_input/t_hash); correctness guard: 33/64/256/300-byte msgs, determinism, fast-path delegation", "ct_analysis", test_regression_schnorr_varlen_ct_fixes_run, true },
+    // === 2026-05-21 P2-SEC-002: batch verify CSPRNG-seeded weights ===
+    // advisory=false: uses C++ API only, no shim/GPU dependency.
+#if SECP256K1_HAS_ADAPTOR
+    { "regression_batch_csprng_seed", "P2-SEC-002: schnorr_batch_verify CSPRNG-seeded weights — adversary cannot pre-compute batch weights; correctness (BWC-1..4): large-batch valid→true, fail-closed, two-call soundness, ECDSA unchanged", "protocol_security", test_regression_batch_csprng_seed_run, false },
+#endif // SECP256K1_HAS_ADAPTOR (used as proxy for adaptor module presence; batch verify always built)
+    // === 2026-05-21 P2-CT-RT-004: adaptor_nonce fixed 2-iteration CT loop ===
+    // advisory=false: C++ API only, no shim/GPU dependency.
+#if SECP256K1_HAS_ADAPTOR
+    { "regression_adaptor_ct_nonce", "P2-CT-RT-004: adaptor_nonce/ecdsa_adaptor_binding fixed 2-iter CT — data-dependent retry loop removed; ct::scalar_select picks first valid candidate; correctness (ACN-1..5): sign+verify 50× Schnorr, 50× ECDSA, adapt+extract, determinism, nonce uniqueness", "ct_analysis", test_regression_adaptor_ct_nonce_run, false },
+#endif // SECP256K1_HAS_ADAPTOR
 };
 
 static constexpr int NUM_MODULES = sizeof(ALL_MODULES) / sizeof(ALL_MODULES[0]);

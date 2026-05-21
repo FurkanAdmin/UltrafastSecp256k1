@@ -11,6 +11,8 @@
 #include "secp256k1/sha256.hpp"
 #include "secp256k1/tagged_hash.hpp"
 #include "secp256k1/ct/point.hpp"
+#include "secp256k1/detail/csprng.hpp"
+#include "secp256k1/detail/secure_erase.hpp"
 #if defined(__SIZEOF_INT128__) && !defined(SECP256K1_PLATFORM_ESP32) && !defined(SECP256K1_PLATFORM_STM32) && !defined(__EMSCRIPTEN__)
 #include "secp256k1/field_52.hpp"
 #endif
@@ -141,7 +143,19 @@ bool schnorr_batch_verify_impl(const Entry* entries, std::size_t n,
     }
 
     // ---- Large-batch path: randomized MSM ----
-    // Compute batch seed = SHA256(all signature data)
+    // Compute batch seed = SHA256(csprng_rand || all signature data)
+    // P2-SEC-002: XOR 32 CSPRNG bytes into the seed before the weight loop.
+    // Without randomization, batch_weight_i = SHA256(SHA256(all_sig_data) || i)
+    // is deterministic and computable by any adversary who knows the batch
+    // entries.  A Wagner-style attack could craft inputs whose weights sum to
+    // cancel a forged entry's contribution.  libsecp256k1 uses a CSPRNG seed
+    // for exactly this reason (see secp256k1_batch_randomizer_gen in batch.h).
+    // We sample 32 bytes once per batch call and XOR them into the digest
+    // before use.  The XOR preserves the domain-binding property of the
+    // SHA256 while making weights unpredictable to the adversary.
+    std::uint8_t csprng_rand[32];
+    secp256k1::detail::csprng_fill(csprng_rand, sizeof(csprng_rand));
+
     SHA256 seed_ctx;
     std::uint8_t s_bytes[32];
     for (std::size_t i = 0; i < n; ++i) {
@@ -155,6 +169,12 @@ bool schnorr_batch_verify_impl(const Entry* entries, std::size_t n,
         seed_ctx.update(entries[i].message.data(), 32);
     }
     auto batch_seed = seed_ctx.finalize();
+    // XOR CSPRNG randomness into the batch seed (one 32-byte XOR, not per-weight).
+    for (std::size_t j = 0; j < 32; ++j) {
+        batch_seed[j] ^= csprng_rand[j];
+    }
+    detail::secure_erase(csprng_rand, sizeof(csprng_rand));
+
     SHA256 batch_weight_base;
     batch_weight_base.update(batch_seed.data(), batch_seed.size());
     // Capture compact midstate once (40 bytes) — avoids 104-byte SHA256 copy per weight call.

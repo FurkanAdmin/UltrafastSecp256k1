@@ -9,6 +9,7 @@
 #include "secp256k1/ct/point.hpp"
 #include "secp256k1/ct/scalar.hpp"
 #include "secp256k1/detail/secure_erase.hpp"
+#include <cstdint>
 #include <cstring>
 
 namespace secp256k1 {
@@ -43,16 +44,34 @@ static Scalar adaptor_nonce(const Scalar& privkey,
         h.update(aux, aux_len);
     }
     auto hash = h.finalize();
-    // parse_bytes_strict_nonzero avoids the conditional mod-n branch that
-    // from_bytes uses when hash >= n (prob ~2^-128) and the is_zero() branch.
-    // The counter-based retry below essentially never executes in practice
-    // but prevents any data-dependent branch on the secret-derived hash.
-    Scalar k;
-    for (std::uint8_t ctr = 0; !Scalar::parse_bytes_strict_nonzero(hash.data(), k); ++ctr) {
-        hash[31] ^= static_cast<std::uint8_t>(ctr ^ 1u);
-    }
+    // P2-CT-RT-004: Replace the data-dependent retry loop with a fixed
+    // 2-iteration CT select pattern (same fix as rfc6979_nonce_hedged).
+    // The original loop `for (ctr=0; !parse_strict_nonzero(...); ++ctr)`
+    // leaks whether hash >= n or == 0 through iteration count via timing.
+    // Fix: always run exactly 2 iterations unconditionally; ct::scalar_select
+    // picks the first valid candidate without any secret-dependent branch.
+    // Probability of needing iteration 2: ~2^-128.
+    // Both failing: ~2^-256 (caller will detect k==0 and treat as sign failure).
+    Scalar cand1{};
+    bool const ok1 = Scalar::parse_bytes_strict_nonzero(hash.data(), cand1);
+
+    // Advance hash state unconditionally (CT: must execute regardless of ok1).
+    // XOR byte 31 with 0x01 (deterministic counter advance, same as original loop ctr=0).
+    hash[31] ^= std::uint8_t{0x01u};
+
+    Scalar cand2{};
+    bool const ok2 = Scalar::parse_bytes_strict_nonzero(hash.data(), cand2);
+    (void)ok2;  // cand2 used only as fallback via ct::scalar_select; ok2 implicit
+
+    // CT select: mask = ~0ULL if ok1 (use cand1), else 0ULL (use cand2)
+    std::uint64_t const mask1 = static_cast<std::uint64_t>(
+        -static_cast<std::int64_t>(static_cast<int>(ok1)));
+    Scalar k = ct::scalar_select(cand1, cand2, mask1);
+
     detail::secure_erase(sk_bytes.data(), sk_bytes.size());
     detail::secure_erase(hash.data(), hash.size());
+    detail::secure_erase(&cand1, sizeof(cand1));
+    detail::secure_erase(&cand2, sizeof(cand2));
     return k;
 }
 
@@ -72,14 +91,27 @@ static Scalar ecdsa_adaptor_binding(const Point& adaptor_point) {
     h.update(adaptor_bytes.data(), adaptor_bytes.size());
     auto hash = h.finalize();
 
-    // Counter-based retry guards against the ~2^-128 probability that the hash
-    // equals zero or >= n after reduction. parse_bytes_strict_nonzero avoids
-    // both the silent mod-n branch (from_bytes) and the is_zero branch.
-    Scalar binding;
-    for (std::uint8_t ctr = 0; !Scalar::parse_bytes_strict_nonzero(hash.data(), binding); ++ctr) {
-        hash[31] ^= static_cast<std::uint8_t>(ctr ^ 1u);
-    }
+    // P2-CT-RT-004 (binding): same fixed 2-iteration CT select pattern applied
+    // here for consistency.  Note: adaptor_point is PUBLIC data (it is sent
+    // over the wire), so this function is NOT on a secret-bearing path.
+    // The CT fix is applied anyway to keep the nonce-generation pattern uniform
+    // and avoid future confusion if the data classification changes.
+    Scalar bcand1{};
+    bool const bok1 = Scalar::parse_bytes_strict_nonzero(hash.data(), bcand1);
+
+    hash[31] ^= std::uint8_t{0x01u};  // deterministic advance, unconditional
+
+    Scalar bcand2{};
+    bool const bok2 = Scalar::parse_bytes_strict_nonzero(hash.data(), bcand2);
+    (void)bok2;  // bcand2 is the fallback; bok2 is implicit via ct::scalar_select
+
+    std::uint64_t const bmask1 = static_cast<std::uint64_t>(
+        -static_cast<std::int64_t>(static_cast<int>(bok1)));
+    Scalar binding = ct::scalar_select(bcand1, bcand2, bmask1);
+
     detail::secure_erase(hash.data(), hash.size());
+    detail::secure_erase(&bcand1, sizeof(bcand1));
+    detail::secure_erase(&bcand2, sizeof(bcand2));
     return binding;
 }
 
