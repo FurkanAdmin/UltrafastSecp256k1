@@ -541,8 +541,10 @@ For the complete compatibility test matrix see `compat/libsecp256k1_shim/tests/`
 - **Upstream behavior:** libsecp256k1 does not expose `secp256k1_schnorrsig_verify_batch`
   in the standard API; this is a shim-only extension.
 - **Shim behavior:** The batch verify shim (`secp256k1_schnorrsig_verify_batch`) requires
-  all messages to have `msglen == 32`. If `msglen != 32`, the function returns 0 without
-  firing the illegal callback.
+  all messages to have `msglen == 32`. If `msglen != 32`, the illegal callback IS fired
+  (`secp256k1_shim_call_illegal_cb`) and the function returns 0.
+  (Note: an earlier version of this document incorrectly stated the callback was not fired.
+  The code has always fired it — SHIM-BATCH-001 doc corrected 2026-05-21.)
 - **Reason:** The batch code path uses fixed 32-byte message processing for performance.
   Variable-length batch verify requires a different internal API path not yet exposed.
 - **Impact:** Callers using variable-length messages in batch verify will get a silent

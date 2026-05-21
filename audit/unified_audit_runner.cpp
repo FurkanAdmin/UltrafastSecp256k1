@@ -626,7 +626,8 @@ int test_exploit_musig2_infinity_pubnonce_run();      // P1-SEC-003: pubnonce_pa
 // ============================================================================
 // Forward declarations -- 2026-05-21 P2 CT/shim fixes
 // ============================================================================
-int test_regression_p2_ct_shim_fixes_run(); // CT-001/002/003 + SHIM-002/003/004
+int test_regression_p2_ct_shim_fixes_run();              // CT-001/002/003 + SHIM-002/003/004
+int test_regression_musig2_nonce_gen_seckey_run();        // P2-SEC-002/003: musig nonce_gen seckey
 
 // ============================================================================
 // Forward declarations -- 2026-05-21 shim security edge cases
@@ -1201,7 +1202,10 @@ static const AuditModule ALL_MODULES[] = {
     { "ct_fast_scalar_v01_timing", "V-01: fast::Scalar operator* banned on secret material — Welch t-test on ECDSA sign with HW=1 vs HW=80 keys", "ct_analysis", test_regression_ct_fast_scalar_v01_run, true },
     { "schnorr_abi_edge_cases", "TQ-005: Schnorr BIP-340 ABI edge cases — r==0, r>=p, s==0, s>=n, wrong-msg, NULL args all rejected", "exploit_poc", test_regression_schnorr_abi_edge_cases_run, false },
     { "regression_ct_mixed_add_magnitude", "CA-mixed-add: point_add_mixed_complete FE52 magnitude contract — normalize_weak X1/Y1 guard, 2G+3G=5G, blinded==unblinded, ct vs fast recover", "math_invariants", test_regression_ct_mixed_add_magnitude_run, false },
-    { "regression_ct_sanitizer_detection", "2026-05-14: Clang sanitizer macro detection — ct field_add/sub/mul/sqr vs fast parity (asserts SECP256K1_HAS_SANITIZER guard does not regress)", "ct_analysis", test_regression_ct_sanitizer_detection_run, false },
+    // P2-TEST-003: advisory=true — test verifies ct/fast field arithmetic parity which
+    // is always identical in Release builds. The sanitizer guard bug only manifests
+    // in TSan/ASan builds; this Release-build test cannot detect the guarded regression.
+    { "regression_ct_sanitizer_detection", "2026-05-14: Clang sanitizer macro detection — ct field_add/sub/mul/sqr vs fast parity; advisory (only catches guard regression in sanitizer builds, not Release)", "ct_analysis", test_regression_ct_sanitizer_detection_run, true },
     { "regression_field_reduce_carry", "2026-05-14: FE64 reduce() carry propagation — (2^255-1)^2 mod p matches Python truth, (p-1)^2 == 1; guards result[2]→[3]→[4] cascade chain", "math_invariants", test_regression_field_reduce_carry_run, false },
     { "regression_shim_static_ctx", "ecf47967: g_static_ctx field alignment after PERF-005 cached_r_G addition", "math_invariants", test_regression_shim_static_ctx_run, true },
     // === 2026-05-11 Security audit regression guards (CT-001, CT-006, RT-011, SHIM-001, SHIM-010, SHIM-012) ===
@@ -1261,15 +1265,17 @@ static const AuditModule ALL_MODULES[] = {
     // advisory=false: uses C++ API only, no GPU/shim dependency.
     { "regression_fe52_var_paths", "PERF-VAR: FE52 mul_var/mul_assign_var/square_var/square_inplace_var produce same results as CT paths (VAR-1..4)", "math_invariants", test_regression_fe52_var_paths_run, false },
     // === 2026-05-21 SEC-001: CT scalar_inverse zero-branch removal ===
-    // advisory=false: uses C++ API only, no GPU/shim dependency.
-    // SEC-001-PARTIAL: removes data-dependent if(a.is_zero()) branch in the
-    // non-int128 Fermat FLT fallback via CT select; mul chain remains fast:: on
-    // non-int128 (CT mul requires __int128 — tracked as SEC-001-INCOMPLETE).
-    { "regression_ct_scalar_inverse_zero", "SEC-001: ct::scalar_inverse zero-branch CT fix — CT select replaces if(is_zero) early return in non-int128 fallback; a*a^{-1}==1, (a^{-1})^{-1}==a, inverse(0)==0", "ct_analysis", test_regression_ct_scalar_inverse_zero_run, false },
+    // advisory=true (P2-TEST-002): fix is PARTIAL — mul chain in non-int128 Fermat
+    // fallback still uses fast:: (SEC-001-INCOMPLETE). Platforms without __int128
+    // (WASM, MSVC 32-bit) have a VT CT scalar_inverse. Mark advisory until resolved.
+    { "regression_ct_scalar_inverse_zero", "SEC-001-PARTIAL: ct::scalar_inverse zero-branch CT fix (int128 path only; non-int128 fast:: mul chain is SEC-001-INCOMPLETE); a*a^{-1}==1, (a^{-1})^{-1}==a, inverse(0)==0", "ct_analysis", test_regression_ct_scalar_inverse_zero_run, true },
     // === 2026-05-21 SEC-002/007/008/010, CT-004/005 ===
     { "regression_ct_ops", "SEC-002/007/008/010,CT-004/005: FROST lagrange CT, batch weight non-zero, adaptor fail-closed, bip32 strict nonzero, musig2 blinded nonce, ecdsa_sign_verified direct ct:: call", "ct_analysis", test_regression_ct_ops_run, false },
     // === 2026-05-21 SEC-006 ===
     { "regression_bip324_privkey_lifetime", "SEC-006: Bip324Session privkey_ raw-byte window documented; complete_handshake erases after use (full store-Scalar fix tracked SEC-006)", "memory_safety", test_regression_bip324_privkey_lifetime_run, false },
+    // === 2026-05-21 P2-SEC-002/003: musig_nonce_gen seckey null + sk erase ===
+    // advisory=true: requires shim; stub returns 77 when shim not linked.
+    { "regression_musig2_nonce_gen_seckey", "P2-SEC-002: NULL seckey uses zero scalar (not session_id32 as HMAC key); P2-SEC-003: sk erased after nonce_gen; full 2-of-2 signing roundtrip (MNG-1..4)", "exploit_poc", test_regression_musig2_nonce_gen_seckey_run, true },
     // === 2026-05-21 P2: CT-001/002/003 + SHIM-002/003/004 ===
     // advisory=true: shim-dependent tests skip gracefully when shim not linked;
     // pure C++ CT tests (musig2_agg, hedged_nonce) always run.

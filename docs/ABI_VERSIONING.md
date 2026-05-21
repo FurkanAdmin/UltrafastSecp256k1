@@ -93,7 +93,7 @@ pairs.
 For minimum-version guards:
 
 ```c
-// Require at least v3.14.0
+// Require at least v3.14.0 (example using hypothetical v3.x naming — current MAJOR is 4)
 #if UFSECP_VERSION_PACKED < 0x030E00
   #error "UltrafastSecp256k1 >= 3.14.0 required"
 #endif
@@ -102,6 +102,7 @@ For minimum-version guards:
 Or at runtime:
 
 ```c
+// Example using hypothetical v3.x version — current MAJOR is 4 (SONAME 4)
 if (ufsecp_version() < 0x030E00) {
     fprintf(stderr, "Upgrade libufsecp to >= 3.14.0\n");
     exit(1);
@@ -114,7 +115,15 @@ if (ufsecp_version() < 0x030E00) {
 
 ```
 libfastsecp256k1.so               -> symlink to current
-libfastsecp256k1.so.3             -> SOVERSION (= MAJOR)
+libfastsecp256k1.so.4             -> SOVERSION (= MAJOR; current MAJOR is 4)
+```
+
+> **Note:** The examples below use hypothetical version numbers for illustration.
+> Current MAJOR = 4; SONAME = `libfastsecp256k1.so.4`.
+
+```
+libfastsecp256k1.so               -> symlink to current
+libfastsecp256k1.so.3             -> example SOVERSION (MAJOR = 3, hypothetical)
 libfastsecp256k1.so.3.14.0        -> full version
 ```
 

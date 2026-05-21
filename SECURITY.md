@@ -155,7 +155,7 @@ The constant-time layer (`ct::` namespace) provides:
 - `ct::scalar_mul` -- timing-safe scalar multiplication
 - `ct::point_add_complete`, `ct::point_dbl` -- complete addition formulas
 
-The CT layer uses no secret-dependent branches or memory access patterns. It carries a ~2-3x performance penalty relative to the optimized (variable-time) path (measured: ECDSA sign 2.17×, Schnorr sign 2.68× on x86-64 GCC 13).
+The CT layer uses no secret-dependent branches or memory access patterns. It carries a performance penalty relative to the optimized (variable-time) path — see `docs/bench_unified_2026-05-21_gcc14_x86-64.json` for current GCC 14.2.0 measurements (prior GCC 13 figures of 2.17×/2.68× are unverified against the current implementation and have been retired).
 
 **Important**: The default (non-CT) operations prioritize performance and are NOT constant-time. Use the `ct::` variants when processing secret keys or nonces.
 

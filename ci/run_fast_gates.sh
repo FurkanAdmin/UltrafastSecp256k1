@@ -44,6 +44,7 @@ MANDATORY_GATES=(
     "ci/check_exploit_wiring.py"
     "ci/check_security_fix_has_test.py"
     "ci/check_advisory_skip_returns.sh"  # CI-004: meta-gate must never self-skip
+    "ci/test_audit_scripts.py"           # P3-PR-011: audit framework self-test is mandatory
     "ci/check_version_sync.py"
     "ci/build_canonical_data.py"
     "ci/sync_docs_from_canonical.py"

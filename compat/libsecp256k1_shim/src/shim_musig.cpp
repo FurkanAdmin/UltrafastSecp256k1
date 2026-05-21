@@ -447,12 +447,19 @@ int secp256k1_musig_nonce_gen(
     SHIM_REQUIRE_CTX(ctx);
     if (!secnonce || !pubnonce || !session_id32) return 0;
 
+    // P2-SEC-002: when seckey is NULL, do not use session_id32 as a private key
+    // substitute. session_id32 is a caller-controlled identifier (may be a counter,
+    // timestamp, or short string) — it is not suitable HMAC entropy. Per BIP-327 §5,
+    // session_id32 MUST be a fresh 32-byte random value; when seckey is absent the
+    // nonce is derived from session_id32+pubkey+msg alone (zero sk), which is safe
+    // only when session_id32 is uniformly random. Callers SHOULD always supply seckey.
     Scalar sk;
     if (seckey) {
         if (!Scalar::parse_bytes_strict_nonzero(seckey, sk)) return 0;
     } else {
-        // session_id32 used as entropy seed — reject zero to avoid degenerate nonces.
-        if (!Scalar::parse_bytes_strict_nonzero(session_id32, sk)) return 0;
+        // seckey absent: use Scalar::zero() — nonce is derived from session_id32+pubkey+msg.
+        // Safe when session_id32 is truly random (BIP-327 requirement).
+        sk = Scalar::zero();
     }
 
     std::array<unsigned char, 32> pub_x = {};
@@ -468,6 +475,9 @@ int secp256k1_musig_nonce_gen(
     std::array<unsigned char, 32> agg_x = {};
 
     auto [sn, pn] = secp256k1::musig2_nonce_gen(sk, pub_x, agg_x, msg, session_id32);
+    // P2-SEC-003: erase sk from stack before returning — sk was derived from the
+    // caller's private key and must not persist after musig2_nonce_gen consumed it.
+    secp256k1::detail::secure_erase(&sk, sizeof(sk));
     sn_pack(secnonce, sn.k1, sn.k2);
     pn_pack(pubnonce, pn);
     return 1;

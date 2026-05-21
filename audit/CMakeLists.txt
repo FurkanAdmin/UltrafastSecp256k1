@@ -3907,7 +3907,9 @@ if(TARGET secp256k1_shim)
         # 2026-05-16 PERF-VAR: fe52 var-time paths correctness
         test_regression_fe52_var_paths.cpp
         # 2026-05-21 P1-SEC-003: MuSig2 pubnonce infinity rejection (shim-dependent)
-        test_exploit_musig2_infinity_pubnonce.cpp)
+        test_exploit_musig2_infinity_pubnonce.cpp
+        # 2026-05-21 P2-SEC-002/003: musig_nonce_gen seckey null + sk erase
+        test_regression_musig2_nonce_gen_seckey.cpp)
     target_compile_definitions(unified_audit_runner PRIVATE SECP256K1_BUILD_COMPAT_SHIM)
     target_link_libraries(unified_audit_runner PRIVATE secp256k1_shim)
     target_include_directories(unified_audit_runner PRIVATE

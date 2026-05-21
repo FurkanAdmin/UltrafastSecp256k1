@@ -106,6 +106,9 @@ jobs:
 
     - name: Run benchmark suite
       run: |
+        echo "::warning::Benchmark running on shared GitHub runner (no CPU pinning, no turbo control)."
+        echo "::warning::Variance ±15-30%. Alert threshold 150% (1.5×) — only regressions >50% are reliably detected."
+        echo "::warning::For controlled regression detection use local bench_unified protocol (CLAUDE.md §Performance)."
         mkdir -p /tmp/benchmark_results
         ./out/bench-gate/src/cpu/bench_unified --quick 2>&1 | tee /tmp/benchmark_results/raw_output.txt
         python3 .github/scripts/parse_benchmark.py \
