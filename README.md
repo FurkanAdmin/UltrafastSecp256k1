@@ -223,7 +223,7 @@ This project: `code → test → execution → evidence → continuous verificat
 We do not rely on trust. We provide reproducible evidence.
 
 - Every exploit attempt becomes a permanent regression test
-- Every commit runs 1,000,000+ assertions across 108 non-exploit audit modules and 263 exploit PoCs ( 372 modules total; count via `python3 ci/sync_module_count.py`; canonical data: `docs/canonical_numbers.json`)
+- Every commit runs 1,000,000+ assertions across 108 non-exploit audit modules and 263 exploit PoCs ( 375 modules total; count via `python3 ci/sync_module_count.py`; canonical data: `docs/canonical_numbers.json`)
 - Every claim maps to a test in [docs/AUDIT_TRACEABILITY.md](docs/AUDIT_TRACEABILITY.md)
 - Every performance number has pinned compiler/driver/toolkit versions and raw logs
 
@@ -377,7 +377,7 @@ This top-level narrative maps directly to the assurance ledger: CT secret-key ro
 | Metric | Value |
 |--------|-------|
 | Internal audit assertions per build | **~1,000,000+** |
-| Audit modules (`unified_audit_runner`) | **109 non-exploit modules + 263 exploit PoCs across 9 sections, 0 failures** |
+| Audit modules (`unified_audit_runner`) | **112 non-exploit modules + 263 exploit PoCs across 9 sections, 0 failures** |
 | Exploit PoC test files | **261 tests, 20+ coverage areas, 0 failures** |
 | CI/CD workflows | **54 GitHub Actions workflows** |
 | Build matrix (arch × config × OS) | **7 × 17 × 5 = 595 combinations** |
@@ -405,7 +405,7 @@ This top-level narrative maps directly to the assurance ledger: CT secret-key ro
 - Performance evidence is tracked through manual/release deep-assurance workflows instead of every-push benchmark fan-out
 - Audit results are logged as **structured artifacts** (JSON reports, per-platform logs), not just pass/fail signals
 - Differential tests run on every push and via manual deep-assurance workflows; no separate nightly schedule
-- All 109 non-exploit audit modules and all 263 exploit PoCs return `AUDIT-READY (self-generated)` status as of the last CAAS gate run. Zero failures — see pinned evidence: [`docs/EXTERNAL_AUDIT_BUNDLE.json`](docs/EXTERNAL_AUDIT_BUNDLE.json).
+- All 112 non-exploit audit modules and all 263 exploit PoCs return `AUDIT-READY (self-generated)` status as of the last CAAS gate run. Zero failures — see pinned evidence: [`docs/EXTERNAL_AUDIT_BUNDLE.json`](docs/EXTERNAL_AUDIT_BUNDLE.json).
 
 ### Exploit PoC Test Suite (263 Tests, 20+ Coverage Areas)
 

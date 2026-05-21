@@ -3816,6 +3816,13 @@ add_executable(unified_audit_runner
     # Regression: CT nonce path uses generator_mul_blinded (2026-05-12)
     # Guards that ct::ecdsa_sign / ct::schnorr_sign activate DPA blinding.
     test_regression_ct_blinding_nonce_path.cpp
+    # SEC-001: CT scalar_inverse zero-branch removal (2026-05-21)
+    # Removes data-dependent if(is_zero) branch in non-int128 Fermat fallback.
+    test_regression_ct_scalar_inverse_zero.cpp
+    # SEC-002/007/008/010, CT-004/005: CT ops regressions (2026-05-21)
+    test_regression_ct_ops_2026_05_21.cpp
+    # SEC-006: Bip324Session privkey_ lifetime documentation (2026-05-21)
+    test_regression_bip324_privkey_lifetime.cpp
 )
 # Shim-independent tests: always add to unified_audit_runner.
 target_sources(unified_audit_runner PRIVATE
@@ -3823,6 +3830,7 @@ target_sources(unified_audit_runner PRIVATE
     test_exploit_shim_recovery_null_arg.cpp
     test_regression_shim_static_ctx.cpp
     test_regression_musig2_signer_index_validation.cpp
+    test_regression_musig2_infinity_nonce.cpp
     $<$<BOOL:${SECP256K1_BUILD_ADAPTOR}>:test_regression_adaptor_binding_domain.cpp>
     test_regression_musig2_abi_signer_index.cpp
     # Feature module stubs: when a module is OFF, these provide advisory-skip
@@ -3949,6 +3957,16 @@ if(SECP256K1_BUILD_SHIM AND SECP256K1_BUILD_CPU)
     set_tests_properties(regression_shim_high_s_verify PROPERTIES
         TIMEOUT 60 LABELS "audit;regression;shim;ecdsa;malleability")
 endif()
+
+# -- SEC-001: CT scalar_inverse zero-branch removal — standalone CTest -----------
+add_executable(test_regression_ct_scalar_inverse_zero_standalone
+    test_regression_ct_scalar_inverse_zero.cpp)
+audit_target_defaults(test_regression_ct_scalar_inverse_zero_standalone)
+target_compile_definitions(test_regression_ct_scalar_inverse_zero_standalone PRIVATE STANDALONE_TEST)
+add_test(NAME regression_ct_scalar_inverse_zero
+    COMMAND test_regression_ct_scalar_inverse_zero_standalone)
+set_tests_properties(regression_ct_scalar_inverse_zero PROPERTIES
+    TIMEOUT 60 LABELS "audit;regression;ct;scalar;inverse" SKIP_RETURN_CODE 77)
 
 # GPU key-erase regression requires ufsecp_gpu symbols; only add when GPU is built.
 if(SECP256K1_BUILD_CUDA OR SECP256K1_BUILD_OPENCL OR TARGET ufsecp_gpu_host OR TARGET secp256k1_gpu_host)
@@ -4781,6 +4799,20 @@ if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)
         SKIP_RETURN_CODE 77
         LABELS "audit;regression;schnorr;shim;ct;security;sec-006")
 endif()
+
+# SEC-005/SEC-009: MuSig2 infinity nonce rejection — C++ API, no shim required.
+add_executable(test_regression_musig2_infinity_nonce_standalone
+    test_regression_musig2_infinity_nonce.cpp)
+audit_target_defaults(test_regression_musig2_infinity_nonce_standalone)
+target_include_directories(test_regression_musig2_infinity_nonce_standalone PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/cpu/include
+    ${CMAKE_BINARY_DIR}/include
+)
+target_compile_definitions(test_regression_musig2_infinity_nonce_standalone PRIVATE STANDALONE_TEST)
+add_test(NAME regression_musig2_infinity_nonce
+    COMMAND test_regression_musig2_infinity_nonce_standalone)
+set_tests_properties(regression_musig2_infinity_nonce PROPERTIES TIMEOUT 30
+    LABELS "audit;regression;musig2;security;sec-005;sec-009")
 
 # SEC-001: MuSig2 ABI signer-index cross-validation (ufsecp_musig2_partial_sign_v2)
 # Uses C ABI via ufsecp_static. advisory=false in unified runner.

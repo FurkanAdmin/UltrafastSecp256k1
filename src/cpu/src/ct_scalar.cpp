@@ -544,9 +544,19 @@ Scalar scalar_inverse(const Scalar& a) noexcept {
 // ============================================================================
 // a^{-1} = a^{n-2} mod n.  Optimized addition chain: 254S + 40M = 294 ops.
 // ~10x slower than SafeGCD but works on all platforms.
+//
+// SEC-001 (PARTIAL FIX): The data-dependent branch `if (a.is_zero())` has been
+// replaced with a CT select at the end of the function to remove timing leakage
+// on the zero-check itself. The squaring/multiplication chain still uses
+// fast::Scalar::operator* which is not constant-time on all 32-bit platforms
+// because ct::scalar_mul itself delegates to fast multiply without __int128
+// (see scalar_mul fallback above). Full CT on non-int128 requires implementing
+// a CT 32-bit scalar multiplication -- tracked as SEC-001-INCOMPLETE.
+// Affected platforms: ARM Cortex-M, ESP32 without int128, WASM32.
 // ============================================================================
 Scalar scalar_inverse(const Scalar& a) noexcept {
-    if (a.is_zero()) return Scalar::zero();
+    // No early return on zero — compute unconditionally to avoid timing branch.
+    // CT select at end returns Scalar::zero() if input is zero.
     auto sqr = [](const Scalar& s) -> Scalar { return s * s; };
     auto sqr_n = [&sqr](Scalar s, int count) -> Scalar {
         for (int i = 0; i < count; ++i) s = sqr(s);
@@ -576,7 +586,10 @@ Scalar scalar_inverse(const Scalar& a) noexcept {
     t = sqr_n(t, 5) * x2;  t = sqr_n(t, 4) * x2;  t = sqr_n(t, 2) * a;
     t = sqr_n(t, 8) * x2;  t = sqr_n(t, 3) * x2;  t = sqr_n(t, 3) * a;
     t = sqr_n(t, 6) * a;   t = sqr_n(t, 8) * x6;
-    return t;
+    // CT select: if a is zero, return zero; otherwise return the chain result.
+    // scalar_is_zero(a) returns all-ones mask when a==0, all-zeros when a!=0.
+    std::uint64_t const zero_mask = scalar_is_zero(a);
+    return scalar_select(Scalar::zero(), t, zero_mask);
 }
 #endif // __SIZEOF_INT128__
 

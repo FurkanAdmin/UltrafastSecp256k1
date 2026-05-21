@@ -216,6 +216,9 @@ int test_exploit_safegcd_divsteps_run();              // Bernstein-Yang SafeGCD 
 int test_exploit_ecdsa_pmn_wraparound_run();          // ECDSA PMN wraparound: r ∈ [n,p) constant + logic (2026-05-05)
 int test_exploit_custom_nonce_injection_run();        // RFC 6979 nonce edge cases (null/zero/n/n-1)
 int test_regression_ct_blinding_nonce_path_run();    // CT nonce path uses generator_mul_blinded (2026-05-12)
+int test_regression_ct_scalar_inverse_zero_run();   // SEC-001: CT scalar_inverse zero-branch removal (2026-05-21)
+int test_regression_ct_ops_run();                   // SEC-002/007/008/010, CT-004/005: CT ops regressions (2026-05-21)
+int test_regression_bip324_privkey_lifetime_run();  // SEC-006: Bip324Session privkey_ lifetime documentation (2026-05-21)
 
 // ============================================================================
 // Forward declarations -- Wycheproof & batch-randomness (Track I3, I6-3)
@@ -555,6 +558,16 @@ int test_regression_ecdsa_batch_curve_check_run(); // CA-001: curve membership c
 int test_regression_fe52_var_paths_run();          // PERF-VAR: fe52 mul_var/square_var must use var-time path (not CT fallback)
 
 // ============================================================================
+// Forward declarations -- 2026-05-21 SEC-005/SEC-009 MuSig2 infinity nonce fix
+// ============================================================================
+int test_regression_musig2_infinity_nonce_run(); // SEC-005/SEC-009: musig2_start_sign_session infinity rejection
+
+// ============================================================================
+// Forward declarations -- 2026-05-21 CT ops regression (SEC-002, SEC-007, SEC-008, SEC-010, CT-004, CT-005)
+// ============================================================================
+int test_regression_ct_ops_run(); // CT correctness: FROST lagrange CT, batch_weight nonzero, adaptor sentinel, BIP-32 strict, MuSig2 nonce blinded, ecdsa_sign_verified direct
+
+// ============================================================================
 // Forward declarations -- 2026-05-12 SEC-001 MuSig2 ABI signer-index fix
 // ============================================================================
 int test_regression_musig2_abi_signer_index_run(); // SEC-001: partial_sign_v2 validates privkey<->signer_index
@@ -599,6 +612,8 @@ int test_regression_shim_security_v7_run();               // 2026-05-13 v7: T-01
 int test_regression_adaptor_degenerate_v7_run();          // 2026-05-13 v7: T-09 adaptor degenerate output guard
 // 2026-05-13 v8 security fixes (P1-SEC-NEW-001, RED-TEAM-008, P2-SEC-NEW-002)
 int test_regression_shim_security_v8_run();               // advisory=true: shim must be linked
+// 2026-05-21 CT ops / security hardening (SEC-002/007/008/010 + CT-004/005)
+int test_regression_ct_ops_run(); // CT ops correctness regressions
 
 // ============================================================================
 // Report section IDs -- 9 audit categories
@@ -1183,6 +1198,9 @@ static const AuditModule ALL_MODULES[] = {
     { "regression_shim_pubkey_sort",           "SHIM-012: secp256k1_ec_pubkey_sort no longer crashes via nullptr ctx — lexicographic order correctness (PST-1..4)",          "memory_safety",  test_regression_shim_pubkey_sort_run,           true },
     { "regression_shim_per_context_blinding",  "SHIM-001: per-context blinding — two contexts on same thread sign independently, unblinded ctx works, NULL seed clears",     "ct_analysis",    test_regression_shim_per_context_blinding_run,  true },
     { "regression_musig2_session_token",       "SHIM-010: MuSig2 token-keyed session map — non-zero token after agg, distinct tokens, reuse gets fresh token, 2-of-2 sign", "memory_safety",  test_regression_musig2_session_token_run,       true },
+    // SEC-005/SEC-009: MuSig2 infinity nonce rejection — C++ API, no shim required.
+    // advisory=false: uses C++ API + fastsecp256k1 only, no GPU/shim dependency.
+    { "regression_musig2_infinity_nonce",      "SEC-005/SEC-009: musig2_start_sign_session rejects infinity R1/R2 (BIP-327 §GetSessionValues step 2); musig2_nonce_agg empty-vector guard", "protocol_security", test_regression_musig2_infinity_nonce_run, false },
     // SEC-007: MuSig2 signer_index cross-check — uses C++ API directly (no shim required)
     // advisory=true: Rule 13 cannot be fully tested at C++ API level when individual_pubkeys
     // is empty (ABI-deserialized state, MED-3). The test_abi_ctx_skips_check case uses
@@ -1224,6 +1242,16 @@ static const AuditModule ALL_MODULES[] = {
     // === 2026-05-16 PERF-VAR: fe52 var-time paths correctness ===
     // advisory=false: uses C++ API only, no GPU/shim dependency.
     { "regression_fe52_var_paths", "PERF-VAR: FE52 mul_var/mul_assign_var/square_var/square_inplace_var produce same results as CT paths (VAR-1..4)", "math_invariants", test_regression_fe52_var_paths_run, false },
+    // === 2026-05-21 SEC-001: CT scalar_inverse zero-branch removal ===
+    // advisory=false: uses C++ API only, no GPU/shim dependency.
+    // SEC-001-PARTIAL: removes data-dependent if(a.is_zero()) branch in the
+    // non-int128 Fermat FLT fallback via CT select; mul chain remains fast:: on
+    // non-int128 (CT mul requires __int128 — tracked as SEC-001-INCOMPLETE).
+    { "regression_ct_scalar_inverse_zero", "SEC-001: ct::scalar_inverse zero-branch CT fix — CT select replaces if(is_zero) early return in non-int128 fallback; a*a^{-1}==1, (a^{-1})^{-1}==a, inverse(0)==0", "ct_analysis", test_regression_ct_scalar_inverse_zero_run, false },
+    // === 2026-05-21 SEC-002/007/008/010, CT-004/005 ===
+    { "regression_ct_ops", "SEC-002/007/008/010,CT-004/005: FROST lagrange CT, batch weight non-zero, adaptor fail-closed, bip32 strict nonzero, musig2 blinded nonce, ecdsa_sign_verified direct ct:: call", "ct_analysis", test_regression_ct_ops_run, false },
+    // === 2026-05-21 SEC-006 ===
+    { "regression_bip324_privkey_lifetime", "SEC-006: Bip324Session privkey_ raw-byte window documented; complete_handshake erases after use (full store-Scalar fix tracked SEC-006)", "memory_safety", test_regression_bip324_privkey_lifetime_run, false },
 };
 
 static constexpr int NUM_MODULES = sizeof(ALL_MODULES) / sizeof(ALL_MODULES[0]);

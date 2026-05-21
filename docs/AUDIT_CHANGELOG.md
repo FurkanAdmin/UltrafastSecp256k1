@@ -1,5 +1,19 @@
 # Audit Changelog
 
+## 2026-05-21 — Fix: CT scalar_inverse zero-branch removal — non-int128 fallback (SEC-001 partial)
+
+- **ct_scalar.cpp (SEC-001-PARTIAL):** Removed the data-dependent `if (a.is_zero()) return Scalar::zero()` early-return branch from the Fermat FLT `scalar_inverse` fallback (non-`__int128` path: ARM32, WASM32, ESP32). Replaced with an unconditional computation followed by `scalar_select(Scalar::zero(), t, scalar_is_zero(a))` at the end. Eliminates timing branch on the secret nonce input in the zero-check. The multiplication chain still uses `fast::operator*` on non-int128 platforms (`ct::scalar_mul` itself delegates to fast mul without `__int128`); full CT multiplication requires a dedicated 32-bit CT scalar mul — tracked as SEC-001-INCOMPLETE. The `__int128` path (SafeGCD Bernstein-Yang) is unaffected and remains fully constant-time.
+- **audit/test_regression_ct_scalar_inverse_zero.cpp (NEW):** Regression coverage: `inverse(0)==0`, `a * a^{-1} == 1` for 200 random scalars, `(a^{-1})^{-1} == a`.
+
+## 2026-05-21 — Fix: MuSig2 infinity nonce + audit_ct_namespace false-green (SEC-005, SEC-009, CI-001, TEST-001, TEST-002, TEST-004)
+
+- **musig2.cpp (SEC-005):** `musig2_start_sign_session` now checks `agg_nonce.R1.is_infinity() || agg_nonce.R2.is_infinity()` before computing the nonce-blinding factor and returns a default-constructed invalid session. Complies with BIP-327 §GetSessionValues step 2.
+- **musig2.cpp (SEC-009):** `musig2_nonce_agg` now early-returns an all-infinity struct when given an empty `pub_nonces` vector, ensuring the SEC-005 check catches it in `start_sign_session`.
+- **audit_ct_namespace.cpp (CI-001/TEST-002):** `audit_ct_namespace_run()` now aggregates `ADVISORY_SKIP_CODE` (77) returned by `run_file_audit()` instead of silently discarding it. A false-green was previously produced when all CT source files were absent (0 checks = 0 failures = PASS; now returns 77 advisory-skip instead).
+- **audit_ct_namespace.cpp (TEST-004):** `run_structural_checks()` now increments `g_fail` when a security-critical source file (ct_sign.cpp, ecdh.cpp) is not found. Previously `else { ++check_num; }` silently skipped the check without recording a failure.
+- **test_regression_musig2_signer_index_validation.cpp (TEST-001):** `test_abi_ctx_skips_check()` now asserts `!psig_skip.is_zero()` instead of `(void)psig_skip` — confirms the ABI bypass produces defined (non-zero, non-UB) output and documents the MED-3 gap. Removes the previous pattern that inflated g_pass without testing.
+- **audit/test_regression_musig2_infinity_nonce.cpp (NEW):** Five sub-tests (MIN-1..MIN-5) covering SEC-005 and SEC-009: empty nonce_agg vector, R1=infinity rejection, R2=infinity rejection, end-to-end empty-agg path, and valid 2-of-2 round-trip regression guard.
+
 ## 2026-05-13 — Fix: bench_unified scalar_mul LTO constant-folding + shim curve check + README ratios
 
 - **bench_unified.cpp (scalar_mul):** Replaced compile-time constants `sc_a * sc_b` with pool-indexed
