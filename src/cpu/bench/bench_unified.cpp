@@ -2526,10 +2526,12 @@ int main(int argc, char** argv) {
     printf("\n");
 
     // ---- Scalar Arithmetic ----
+    // BENCH-001 fix: micro_scalar_inv measures Scalar::inverse() = fast SafeGCD (variable-time).
+    // The real CT inverse is ct::scalar_inverse (shown in CT POINT ARITHMETIC section above).
+    // Compare Ultra var-time inv vs libsecp var-time inv for a fair apples-to-apples row.
     print_header_3col("SCALAR ARITHMETIC");
     print_row_3col("mul",               smul,           ls_sc_mul);
-    print_row_3col("inv (CT)",          micro_scalar_inv, ls_sc_inv);
-    print_row_3col("inv (var-time)",    micro_scalar_inv, ls_sc_inv_var);
+    print_row_3col("inv (fast/var-time)", micro_scalar_inv, ls_sc_inv_var);
     print_row_3col("add",               sadd,           ls_sc_add);
     print_row_3col("negate",            sneg,           ls_sc_neg);
     print_row_3col("from_bytes (32B)",  sc_from_bytes,  ls_sc_from_bytes);
@@ -2569,20 +2571,28 @@ int main(int argc, char** argv) {
 
     // ECDSA Verify: cold-path (Point arg, no precomputed GLV table).
     // Production performance (EcdsaPublicKey, warm) shown in ConnectBlock section.
+    // BENCH-002 note: ls_schnorr_verify uses a pre-parsed secp256k1_xonly_pubkey from setup.
+    // "cached" row is the fair apples-to-apples: both sides use a pre-parsed pubkey object.
+    // "raw bytes" row shows Ultra's lift_x cost vs libsecp cached — Ultra is handicapped here.
     print_header_3col("VERIFICATION");
     print_row_3col("ECDSA Verify [cold-path Point]", u_ecdsa_verify, ls_ecdsa_verify);
-    print_row_3col("Schnorr Verify (cached)",   u_schnorr_verify,     ls_schnorr_verify);
-    print_row_3col("Schnorr Verify (raw)",      u_schnorr_verify_raw, ls_schnorr_verify);
+    print_row_3col("Schnorr Verify (cached pubkey)", u_schnorr_verify,     ls_schnorr_verify);
+    print_row_3col("Schnorr Verify (Ultra raw+lift_x vs libsecp cached)", u_schnorr_verify_raw, ls_schnorr_verify);
     print_sep_3col();
     printf("\n");
 
     // CT-vs-CT: libsecp256k1 sign is always CT, so compare with Ultra CT sign.
     // Verify doesn't change (no secret data), so same numbers as FAST.
+    // BENCH-002 fix: ls_schnorr_verify uses a pre-parsed secp256k1_xonly_pubkey (cached).
+    // Fair comparison: u_schnorr_verify also uses a pre-parsed SchnorrXonlyPubkey (cached).
+    // Both sides parse the xonly pubkey (lift_x) only once at setup, not in the timed loop.
+    // Use u_schnorr_verify (cached GLV tables) vs ls_schnorr_verify for cached-vs-cached.
     print_header_3col("CT-vs-CT (fair signing)");
     print_row_3col("ECDSA Sign",          u_ct_ecdsa,         ls_ecdsa_sign);
     print_row_3col("Schnorr Sign",        u_ct_schnorr,       ls_schnorr_sign);
     print_row_3col("ECDSA Verify",        u_ecdsa_verify,     ls_ecdsa_verify);
-    print_row_3col("Schnorr Verify",      u_schnorr_verify_raw, ls_schnorr_verify);
+    // Fair comparison: both sides use a pre-parsed pubkey (lift_x done at setup, not timed).
+    print_row_3col("Schnorr Verify (cached pubkey)", u_schnorr_verify, ls_schnorr_verify);
     print_sep_3col();
     printf("\n");
 
