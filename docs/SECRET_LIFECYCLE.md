@@ -317,3 +317,5 @@ Erases: compressed point representation, `x_bytes` after shared secret derivatio
 3. **Stack vs heap**: Stack secrets use `secure_erase(&var, sizeof(var))`. Heap secrets (FROST coefficients vector) iterate and erase each element.
 
 4. **No secret in return value**: Functions return public values (signatures, commitments). Secret intermediates are never returned.
+
+<!-- 2026-05-21: ecdsa.cpp — ECDSASignature::from_compact deprecated (SEC-003); both overloads now carry [[deprecated]] attribute directing callers to parse_compact_strict. The array overload was inlined to avoid -Werror=deprecated-declarations from a deprecated function calling another deprecated function. No behavioral change; RFC 6979 HMAC state lifecycle unchanged. -->

@@ -87,7 +87,7 @@ ECDSASignature ECDSASignature::from_compact(const uint8_t* data64) {
 [[deprecated("Use ECDSASignature::parse_compact_strict for validated parsing. "
              "from_compact silently reduces non-canonical r/s values mod n (SEC-003).")]]
 ECDSASignature ECDSASignature::from_compact(const std::array<uint8_t, 64>& data) {
-    return from_compact(data.data());
+    return {Scalar::from_bytes(data.data()), Scalar::from_bytes(data.data() + 32)};
 }
 
 bool ECDSASignature::parse_compact_strict(const uint8_t* data64,
