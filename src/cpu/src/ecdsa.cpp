@@ -5,6 +5,7 @@
 #include "secp256k1/field_52.hpp"
 #include "secp256k1/ct/point.hpp"  // ct::generator_mul for sign-then-verify
 #include "secp256k1/ct/scalar.hpp" // ct::ct_normalize_low_s
+#include "secp256k1/ct/sign.hpp"   // ct::ecdsa_sign (CT-005: direct CT path, no deprecated wrapper)
 #include "secp256k1/detail/secure_erase.hpp"
 #include "secp256k1/debug_invariants.hpp"
 #include <cassert>
@@ -70,10 +71,21 @@ std::array<std::uint8_t, 64> ECDSASignature::to_compact() const {
     return out;
 }
 
+// SEC-003: from_compact silently reduces r/s mod n via Scalar::from_bytes().
+// Non-canonical inputs (r == 0, r >= n, s == 0, s >= n) are accepted and
+// wrapped, which can produce degenerate signatures that verify incorrectly
+// against signatures produced from the same bytes via parse_compact_strict().
+// Callers should use parse_compact_strict() which rejects non-canonical inputs.
+// from_compact is retained for backward compatibility with code that intentionally
+// constructs test vectors using out-of-range values.
+[[deprecated("Use ECDSASignature::parse_compact_strict for validated parsing. "
+             "from_compact silently reduces non-canonical r/s values mod n (SEC-003).")]]
 ECDSASignature ECDSASignature::from_compact(const uint8_t* data64) {
     return {Scalar::from_bytes(data64), Scalar::from_bytes(data64 + 32)};
 }
 
+[[deprecated("Use ECDSASignature::parse_compact_strict for validated parsing. "
+             "from_compact silently reduces non-canonical r/s values mod n (SEC-003).")]]
 ECDSASignature ECDSASignature::from_compact(const std::array<uint8_t, 64>& data) {
     return from_compact(data.data());
 }
@@ -547,14 +559,9 @@ ECDSASignature ecdsa_sign(const std::array<uint8_t, 32>& msg_hash,
 
 ECDSASignature ecdsa_sign_verified(const std::array<uint8_t, 32>& msg_hash,
                                    const Scalar& private_key) {
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#endif
-    auto result = ecdsa_sign(msg_hash, private_key);
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC diagnostic pop
-#endif
+    // CT-005: call ct::ecdsa_sign directly instead of the deprecated
+    // secp256k1::ecdsa_sign (variable-time) wrapper via pragma suppression.
+    auto result = ct::ecdsa_sign(msg_hash, private_key);
 
     if (!result.r.is_zero()) {
         auto pk = ct::generator_mul(private_key);

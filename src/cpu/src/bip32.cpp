@@ -459,9 +459,10 @@ std::pair<ExtendedKey, bool> bip32_master_key(const uint8_t* seed, std::size_t s
     std::memcpy(IR.data(), I.data() + 32, 32);
 
     auto master_key = Scalar{};
-    // BIP-32: IL must be < curve order n; reject if >= n (same as child derivation)
-    if (!Scalar::parse_bytes_strict(IL, master_key)) return {ExtendedKey{}, false};
-    if (master_key.is_zero()) return {ExtendedKey{}, false};
+    // BIP-32: IL must be < curve order n AND non-zero; parse_bytes_strict_nonzero
+    // combines both checks in one call (SEC-010: was two separate calls, second
+    // used variable-time is_zero() which could leak via timing on marginal hardware).
+    if (!Scalar::parse_bytes_strict_nonzero(IL, master_key)) return {ExtendedKey{}, false};
 
     ExtendedKey ext{};
     ext.key = master_key.to_bytes();

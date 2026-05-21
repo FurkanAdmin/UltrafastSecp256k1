@@ -134,7 +134,14 @@ secp256k1_context *secp256k1_context_create(unsigned int flags) {
 }
 
 secp256k1_context *secp256k1_context_clone(const secp256k1_context *ctx) {
-    if (!ctx) { std::abort(); }
+    if (!ctx) {
+        // SHIM-004 fix: fire registered illegal callback instead of calling std::abort()
+        // directly. This allows fuzz harnesses that register a no-op callback to survive
+        // NULL context calls without crashing the process. Matches upstream libsecp256k1
+        // behavior where illegal_callback is invoked before returning NULL.
+        secp256k1_shim_call_illegal_cb(nullptr, "secp256k1_context_clone: NULL context");
+        return nullptr;
+    }
     auto *clone = static_cast<secp256k1_context *>(std::malloc(sizeof(secp256k1_context)));
     if (!clone) {
         // SHIM-A04: fire error callback on malloc failure (matches libsecp behavior).

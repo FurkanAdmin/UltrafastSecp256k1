@@ -222,9 +222,12 @@ std::pair<MuSig2SecNonce, MuSig2PubNonce> musig2_nonce_gen(
     secure_erase(aux_hash.data(), aux_hash.size());
     secure_erase(t, sizeof(t));
 
-    // R1 = k1 * G, R2 = k2 * G (CT: nonces are secret, must use constant-time path)
-    auto R1 = ct::generator_mul(sec.k1);
-    auto R2 = ct::generator_mul(sec.k2);
+    // R1 = k1 * G, R2 = k2 * G (CT-004: use generator_mul_blinded for DPA defense;
+    // blinding is transparent — blinded(k)*G == k*G mathematically, so nonces
+    // remain deterministic while gaining protection against power/EM side channels
+    // when secp256k1_context_randomize() has been called).
+    auto R1 = ct::generator_mul_blinded(sec.k1);
+    auto R2 = ct::generator_mul_blinded(sec.k2);
     pub.R1 = R1.to_compressed();
     pub.R2 = R2.to_compressed();
 
@@ -250,6 +253,15 @@ MuSig2PubNonce MuSig2PubNonce::deserialize(const std::array<uint8_t, 66>& data) 
 // -- Nonce Aggregation --------------------------------------------------------
 
 MuSig2AggNonce musig2_nonce_agg(const std::vector<MuSig2PubNonce>& pub_nonces) {
+    // SEC-009: empty vector guard — return infinity-bearing struct so that
+    // musig2_start_sign_session rejects it via the SEC-005 check below.
+    if (pub_nonces.empty()) {
+        MuSig2AggNonce empty{};
+        empty.R1 = Point::infinity();
+        empty.R2 = Point::infinity();
+        return empty;
+    }
+
     MuSig2AggNonce agg{};
     agg.R1 = Point::infinity();
     agg.R2 = Point::infinity();
@@ -286,6 +298,16 @@ MuSig2Session musig2_start_sign_session(
     const std::array<uint8_t, 32>& msg) {
 
     MuSig2Session session{};
+
+    // SEC-005: BIP-327 §GetSessionValues step 2 — abort if either aggregated nonce
+    // component is infinity (indicates empty input, nonce cancellation, or invalid input).
+    // A zero Scalar for session.b and session.e signals an invalid session to the caller
+    // (musig2_partial_sign checks: if session.e.is_zero() the session is degenerate).
+    // Returning a default-constructed session (all-zero scalars, infinity R) is the
+    // agreed invalid-session convention used throughout this codebase.
+    if (agg_nonce.R1.is_infinity() || agg_nonce.R2.is_infinity()) {
+        return session;  // default-constructed: R=infinity, b=0, e=0, R_negated=false
+    }
 
     // b = tagged_hash("MuSig/nonceblinding", cbytes_ext(R1)||cbytes_ext(R2)||xbytes(Q)||msg)
     // BIP-327 §GetSessionValues: tag MUST be "MuSig/nonceblinding" (not "noncecoef").

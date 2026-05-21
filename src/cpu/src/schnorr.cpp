@@ -569,6 +569,10 @@ bool schnorr_verify(const uint8_t* pubkey_x32,
     x_aff.negate_assign(1);
     x_aff.add_assign(r52);
     const bool x_match = x_aff.normalizes_to_zero_var();
+    // PERF-001: full normalize() is required here — normalize_weak() is NOT safe
+    // for parity extraction because it may leave the value as v or v+p (both
+    // valid weak representations).  Since p is odd, parity(v) != parity(v+p).
+    // Only the fully reduced canonical form in [0, p) gives the correct parity.
     y_aff.normalize();
     return x_match & ((y_aff.n[0] & 1) == 0);
 #else
@@ -613,6 +617,7 @@ bool schnorr_verify(const fast::Point& P,
     x_aff.negate_assign(1);
     x_aff.add_assign(r52);
     const bool x_match = x_aff.normalizes_to_zero_var();
+    // PERF-001: full normalize() required — see note in schnorr_verify(pubkey_x32).
     y_aff.normalize();
     return x_match & ((y_aff.n[0] & 1) == 0);
 #else
@@ -680,12 +685,21 @@ bool schnorr_xonly_pubkey_parse(SchnorrXonlyPubkey& out,
 
 SchnorrXonlyPubkey schnorr_xonly_from_keypair(const SchnorrKeypair& kp) {
     SchnorrXonlyPubkey pub{};
-    // CT: compute point to learn parity, then CT-negate the scalar if Y is odd.
-    // Avoids branching on the secret-derived p_y_odd bit.
+    // PERF-009: compute point once, then CT-conditionally negate Y instead of
+    // recomputing k_neg*G via a second ct::generator_mul (~33µs savings).
+    //
+    // CT property: p_y_odd is derived from a secret scalar, so the conditional
+    // negate must be branchless.  ct::point_neg + ct::point_select give that:
+    //   mask = all-1s when p_y_odd → select P_neg; mask = 0 → select P.
+    // No branch on infinity: generator_mul of a non-zero scalar is never ∞.
     auto P = ct::generator_mul(kp.d);
     auto [px, p_y_odd] = P.x_bytes_and_parity();
-    auto d_adj = ct::scalar_cneg(kp.d, ct::bool_to_mask(p_y_odd));
-    auto P_even = ct::generator_mul(d_adj);
+    const std::uint64_t mask = ct::bool_to_mask(p_y_odd);
+    // CT-conditional Y-negation: cheaper than a second generator_mul.
+    auto P_ct     = ct::CTJacobianPoint::from_point(P);
+    auto P_neg_ct = ct::point_neg(P_ct);
+    auto P_even_ct = ct::point_select(P_neg_ct, P_ct, mask);
+    auto P_even = P_even_ct.to_point();
     P_even.normalize();
     pub.point = P_even;
     pub.x_bytes = px;

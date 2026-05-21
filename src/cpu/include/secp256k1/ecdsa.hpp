@@ -47,8 +47,14 @@ struct ECDSASignature {
     // Compact 64-byte encoding: r (32 bytes) || s (32 bytes)
     std::array<std::uint8_t, 64> to_compact() const;
 
-    // Decode from compact 64-byte encoding
+    // Decode from compact 64-byte encoding.
+    // SEC-003: silently reduces r/s mod n — non-canonical inputs (r==0, r>=n, s==0, s>=n)
+    // are accepted and wrapped. Use parse_compact_strict() for validated parsing.
+    [[deprecated("Use ECDSASignature::parse_compact_strict for validated parsing. "
+                 "from_compact silently reduces non-canonical r/s values mod n (SEC-003).")]]
     static ECDSASignature from_compact(const std::uint8_t* data64);
+    [[deprecated("Use ECDSASignature::parse_compact_strict for validated parsing. "
+                 "from_compact silently reduces non-canonical r/s values mod n (SEC-003).")]]
     static ECDSASignature from_compact(const std::array<std::uint8_t, 64>& data);
 
     // Strict compact parse: rejects r >= n, s >= n, r == 0, s == 0 (no reduce)

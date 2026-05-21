@@ -612,8 +612,6 @@ int test_regression_shim_security_v7_run();               // 2026-05-13 v7: T-01
 int test_regression_adaptor_degenerate_v7_run();          // 2026-05-13 v7: T-09 adaptor degenerate output guard
 // 2026-05-13 v8 security fixes (P1-SEC-NEW-001, RED-TEAM-008, P2-SEC-NEW-002)
 int test_regression_shim_security_v8_run();               // advisory=true: shim must be linked
-// 2026-05-21 CT ops / security hardening (SEC-002/007/008/010 + CT-004/005)
-int test_regression_ct_ops_run(); // CT ops correctness regressions
 
 // ============================================================================
 // Report section IDs -- 9 audit categories

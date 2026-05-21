@@ -54,6 +54,7 @@ int test_zk_run();
 #ifdef SECP256K1_BIP324
 int test_bip324_run();
 #endif
+int test_perf_schnorr_correctness_run();
 
 // -- Module descriptor --------------------------------------------------------
 struct TestModule {
@@ -96,6 +97,7 @@ static const TestModule MODULES[] = {
 #ifdef SECP256K1_BIP324
     { "BIP-324 encrypted transport",                          test_bip324_run },
 #endif
+    { "Schnorr hot-path correctness (PERF-001/PERF-009)", test_perf_schnorr_correctness_run },
 };
 
 static constexpr int NUM_MODULES = sizeof(MODULES) / sizeof(MODULES[0]);

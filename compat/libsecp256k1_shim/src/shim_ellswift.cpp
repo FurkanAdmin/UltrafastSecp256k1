@@ -152,7 +152,14 @@ int secp256k1_ellswift_xdh(
     void* data)
 {
     SHIM_REQUIRE_CTX(ctx);
-    if (!output || !ell_a64 || !ell_b64 || !seckey32 || !hashfp) return 0;
+    // SHIM-008 fix: NULL hashfp is a programming error — fire illegal callback so
+    // callers that registered a no-op fuzz callback can intercept it instead of
+    // getting a silent failure (matches upstream libsecp256k1 argument validation).
+    if (!hashfp) {
+        secp256k1_shim_call_illegal_cb(ctx, "secp256k1_ellswift_xdh: NULL hashfp");
+        return 0;
+    }
+    if (!output || !ell_a64 || !ell_b64 || !seckey32) return 0;
 
     std::array<uint8_t, 32> kb{};
     std::memcpy(kb.data(), seckey32, 32);

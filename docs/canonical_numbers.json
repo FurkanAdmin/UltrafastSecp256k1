@@ -206,6 +206,6 @@
     }
   },
   "exploit_poc_count": 263,
-  "non_exploit_modules": 108,
-  "total_modules": 371
+  "non_exploit_modules": 109,
+  "total_modules": 372
 }

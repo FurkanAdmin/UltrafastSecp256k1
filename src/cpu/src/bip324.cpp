@@ -149,6 +149,11 @@ Bip324Session::Bip324Session(bool initiator) noexcept
     }
     our_encoding_ = ellswift_create(sk);
     detail::secure_erase(&sk, sizeof(sk));
+    // SEC-006: privkey_ raw bytes remain in memory until complete_handshake() is called,
+    // which re-parses them into a Scalar for the ECDH step and then erases them.
+    // Risk window: process memory dump between this constructor and complete_handshake().
+    // Full fix would store a Scalar member directly and erase it after ellswift_create(),
+    // eliminating the raw-byte window entirely. Tracked as SEC-006.
 }
 
 Bip324Session::Bip324Session(bool initiator, const std::uint8_t* privkey) noexcept
@@ -163,6 +168,10 @@ Bip324Session::Bip324Session(bool initiator, const std::uint8_t* privkey) noexce
     }
     our_encoding_ = ellswift_create(sk);
     detail::secure_erase(&sk, sizeof(sk));
+    // SEC-006: privkey_ raw bytes remain in memory until complete_handshake() is called.
+    // Risk window: process memory dump between this constructor and complete_handshake().
+    // The caller's privkey buffer is already a security concern at call time; this
+    // adds a bounded window during session setup. Tracked as SEC-006.
 }
 
 bool Bip324Session::complete_handshake(const std::uint8_t* peer_encoding) noexcept {

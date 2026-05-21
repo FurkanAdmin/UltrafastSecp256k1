@@ -54,21 +54,23 @@ int secp256k1_schnorrsig_verify_batch(
     if (!sigs64 || !msgs || !pubkeys) return 0;
 
     // Only 32-byte messages supported by internal batch_verify.
-    if (msglen != 32) return 0;
+    // SHIM-006 fix: fire illegal callback on unsupported msglen (not silent 0).
+    if (msglen != 32) {
+        secp256k1_shim_call_illegal_cb(ctx, "secp256k1_schnorrsig_verify_batch: msglen != 32 not supported");
+        return 0;
+    }
 
     // Small batches: fall back to individual verify (lower overhead).
     if (n < kBatchMinSchnorr) {
         for (size_t i = 0; i < n; ++i) {
             if (!sigs64[i] || !msgs[i] || !pubkeys[i]) return 0;
+            // PERF-003: use raw-pointer parse_strict overload — avoids 64-byte stack
+            // zero-init + memcpy per iteration (saves ~128 bytes of stack traffic/sig).
             secp256k1::SchnorrSignature sig;
-            std::array<uint8_t, 64> sb{};
-            std::memcpy(sb.data(), sigs64[i], 64);
-            if (!secp256k1::SchnorrSignature::parse_strict(sb, sig)) return 0;
-            std::array<uint8_t, 32> pk_bytes{};
-            std::memcpy(pk_bytes.data(), pubkeys[i]->data, 32);
-            std::array<uint8_t, 32> msg32{};
-            std::memcpy(msg32.data(), msgs[i], 32);
-            if (!secp256k1::schnorr_verify(pk_bytes, msg32, sig)) return 0;
+            if (!secp256k1::SchnorrSignature::parse_strict(sigs64[i], sig)) return 0;
+            // Pass raw pointers directly to schnorr_verify — avoids two 32-byte
+            // stack copies (pk_bytes, msg32) that were an avoidable memcpy per call.
+            if (!secp256k1::schnorr_verify(pubkeys[i]->data, msgs[i], sig)) return 0;
         }
         return 1;
     }

@@ -1139,6 +1139,7 @@ if(BUILD_TESTING)
         tests/test_ecc_properties.cpp
         tests/test_ecies.cpp
         tests/test_sha.cpp
+        tests/test_perf_schnorr_correctness.cpp
     )
     target_link_libraries(run_selftest PRIVATE ${SECP256K1_LIB_NAME})
 
@@ -1328,6 +1329,14 @@ if(BUILD_TESTING)
     target_compile_definitions(test_sha_standalone PRIVATE STANDALONE_TEST)
     add_test(NAME sha COMMAND test_sha_standalone)
 
+    # -- Schnorr hot-path correctness regression (PERF-001 / PERF-009) --
+    add_executable(test_perf_schnorr_correctness_standalone
+        tests/test_perf_schnorr_correctness.cpp
+    )
+    target_link_libraries(test_perf_schnorr_correctness_standalone PRIVATE ${SECP256K1_LIB_NAME})
+    target_compile_definitions(test_perf_schnorr_correctness_standalone PRIVATE STANDALONE_TEST)
+    add_test(NAME perf_schnorr_correctness COMMAND test_perf_schnorr_correctness_standalone)
+
     # -- BIP-141/143/144 SegWit tests --
     target_sources(run_selftest PRIVATE tests/test_bip141_143_144.cpp)
     add_executable(test_bip141_143_144_standalone tests/test_bip141_143_144.cpp)
@@ -1370,7 +1379,7 @@ if(BUILD_TESTING)
     if(SECP256K1_BUILD_ETHEREUM)
         list(APPEND CORE_TESTS ethereum)
     endif()
-    list(APPEND CORE_TESTS wallet zk_proofs ecies sha bip141_143_144 bip342 ffi_coverage)
+    list(APPEND CORE_TESTS wallet zk_proofs ecies sha bip141_143_144 bip342 ffi_coverage perf_schnorr_correctness)
     set_tests_properties(${CORE_TESTS} PROPERTIES LABELS "core")
 
     # -- Audit infrastructure lives in audit/ ------------------------------

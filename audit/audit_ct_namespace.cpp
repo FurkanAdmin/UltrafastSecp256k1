@@ -310,7 +310,10 @@ static void run_structural_checks(const std::string& root, int& check_num) {
             CHECK(!includes_fast_hpp, msg);
             ++check_num;
         } else {
+            // TEST-004: security-critical file absent — count as failure, not silent skip.
             ++check_num;
+            ++g_fail;
+            AUDIT_LOG("  [STRUCTURAL-SKIP-AS-FAIL] File not found: %s\n", path.c_str());
         }
     }
 
@@ -325,7 +328,10 @@ static void run_structural_checks(const std::string& root, int& check_num) {
             CHECK(contains(r.content, "secp256k1/ct/point.hpp"), msg);
             ++check_num;
         } else {
+            // TEST-004: security-critical file absent — count as failure, not silent skip.
             ++check_num;
+            ++g_fail;
+            AUDIT_LOG("  [STRUCTURAL-SKIP-AS-FAIL] File not found: %s\n", path.c_str());
         }
     }
 
@@ -340,7 +346,10 @@ static void run_structural_checks(const std::string& root, int& check_num) {
             CHECK(contains(r.content, "detail/secure_erase.hpp"), msg);
             ++check_num;
         } else {
+            // TEST-004: security-critical file absent — count as failure, not silent skip.
             ++check_num;
+            ++g_fail;
+            AUDIT_LOG("  [STRUCTURAL-SKIP-AS-FAIL] File not found: %s\n", path.c_str());
         }
     }
 
@@ -356,7 +365,10 @@ static void run_structural_checks(const std::string& root, int& check_num) {
             CHECK(contains(r.content, "secure_erase"), msg);
             ++check_num;
         } else {
+            // TEST-004: security-critical file absent — count as failure, not silent skip.
             ++check_num;
+            ++g_fail;
+            AUDIT_LOG("  [STRUCTURAL-SKIP-AS-FAIL] File not found: %s\n", path.c_str());
         }
     }
 }
@@ -385,10 +397,14 @@ int audit_ct_namespace_run() {
 
     int check_num = 1;
 
-    // Per-file audits
+    // Per-file audits — aggregate ADVISORY_SKIP_CODE (77) from run_file_audit().
+    // CI-001 fix: previously the return value was silently discarded, causing a
+    // false-green when all audited files were absent (0 checks = 0 failures = PASS).
+    int any_skip = 0;
     for (const auto& audit : AUDITS) {
         AUDIT_LOG("\n  Auditing: %s\n", audit.label);
-        run_file_audit(root, audit, check_num);
+        int rc = run_file_audit(root, audit, check_num);
+        if (rc == ADVISORY_SKIP_CODE) any_skip = 1;
     }
 
     // Structural checks
@@ -396,6 +412,7 @@ int audit_ct_namespace_run() {
 
     printf("[audit_ct_namespace] %d/%d checks passed\n",
            g_pass, g_pass + g_fail);
+    if (g_fail == 0 && any_skip) return ADVISORY_SKIP_CODE;
     return (g_fail > 0) ? 1 : 0;
 }
 

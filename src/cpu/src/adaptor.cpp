@@ -268,8 +268,11 @@ ecdsa_adaptor_sign(const Scalar& private_key,
     auto R_x_bytes = R.x().to_bytes();
     Scalar const r = Scalar::from_bytes(R_x_bytes);
     if (r.is_zero()) {
-        // Degenerate case
-        return ECDSAAdaptorSig{R_hat, Scalar::zero(), r};
+        // SEC-008: degenerate case — return fully-zero sentinel.
+        // Previously returned {R_hat, Scalar::zero(), r} which left a non-zero
+        // R_hat in the output struct, creating a partially-populated degenerate
+        // pre-signature that could mislead callers checking only r==0.
+        return ECDSAAdaptorSig{Point::infinity(), Scalar::zero(), Scalar::zero()};
     }
 
     // s = k^-^1 * (z + r*x)  where z = msg_hash

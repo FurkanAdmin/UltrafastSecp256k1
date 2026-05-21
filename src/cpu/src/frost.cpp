@@ -270,8 +270,8 @@ static Scalar frost_lagrange_coefficient_from_commitments(
             continue;
         }
         Scalar const x_j = Scalar::from_uint64(j);
-        num = num * x_j;
-        den = den * (x_j - x_i);
+        num = secp256k1::ct::scalar_mul(num, x_j);              // SEC-002/CT-002: was fast::operator*, VT on secret-adjacent path
+        den = secp256k1::ct::scalar_mul(den, secp256k1::ct::scalar_sub(x_j, x_i));  // SEC-002/CT-002: was fast::operator*(x_j - x_i), VT
     }
 
     if (!found_i) {

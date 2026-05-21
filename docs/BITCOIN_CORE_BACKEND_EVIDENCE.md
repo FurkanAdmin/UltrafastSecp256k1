@@ -1,6 +1,6 @@
 # Bitcoin Core Alternative Backend — Evidence Document
 
-> Version: 1.3 — 2026-05-11
+> Version: 1.4 — 2026-05-21
 > Profile: `bitcoin-core-backend`
 > Status: PR-prep / RC-prep — evidence refresh in progress; not yet submitted (see BITCOIN_CORE_PR_BLOCKERS.md)
 
@@ -96,7 +96,7 @@ known gap (see Section 3).
 | `secp256k1_xonly_pubkey_parse` rejects `x >= p` and x-coordinates with no valid y | `ci/check_libsecp_shim_parity.py` | `preflight.yml` | Every commit |
 | `secp256k1_pubkey_parse` rejects the point at infinity and malformed encodings | `ci/check_libsecp_shim_parity.py` | `preflight.yml` | Every commit |
 | RFC 6979 deterministic nonce derivation matches the libsecp256k1 reference output on the BIP-340 test vectors and the RFC 6979 ECDSA test vectors | `ci/rfc6979_spec_verifier.py` | `security-audit.yml` | Every commit |
-| `ndata` / R-grinding compatibility: `secp256k1_ecdsa_sign` with `ndata != NULL` (extra entropy) produces the same output as libsecp256k1 for the same `ndata` input | `compat/libsecp256k1_shim/src/shim_ecdsa.cpp` (`ecdsa_sign_hedged`) | Manual verified; CI gate planned | 2026-04-27 |
+| `ndata` / R-grinding compatibility: `secp256k1_ecdsa_sign` with `ndata != NULL` (extra entropy) produces a valid but not bit-identical signature vs libsecp256k1 when ndata is used (hedged nonce derivation). R-grinding terminates correctly. See `docs/SHIM_KNOWN_DIVERGENCES.md §SHIM-010`. | `compat/libsecp256k1_shim/src/shim_ecdsa.cpp` (`ecdsa_sign_hedged`) | Produces valid but not bit-identical signature vs libsecp256k1 when ndata is used (hedged nonce derivation). R-grinding terminates correctly. CI gate: not yet implemented. See SHIM_KNOWN_DIVERGENCES.md for details. | 2026-05-21 |
 | The shim layer does not leak C++20 language requirements to consumers: the gate's `ci/check_core_build_mode.py` parses `compat/libsecp256k1_shim/CMakeLists.txt` and fails the build if `target_compile_features(... PUBLIC cxx_std_*)` is used (must be `PRIVATE`) | `ci/check_core_build_mode.py` | `gate.yml` Block 3 (`Core build mode check`) | Every commit |
 | Context creation calls `ensure_library_integrity()` self-test: `ufsecp_ctx_create` verifies field arithmetic, scalar arithmetic, and generator point before returning | `compat/libsecp256k1_shim/src/shim_context.cpp` | Audit tests (`unified_audit_runner`) | Every commit |
 | Zero-signature detection: CT signing primitives returning `r == 0`, `s == 0`, or all-zero Schnorr signature cause the ABI wrapper to return `UFSECP_ERR_INTERNAL`, not serialize the zero result | `audit/test_exploit_boundary_sentinels.cpp` | `unified_audit_runner` via CTest | Every commit |
@@ -167,17 +167,17 @@ Full data: `docs/BITCOIN_CORE_BENCH_RESULTS.json` (commit `48e7c02f`, 2026-05-12
 ### CT Signing — Compiler Results (Material Disclosure)
 
 CT signing performance on GCC 14.2.0 (Linux default for Bitcoin Core CI),
-from `docs/bench_unified_2026-05-16_gcc14_x86-64.json`
+from `docs/bench_unified_2026-05-11_gcc14_x86-64.json`
 (Intel i5-14400F, turbo disabled via `intel_pstate/no_turbo=1`, governor=performance,
 core pinned, 500 warmup, 11 passes, IQR trimming):
 
 | Compiler | CT ECDSA sign | CT Schnorr sign | Canonical artifact |
 |----------|:---:|:---:|---|
-| **GCC 14.2.0** (Linux default) | **1.30× faster** (+30%) | **1.28× faster** (+28%) | `docs/bench_unified_2026-05-16_gcc14_x86-64.json` |
+| **GCC 14.2.0** (Linux default) | **1.24× faster** (+24%) | **1.09× faster** (+9%) | `docs/bench_unified_2026-05-11_gcc14_x86-64.json` |
 | Clang 19 (archived, 2026-03-24) | 1.33× faster (+33%) | ~1.09× faster | `docs/BENCHMARKS.md §archived` — not a current controlled run |
 
 > **Two benchmark sets, two different measurements:**
-> - `bench_unified` CT-vs-CT rows (above): isolate the raw CT signing primitive (RFC6979 + CT generator mul + CT scalar inverse). GCC 14: 1.30×/1.28× faster.
+> - `bench_unified` CT-vs-CT rows (above): isolate the raw CT signing primitive (RFC6979 + CT generator mul + CT scalar inverse). GCC 14: 1.24×/1.09× faster.
 > - `bench_bitcoin SignTransaction*` rows: cover the full Bitcoin Core transaction-signing path including context-blinding cache and pre-computed generator tables. GCC 13/14: 1.09–1.24× faster (see §Results table above).
 >
 > Both are correct — they measure different scopes. The full-path `SignTransaction*` numbers are the Bitcoin Core-relevant ones; the CT primitive numbers confirm no scalar-inverse regression on GCC 14.

@@ -76,7 +76,14 @@ Scalar batch_weight(const SHA256::Midstate& midstate, uint32_t index) {
     SHA256 ctx = SHA256::from_midstate(midstate);  // 40-byte copy, not 104
     ctx.update(index_bytes, sizeof(index_bytes));
     auto h = ctx.finalize();
-    return Scalar::from_bytes(h);
+    Scalar w = Scalar::from_bytes(h);
+    // SEC-007: SHA256 output equal to the curve order n reduces to 0 mod n.
+    // A zero weight would silently exclude this signature from the batch check,
+    // turning a potentially invalid signature into an unchecked one.
+    // Probability is ~2^-128 but the consequence is fail-open, so we use 1
+    // as a safe non-zero fallback.
+    if (w.is_zero()) w = Scalar::one();
+    return w;
 }
 
 struct SchnorrBatchScratch {
