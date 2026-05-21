@@ -607,10 +607,17 @@ class AuditTestScanner:
         # A comment mentioning the symbol is NOT the same as it being registered.
         runner_text_stripped = re.sub(r'//[^\n]*', '', runner_text)
 
-        # Collect every test_exploit_*.cpp that defines a `*_run()` entry point
-        exploit_files = sorted(self.audit_dir.glob("test_exploit_*.cpp"))
+        # Collect every test_exploit_*.cpp, test_regression_*.cpp, and
+        # test_mutation_*.cpp that defines a `*_run()` entry point.
+        # TEST-005: regression and mutation tests must also be wired into
+        # unified_audit_runner.cpp to contribute to the aggregated verdict.
+        exploit_files = sorted(
+            list(self.audit_dir.glob("test_exploit_*.cpp")) +
+            list(self.audit_dir.glob("test_regression_*.cpp")) +
+            list(self.audit_dir.glob("test_mutation_*.cpp"))
+        )
         run_decl_re = re.compile(
-            r"^\s*(?:int|static\s+int)\s+(test_exploit_[A-Za-z0-9_]+_run)\s*\("
+            r"^\s*(?:int|static\s+int)\s+(test_(?:exploit|regression|mutation)_[A-Za-z0-9_]+_run)\s*\("
             , re.MULTILINE)
 
         for cpp in exploit_files:
@@ -638,16 +645,23 @@ class AuditTestScanner:
             # Registration check: symbol must appear both as a forward decl
             # AND inside the ALL_MODULES table of unified_audit_runner.
             if run_sym not in runner_text_stripped:
+                # Determine the appropriate section for the finding hint
+                if cpp.name.startswith("test_regression_"):
+                    section_hint = "math_invariants"
+                elif cpp.name.startswith("test_mutation_"):
+                    section_hint = "exploit_poc"
+                else:
+                    section_hint = "exploit_poc"
                 self._add(
                     cpp.name, m.start(), "high", "G", "exploit_unwired",
                     f"{cpp.name} exposes {run_sym}() but unified_audit_runner.cpp "
-                    f"does not reference it; this PoC runs only as a standalone "
+                    f"does not reference it; this test runs only as a standalone "
                     f"CTest binary and does not contribute to the aggregated "
                     f"audit verdict (BUG-A1 class).",
                     m.group(0).strip()[:120],
                     f"Add `int {run_sym}();` to the forward declarations block "
                     f"and register an ALL_MODULES entry with section "
-                    f"\"exploit_poc\" in audit/unified_audit_runner.cpp.")
+                    f"\"{section_hint}\" in audit/unified_audit_runner.cpp.")
 
 
 # ---------------------------------------------------------------------------
@@ -760,6 +774,12 @@ def main():
         print_report(findings, total_files)
 
     # Exit code: 0=clean, 1=high/critical — applies in ALL output modes
+    # TODO (TEST-006): threshold divergence between pipelines:
+    #   - caas.yml inline Python blocks on total_findings > 0 (any severity)
+    #   - preflight.yml gate blocks on HIGH/critical (n_crit + n_high > 0)
+    #   These two thresholds are inconsistent. Owner should decide whether
+    #   medium/low findings should be blocking in caas.yml or advisory-only.
+    #   Until resolved: caas.yml is stricter (0-tolerance), preflight is lenient.
     n_crit = sum(1 for f in findings if f.severity == "critical")
     n_high = sum(1 for f in findings if f.severity == "high")
     sys.exit(1 if (n_crit + n_high) > 0 else 0)

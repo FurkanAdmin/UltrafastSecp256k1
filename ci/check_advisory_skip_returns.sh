@@ -2,6 +2,12 @@
 # Verifies that advisory audit modules return ADVISORY_SKIP_CODE=77 when
 # GPU/optional infrastructure is absent (not 0, which would be a false PASS).
 #
+# TODO CI-003: This script currently checks only 2 hard-coded advisory binaries.
+# For complete Rule 16 enforcement, enumerate ALL advisory=true entries in
+# audit/unified_audit_runner.cpp ALL_MODULES[] and verify each standalone binary
+# returns ADVISORY_SKIP_CODE (77) when GPU/optional infrastructure is absent.
+# Until fixed, advisory skip coverage is incomplete.
+#
 # Exit codes:
 #   0  — all checked advisory binaries return 77 correctly (or were not found)
 #   1  — at least one advisory binary returned 0 (false PASS)

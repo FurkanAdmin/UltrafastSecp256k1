@@ -196,7 +196,7 @@ def check_version_sync(root: Path) -> bool:
     if ok:
         print(f'\n  All version declarations match {canonical}.')
     else:
-        print('\n  FAIL — run: python3 scripts/sync_version_refs.py --dry-run')
+        print('\n  FAIL — run: python3 ci/sync_version_refs.py --dry-run')
     return ok
 
 
@@ -227,9 +227,13 @@ def check_count_sync(root: Path) -> bool:
         # (ufsecp_bip352_prepare_scan_plan) which is not a GPU kernel dispatch.
         # NOTE: the macro name is UFSECP_API, not UFSECP_GPU_API (which does not
         # exist in this header). The pattern below is the authoritative count source.
-        auth_gpu = len(re.findall(
-            r'^UFSECP_API\s+ufsecp_error_t\s+ufsecp_gpu_\w+\s*\(',
-            t, re.MULTILINE))
+        # Exclude lifecycle/context functions (device_info, ctx_create, last_error)
+        # which are not batch-op dispatch functions.
+        _gpu_fns = re.findall(
+            r'^UFSECP_API\s+ufsecp_error_t\s+(ufsecp_gpu_\w+)\s*\(',
+            t, re.MULTILINE)
+        _lifecycle_fns = {'ufsecp_gpu_device_info', 'ufsecp_gpu_ctx_create', 'ufsecp_gpu_last_error'}
+        auth_gpu = len([fn for fn in _gpu_fns if fn not in _lifecycle_fns])
 
     # Scan docs for stale exploit counts (3+ digit numbers only — small counts
     # like "14 new exploit PoCs" are incremental changelog entries, not totals)
@@ -248,7 +252,7 @@ def check_count_sync(root: Path) -> bool:
         print(f'\n  STALE exploit PoC references ({len(stale)} locations):')
         for path, n in stale[:10]:
             print(f'    {path}: found {n}, expected {auth_exploit}')
-        print(f'\n  Fix: python3 scripts/sync_version_refs.py --sync-exploit --dry-run')
+        print(f'\n  Fix: python3 ci/sync_version_refs.py --sync-exploit --dry-run')
     else:
         print(f'\n  All exploit PoC count references match {auth_exploit}. OK')
     return ok

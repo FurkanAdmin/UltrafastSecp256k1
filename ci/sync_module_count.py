@@ -183,6 +183,23 @@ def make_replacements(content: str,
             changes += 1
         new = result
 
+    # PAREN_MODULES_RE: replaces ALL occurrences (count=0 is the default for re.sub)
+    # e.g. "(N modules," or "across N modules" → updated counts
+    def _replace_paren_modules(m: re.Match) -> str:
+        nonlocal changes
+        prefix = 'across' if m.group(0).lstrip().startswith('across') else '('
+        sep = ' ' if prefix == 'across' else ' '
+        inner = m.group(0)
+        if 'non-exploit' in inner:
+            replacement = f'{prefix} {non_exploit} non-exploit modules'
+        else:
+            replacement = f'{prefix} {total} modules'
+        if inner != replacement:
+            changes += 1
+        return replacement
+
+    new = PAREN_MODULES_RE.sub(_replace_paren_modules, new)
+
     _sub(ALL_BOTH_RE,
          f'All {non_exploit} non-exploit audit modules and all {exploit_mods} exploit PoCs')
     _sub(TABLE_EXPLOIT_ROW_RE,
@@ -271,7 +288,7 @@ def main() -> int:
     if args.dry_run:
         if total_changed_files > 0:
             print(f'[DRIFT] would update {total_changed_files} file(s), {total_changed_lines} occurrence(s).')
-            print('Run: python3 scripts/sync_all_docs.py')
+            print('Run: python3 ci/sync_all_docs.py')
             return 1
         print('[OK] All docs already up to date.')
     elif total_changed_files == 0:

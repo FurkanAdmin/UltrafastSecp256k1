@@ -1008,7 +1008,7 @@ jobs:
           name: caas-evidence-chain-${{ github.run_id }}
           path: docs/EVIDENCE_CHAIN.json
           retention-days: 365
-          if-no-files-found: warn
+          if-no-files-found: error
 
       - name: Final step summary
         if: always()
