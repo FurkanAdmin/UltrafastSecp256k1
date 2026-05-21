@@ -166,8 +166,8 @@ jobs:
       # silently become the new baseline, masking further regressions.
       # To reset/update the baseline: trigger workflow_dispatch manually on a
       # known-good commit; review the JSON artifact before accepting it.
-      # alert-threshold: '200%' = alert if ≥100% slower than baseline (2×).
-      # Shared runners have ±15-30% variance; 200% detects only catastrophic regressions.
+      # alert-threshold: '150%' = alert if >=50% slower than baseline (1.5x).
+      # At 200% (2x slower) significant regressions pass silently.
       if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
       uses: benchmark-action/github-action-benchmark@a7bc2366eda11037936ea57d811a43b3418d3073 # v1
       with:
@@ -176,7 +176,7 @@ jobs:
         output-file-path: /tmp/benchmark_results/benchmark.json
         github-token: ${{ secrets.GITHUB_TOKEN }}
         auto-push: false
-        alert-threshold: '200%'
+        alert-threshold: '150%'
         comment-on-alert: true
         fail-on-alert: true
         benchmark-data-dir-path: 'dev/bench-gate'
@@ -185,8 +185,10 @@ jobs:
       # Compares PR benchmark against the stored baseline from push events.
       # Does NOT store (auto-push: false) -- only the push to main/dev updates baseline.
       # BLOCKS PR if regression exceeds threshold.
-      # Threshold: alert-threshold '200%' in github-action-benchmark = any
-      # operation that runs >2x as long as the baseline (>100% slower) fails.
+      # Threshold: alert-threshold '150%' in github-action-benchmark = any
+      # operation that runs >1.5x as long as the baseline (>50% slower) fails.
+      # alert-threshold: '150%' = alert if >=50% slower than baseline (1.5x).
+      # At 200% (2x slower) significant regressions pass silently.
       if: github.event_name == 'pull_request'
       uses: benchmark-action/github-action-benchmark@a7bc2366eda11037936ea57d811a43b3418d3073 # v1
       with:
@@ -195,7 +197,7 @@ jobs:
         output-file-path: /tmp/benchmark_results/benchmark.json
         github-token: ${{ secrets.GITHUB_TOKEN }}
         auto-push: false
-        alert-threshold: '200%'
+        alert-threshold: '150%'
         comment-on-alert: true
         fail-on-alert: true
         benchmark-data-dir-path: 'dev/bench-gate'
@@ -216,7 +218,7 @@ jobs:
       run: |
         echo "## Benchmark Smoke Test (quick mode -- not a regression gate)" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "**Event:** \`${{ github.event_name }}\`  **Threshold:** alert-threshold '200%' = any op running >2x baseline (>100% slower) fails." >> $GITHUB_STEP_SUMMARY
+        echo "**Event:** \`${{ github.event_name }}\`  **Threshold:** alert-threshold '150%' = any op running >1.5x baseline (>50% slower) fails." >> $GITHUB_STEP_SUMMARY
         if [ "${{ github.event_name }}" = "push" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
           echo "**Baseline:** stored to \`dev/bench-gate\` on gh-pages (auto-push: true)" >> $GITHUB_STEP_SUMMARY
         else

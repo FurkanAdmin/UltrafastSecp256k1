@@ -154,8 +154,8 @@ Two fixes were required:
 | Stage 2b — ABI stability | ✅ PASS | `static_assert` struct layout guards |
 | Stage 2c — differential | ✅ PASS | Cross-validation against libsecp256k1 |
 | Stage 2d — Wycheproof | ✅ 11/11 | All Wycheproof test suites pass |
-| Stage 2e — Bitcoin Core tests | ✅ 693/693 | `docs/BITCOIN_CORE_TEST_RESULTS.json` |
+| Stage 2e — Bitcoin Core tests | ✅ 749/749 | `docs/BITCOIN_CORE_BENCH_RESULTS.json` (GCC 14, 2026-05-20) |
 
 ---
 
-*Last updated: 2026-05-11 — Security fixes: CT-001 ellswift non-CT gen_mul, CT-003 schnorr_xonly branchless parity, RT-004 HMAC pad erase, CT-006 MuSig2 k1/k2 strict parsing, RT-011 BIP32 private_key() strict, SHIM-002 context_create callback, SHIM-012 pubkey_sort crash. Stage 0 updated 235→254. ConnectBlock: Ultra wins ALL scenarios +1.0–+2.1% with LTO (confirmed, err% 0.1–0.3%, re-measured 2026-05-11). All blockers remain closed.*
+*Last updated: 2026-05-20 — Security fixes: CT-001 ellswift non-CT gen_mul, CT-003 schnorr_xonly branchless parity, RT-004 HMAC pad erase, CT-006 MuSig2 k1/k2 strict parsing, RT-011 BIP32 private_key() strict, SHIM-002 context_create callback, SHIM-012 pubkey_sort crash. Stage 0 updated 235→254. Stage 2e updated 693/693 (Clang 19) → 749/749 (GCC 14, 2026-05-20). ConnectBlock: Ultra wins ALL scenarios +0.9–+1.5% with LTO (confirmed, err% 0.2–0.5%, hard turbo lock 2026-05-12; see docs/BITCOIN_CORE_BENCH_RESULTS.json). All blockers remain closed.*

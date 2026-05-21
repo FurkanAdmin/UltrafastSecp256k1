@@ -32,6 +32,10 @@ jobs:
     name: Release / CAAS Gate
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    # NOTE: The 'release-gate' GitHub environment must be configured in repo
+    # Settings → Environments with required reviewers to enforce manual approval.
+    # This prevents accidental or automated releases triggered by tag push alone.
+    environment: release-gate
     steps:
       - name: Harden the runner (Audit all outbound calls)
         uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0

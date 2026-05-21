@@ -205,7 +205,7 @@
       "promote_to_release_grade_when": "A bench_unified --shim controlled run populates the per-function ns fields above with non-null values and the ci/check_bench_doc_consistency gate accepts the delta."
     }
   },
-  "exploit_poc_count": 263,
-  "non_exploit_modules": 109,
-  "total_modules": 372
+  "exploit_poc_count": 265,
+  "non_exploit_modules": 114,
+  "total_modules": 379
 }

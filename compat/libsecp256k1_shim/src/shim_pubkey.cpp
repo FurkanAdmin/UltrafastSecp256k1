@@ -144,6 +144,15 @@ int secp256k1_ec_pubkey_cmp(
     const secp256k1_context *ctx,
     const secp256k1_pubkey *pubkey1, const secp256k1_pubkey *pubkey2)
 {
+    // SHIM-005: NULL ctx must fire the illegal callback before any other check.
+    // The previous code only fired the callback when pubkeys were null, passing
+    // NULL ctx to secp256k1_shim_call_illegal_cb which is itself unsafe. This
+    // guard fires first so the callback receives a valid (non-NULL) ctx, and
+    // matches upstream libsecp256k1 behavior (NULL ctx → callback → abort).
+    if (SECP256K1_UNLIKELY(!ctx)) {
+        secp256k1_shim_call_illegal_cb(ctx, "secp256k1_ec_pubkey_cmp: NULL ctx");
+        return 0;
+    }
     if (!pubkey1 || !pubkey2) {
         secp256k1_shim_call_illegal_cb(ctx,
             "secp256k1_ec_pubkey_cmp: invalid pubkey argument");

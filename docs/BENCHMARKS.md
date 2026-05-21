@@ -81,6 +81,8 @@ Covered flows include:
 
 Quick sanity run from `bench_unified --quick` on the local x86-64 validation machine:
 
+> **[diagnostic]** Run: `bench_unified --quick` | Machine: i5-14400F | GCC 14.2.0 | Turbo: off | Date: see git log
+
 | Flow | Time |
 |------|-----:|
 | ECDH (`ecdh_compute`) | 22.8 us |
@@ -304,6 +306,8 @@ Run policy: native board execution (no QEMU), `bench_unified --suite all --passe
 
 #### Full Benchmark (opt3 retained)
 
+> **[diagnostic]** FAST-path (variable-time) rows below compare VT Ultra vs CT libsecp256k1. Not production-equivalent. CT signing on RISC-V: ~1.06×–1.07×.
+
 | Operation | Time | Ratio vs libsecp | Notes |
 |-----------|------|------------------|-------|
 | ECDSA Sign | 72.64 us | 2.00x | FAST path |
@@ -437,13 +441,15 @@ paths (sign, pubkey, batch) win by 2–2.7×. CT signing beats libsecp by ~7% CT
 > As of early 2026, this is the only multi-backend (CUDA + OpenCL + Metal) secp256k1 library
 > with CT-signed batch ECDSA and Schnorr on GPU that the authors are aware of. If you know of others, please open an issue.
 
+All throughput numbers below are **Kernel-only (excl. PCIe DMA)**. Wall-clock throughput including host↔device transfer is lower.
+
 | Operation | Time/Op | Throughput | Notes |
 |-----------|---------|------------|-------|
-| ECDSA Sign | 204.8 ns | 4.88 M/s | RFC 6979, low-S, batch 16K |
-| ECDSA Verify | **230.2 ns** | **4.34 M/s** | Shamir+GLV double-mul, batch 64K |
-| ECDSA Sign + Recid | 311.5 ns | 3.21 M/s | Recoverable, batch 16K |
-| Schnorr Sign (BIP-340) | 273.4 ns | 3.66 M/s | Tagged hash midstates, batch 16K |
-| Schnorr Verify (BIP-340) | **167.0 ns** | **5.99 M/s** | Shamir+GLV double-mul, batch 64K |
+| ECDSA Sign | 204.8 ns | 4.88 M/s | Kernel-only (excl. PCIe DMA), RFC 6979, low-S, batch 16K |
+| ECDSA Verify | **230.2 ns** | **4.34 M/s** | Kernel-only (excl. PCIe DMA), Shamir+GLV double-mul, batch 64K |
+| ECDSA Sign + Recid | 311.5 ns | 3.21 M/s | Kernel-only (excl. PCIe DMA), Recoverable, batch 16K |
+| Schnorr Sign (BIP-340) | 273.4 ns | 3.66 M/s | Kernel-only (excl. PCIe DMA), Tagged hash midstates, batch 16K |
+| Schnorr Verify (BIP-340) | **167.0 ns** | **5.99 M/s** | Kernel-only (excl. PCIe DMA), Shamir+GLV double-mul, batch 64K |
 
 ### GPU Zero-Knowledge Operations
 

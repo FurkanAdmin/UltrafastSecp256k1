@@ -16,12 +16,12 @@ It is not a trust request. It is a verification package.
   </a>
 </p>
 
-[![Gate](https://github.com/shrec/UltrafastSecp256k1/actions/workflows/gate.yml/badge.svg?branch=main)](https://github.com/shrec/UltrafastSecp256k1/actions/workflows/gate.yml)
-[![CI](https://github.com/shrec/UltrafastSecp256k1/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/shrec/UltrafastSecp256k1/actions/workflows/ci.yml)
-[![Security Audit](https://github.com/shrec/UltrafastSecp256k1/actions/workflows/security-audit.yml/badge.svg?branch=main)](https://github.com/shrec/UltrafastSecp256k1/actions/workflows/security-audit.yml)
-[![CAAS](https://github.com/shrec/UltrafastSecp256k1/actions/workflows/caas.yml/badge.svg?branch=main)](https://github.com/shrec/UltrafastSecp256k1/actions/workflows/caas.yml)
+[![Gate](https://github.com/shrec/UltrafastSecp256k1/actions/workflows/gate.yml/badge.svg?branch=dev)](https://github.com/shrec/UltrafastSecp256k1/actions/workflows/gate.yml)
+[![CI](https://github.com/shrec/UltrafastSecp256k1/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/shrec/UltrafastSecp256k1/actions/workflows/ci.yml)
+[![Security Audit](https://github.com/shrec/UltrafastSecp256k1/actions/workflows/security-audit.yml/badge.svg?branch=dev)](https://github.com/shrec/UltrafastSecp256k1/actions/workflows/security-audit.yml)
+[![CAAS](https://github.com/shrec/UltrafastSecp256k1/actions/workflows/caas.yml/badge.svg?branch=dev)](https://github.com/shrec/UltrafastSecp256k1/actions/workflows/caas.yml)
 [![SonarCloud](https://sonarcloud.io/api/project_badges/measure?project=shrec_UltrafastSecp256k1&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=shrec_UltrafastSecp256k1)
-[![CodeQL](https://github.com/shrec/UltrafastSecp256k1/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/shrec/UltrafastSecp256k1/actions/workflows/codeql.yml)
+[![CodeQL](https://github.com/shrec/UltrafastSecp256k1/actions/workflows/codeql.yml/badge.svg?branch=dev)](https://github.com/shrec/UltrafastSecp256k1/actions/workflows/codeql.yml)
 [![OSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/shrec/UltrafastSecp256k1/badge)](https://securityscorecards.dev/viewer/?uri=github.com/shrec/UltrafastSecp256k1)
 [![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.19685027-blue.svg)](https://doi.org/10.5281/zenodo.19685027)
 
@@ -42,6 +42,8 @@ It is not a trust request. It is a verification package.
 **Scope:** CPU secp256k1 backend only — ECDSA/Schnorr sign/verify, RFC 6979 nonce, DER parsing, constant-time signing, libsecp256k1-compatible shim. GPU, FFI, bindings, WASM, ZK, multi-coin, and wallet tooling are out of scope for this evaluation.
 
 **NOT A REPLACEMENT.** This PR adds an opt-in compile-time alternative backend (`-DSECP256K1_BACKEND=ultrafast`, default: `bundled`). When bundled, the build is byte-for-byte identical to today. The existing `src/secp256k1/` path and all existing behavior is unchanged.
+
+**Note:** No external third-party audit has been performed. CAAS is the project's own automated security framework.
 
 **Reproduce from patch (primary — stable):**
 ```bash
@@ -82,7 +84,8 @@ python3 ci/caas_runner.py --profile bitcoin-core-backend --json -o btc.json
 > **ConnectBlock (primary block-validation workload):** within ±1.5% of libsecp256k1 depending on build configuration.
 > - With Release+LTO (GCC 14.2.0, required for any positive result): **+0.9–1.5%** across all workload profiles (AllEcdsa, AllSchnorr, Mixed)
 > - Without LTO: **−0.5–1.0%** on all profiles (larger code footprint causes i-cache pressure)
-> - Taproot key-path signing is 10–35% faster with Release+LTO (not measured without LTO)
+> - Taproot key-path signing: +10% faster (SignTransactionSchnorr)
+> - Taproot script-path signing: +35% faster (SignSchnorrWithMerkleRoot)
 > - Canonical data: [docs/BITCOIN_CORE_BENCH_RESULTS.json](docs/BITCOIN_CORE_BENCH_RESULTS.json) (commit 48e7c02f)
 
 ---

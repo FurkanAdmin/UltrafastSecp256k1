@@ -645,8 +645,12 @@ int secp256k1_musig_partial_sig_agg(
     // SHIM-004: fail-closed on all-zero signature — degenerate aggregation result.
     // A 64-byte all-zero Schnorr signature is always invalid; returning it as success
     // would allow a caller to serialize and broadcast a trivially invalid signature.
-    bool all_zero = true;
-    for (int i = 0; i < 64; ++i) { if (final_sig[i] != 0) { all_zero = false; break; } }
+    // SHIM-MUSIG-CT: use a CT accumulator (no early-exit branch) so the all-zero
+    // check does not leak information about the aggregated signature value via
+    // cache or branch-predictor timing. The loop runs all 64 bytes unconditionally.
+    uint32_t nonzero = 0;
+    for (int i = 0; i < 64; ++i) nonzero |= static_cast<uint32_t>(final_sig[i]);
+    const bool all_zero = (nonzero == 0);
     if (all_zero) {
         ka_remove(sess_load_cache_ptr(session));
         return 0;

@@ -481,3 +481,89 @@ For the complete compatibility test matrix see `compat/libsecp256k1_shim/tests/`
 - **Reason:** Hedged nonce provides defense against bad RNG without requiring exact RFC6979 parity.
 - **Impact:** Signatures differ byte-for-byte from libsecp256k1 when ndata is used. R-grinding terminates correctly and produces a valid low-S/low-R signature. Bitcoin Core production path uses noncefp=NULL (unaffected).
 - **Test:** Verify R-grinding terminates within bounded iterations; confirm produced signature is valid (not necessarily identical to libsecp output).
+
+---
+
+## secp256k1_ec_pubkey_cmp — NULL ctx now fires illegal callback (SHIM-005-FIX)
+
+- **Upstream behavior:** NULL ctx fires the illegal callback (default: abort) before any other
+  argument check. The pubkey comparison result is never computed if ctx is NULL.
+- **Previous shim behavior:** NULL ctx was passed directly to `secp256k1_shim_call_illegal_cb`
+  only when pubkeys were null — not when ctx itself was null. This meant a NULL ctx could
+  silently reach `secp256k1_ec_pubkey_serialize` with a NULL context, a separate bug.
+- **Current shim behavior (post-fix):** Explicit `!ctx` guard fires the illegal callback
+  and returns 0 before any pubkey or serialize logic. **Fixed 2026-05-21 (SHIM-005-FIX).**
+- **Reason:** Matches upstream libsecp256k1 contract — NULL ctx is always a programming
+  error and must fire the callback.
+- **Impact:** None for correct callers. Callers that accidentally pass NULL ctx now get the
+  same abort behavior as with upstream libsecp256k1.
+- **Test:** `test_shim_security_edge_cases_run` — calls `secp256k1_ec_pubkey_cmp` with NULL
+  ctx and asserts the illegal callback fires.
+
+---
+
+## secp256k1_musig_partial_sig_agg — all-zero check uses CT accumulator (SHIM-MUSIG-CT)
+
+- **Upstream behavior:** No all-zero check — returns the aggregated value unconditionally.
+- **Shim behavior:** Checks whether the 64-byte aggregated signature is all-zero (degenerate
+  aggregation result) and returns 0 if so. **Updated 2026-05-21:** the check now uses a
+  branchless OR-accumulator (`uint32_t nonzero = 0; for(i) nonzero |= sig[i]`) instead of
+  the previous early-exit `break` loop.
+- **Reason:** The early-exit loop leaked information about the signature bytes via
+  branch-predictor and cache timing — the loop terminated faster when a non-zero byte
+  appeared early, revealing the index of the first non-zero byte. The OR-accumulator
+  runs all 64 bytes unconditionally, eliminating this side-channel.
+- **Impact:** No behavioral change for callers — the return value is the same. Timing
+  behavior is now data-independent for the all-zero check.
+- **Test:** `test_regression_shim_security_v7_run` (musig2 aggregate round-trips).
+
+---
+
+## secp256k1_musig_nonce_gen — extra_input32 silently ignored (SHIM-NONCEGEN-001)
+
+- **Upstream behavior:** `secp256k1_musig_nonce_gen` accepts an `extra_input32` parameter
+  that is mixed into the nonce derivation as additional entropy (defense-in-depth).
+- **Shim behavior:** The `extra_input32` parameter is accepted in the function signature but
+  not forwarded to the internal `frost_sign_nonce_gen` / `musig2_nonce_gen` primitives.
+  The parameter is silently ignored.
+- **Reason:** The shim's internal nonce generation API does not expose an `extra_input32`
+  parameter. Adding support requires a non-trivial API change to the nonce derivation path.
+- **Impact:** Callers relying on `extra_input32` for additional entropy get correct nonces
+  (RFC 6979 / BIP-340 hedged) but without the extra input mixed in. For production Bitcoin
+  Core usage (extra_input32 = NULL or ignored), there is no difference.
+- **Test:** TODO — differential test against libsecp256k1-zkp that verifies nonce bytes
+  differ when extra_input32 is non-NULL.
+
+---
+
+## secp256k1_schnorrsig_verify_batch — msglen != 32 silently rejects (SHIM-BATCH-001)
+
+- **Upstream behavior:** libsecp256k1 does not expose `secp256k1_schnorrsig_verify_batch`
+  in the standard API; this is a shim-only extension.
+- **Shim behavior:** The batch verify shim (`secp256k1_schnorrsig_verify_batch`) requires
+  all messages to have `msglen == 32`. If `msglen != 32`, the function returns 0 without
+  firing the illegal callback.
+- **Reason:** The batch code path uses fixed 32-byte message processing for performance.
+  Variable-length batch verify requires a different internal API path not yet exposed.
+- **Impact:** Callers using variable-length messages in batch verify will get a silent
+  rejection (return 0) rather than an error callback. Single-message verify (`secp256k1_schnorrsig_verify`)
+  supports any msglen correctly.
+- **Test:** TODO — `secp256k1_schnorrsig_verify_batch` with msglen=0 and msglen=64,
+  assert returns 0.
+
+---
+
+## secp256k1_musig_pubkey_ec_tweak_add / secp256k1_musig_pubkey_xonly_tweak_add — NULL ctx silently accepted (SHIM-MUSIG-CTX-001)
+
+- **Upstream behavior:** NULL ctx fires the illegal callback (default: abort).
+- **Shim behavior:** Both `secp256k1_musig_pubkey_ec_tweak_add` and
+  `secp256k1_musig_pubkey_xonly_tweak_add` use `SHIM_REQUIRE_CTX(ctx)` which fires the
+  illegal callback on NULL ctx. However, if the callback does not abort (custom callback),
+  the function may proceed with a NULL ctx — the `ctx_can_sign()` call would need a
+  non-NULL ctx for the context flag check.
+- **Reason:** `SHIM_REQUIRE_CTX` is the standard pattern used across the shim for context
+  validation. A non-aborting custom callback is an unusual configuration.
+- **Impact:** Standard usage (default callback = abort on NULL ctx) is unaffected.
+  Callers with a non-aborting custom callback may observe different behavior from upstream
+  if NULL ctx is passed.
+- **Test:** Covered indirectly by context-flag tests in `test_regression_shim_security_v7_run`.

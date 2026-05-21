@@ -540,6 +540,28 @@ def main() -> int:
             f"    Update canonical_numbers.json bitcoin_core_compat fields."
         )
 
+    # ── Scan all bench_unified_*.json for _STALE or _DERIVED keys ─────────────
+    # Such keys indicate a corrupted or hand-crafted artifact that must not be
+    # cited as a canonical benchmark source.
+    for bench_path in sorted((ROOT / "docs").glob("bench_unified_*.json")):
+        try:
+            bench_data = json.loads(bench_path.read_text())
+            stale_keys: list[str] = []
+            for section in bench_data.values():
+                if isinstance(section, dict):
+                    stale_keys.extend(
+                        k for k in section
+                        if "_STALE" in str(k) or "_DERIVED" in str(k)
+                    )
+            if stale_keys:
+                all_violations.append(
+                    f"  STALE ARTIFACT DETECTED [{bench_path.name}]: contains keys "
+                    f"{stale_keys}. "
+                    f"Regenerate with bench_unified --json before citing."
+                )
+        except Exception:
+            pass
+
     # ── Report ────────────────────────────────────────────────────────────────
     if all_violations:
         print(f"check_bench_doc_consistency: {len(all_violations)} violation(s) found\n")

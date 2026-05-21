@@ -12,7 +12,7 @@
 | Audit modules | 379 across 9 failure classes |
 | Exploit PoC tests | 265 exploit PoCs test files, 200+ attack vectors |
 | Platforms | X64, ARM64, RISC-V, macOS, Windows, iOS, Android, WASM, ROCm (16 configurations) |
-| Fuzz inputs | 530,000+ parser/adversarial |
+| Fuzz inputs | seed corpus: ~530K entries (runtime corpus grows dynamically) |
 | CI workflows | 54 GitHub Actions workflows |
 | Current CI run failures | **0** (failures in the current CI run — not a lifetime claim) |
 
@@ -23,7 +23,7 @@ This system continuously verifies correctness across math, protocol, constant-ti
 | Domain | Status |
 |--------|--------|
 | Mathematical invariants (field, scalar, group) | **COVERED** |
-| Constant-time behavior (formal + empirical) | **COVERED** |
+| Constant-time behavior (tool-verified + empirical) | **COVERED** |
 | Exploit PoC adversarial tests | **COVERED** |
 | Cross-platform determinism | **COVERED** |
 | Fuzzing + adversarial inputs | **COVERED** |
@@ -52,7 +52,7 @@ This system continuously verifies correctness across math, protocol, constant-ti
 | CI Workflows         | 54 GitHub Actions workflows                 |
 | CI Build Matrix      | 17 configurations, 7 architectures, 5 OSes  |
 | Sanitizers           | ASan+UBSan, TSan, Valgrind memcheck + dedicated C ABI thread stress         |
-| Fuzzing              | 3 libFuzzer harnesses + 530K deterministic   |
+| Fuzzing              | 3 libFuzzer harnesses + seed corpus: ~530K entries (runtime corpus grows dynamically) |
 | Static Analysis      | CodeQL, SonarCloud, clang-tidy, -Werror      |
 | Language Bindings    | 12 (Python, C#, Rust, Node, PHP, Go, Java, Swift, RN, Ruby, Dart, C API) |
 | Supply Chain         | OpenSSF Scorecard, harden-runner, pinned actions, Dependency Review |
