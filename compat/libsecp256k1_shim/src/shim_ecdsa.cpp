@@ -334,9 +334,13 @@ int secp256k1_ecdsa_sign(
     // cannot forward an arbitrary noncefp callback. Fail-closed so callers
     // that rely on a specific nonce function are not silently given RFC 6979.
     // The two standard constants (rfc6979 / default) are treated as NULL.
+    // Fire the illegal callback so callers with handlers know exactly why (PASS3-001 fix).
     if (noncefp != nullptr &&
         noncefp != secp256k1_nonce_function_rfc6979 &&
         noncefp != secp256k1_nonce_function_default) {
+        secp256k1_shim_call_illegal_cb(ctx,
+            "secp256k1_ecdsa_sign: custom nonce functions are not supported; "
+            "pass NULL or secp256k1_nonce_function_rfc6979");
         return 0;
     }
 

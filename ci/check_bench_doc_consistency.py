@@ -276,9 +276,17 @@ def find_bench_unified_json() -> Path | None:
                     return p
         except Exception:
             pass
-    # Fallback: newest glob match
-    candidates = sorted(ROOT.glob(BENCH_UNIFIED_GLOB), reverse=True)
-    return candidates[0] if candidates else None
+    # Refuse to silently fall back to newest glob: the declared canonical is
+    # authoritative. If it is absent, force an explicit update of
+    # canonical_numbers.json._canonical_bench_artifact rather than auto-selecting
+    # a potentially inconsistent newer file (e.g. one with _STALE ratio fields).
+    print(
+        "ERROR: canonical bench artifact declared in canonical_numbers.json not found.\n"
+        "  Update canonical_numbers.json._canonical_bench_artifact to point to the\n"
+        "  correct file, then re-run this check.",
+        file=__import__("sys").stderr,
+    )
+    return None
 
 
 def check_internal_bench_consistency(bench: dict, bench_name: str) -> list[str]:

@@ -165,7 +165,7 @@ Scalar taproot_tweak_privkey(
     const uint8_t* merkle_root,
     std::size_t merkle_root_len) {
 
-    if (private_key.is_zero()) return Scalar::zero();
+    if (private_key.is_zero_ct()) return Scalar::zero();
 
     // P = d * G (CT)
     auto P = ct::generator_mul(private_key);
@@ -186,7 +186,7 @@ Scalar taproot_tweak_privkey(
 
     detail::secure_erase(&d, sizeof(d));
 
-    if (tweaked.is_zero()) return Scalar::zero();
+    if (tweaked.is_zero_ct()) return Scalar::zero();
 
     return tweaked;
 }

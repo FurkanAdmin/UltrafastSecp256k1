@@ -57,8 +57,13 @@ TABLE_EXPLOIT_ROW_RE = re.compile(
     r'\d+ non-exploit modules \+ \d+ exploit PoCs across \d+ sections, \d+ failures'
 )
 
-# Matches "N-module unified_audit_runner"
+# Matches "N-module unified_audit_runner" (plain and backtick-wrapped variants)
 RUNNER_MODULE_COUNT_RE = re.compile(r'\b\d{3}-module unified_audit_runner\b')
+RUNNER_MODULE_COUNT_BT_RE = re.compile(r'\b\d{3}-module `unified_audit_runner`')
+
+# Matches "264 exploit PoCs" / "264 exploit-PoCs" without "modules" suffix.
+# Uses 3+ digit requirement to avoid false positives from incremental changelog entries.
+EXPLOIT_POCS_SIMPLE_RE = re.compile(r'\b(\d{3,})\s+exploit[ -]PoC[s]?\b', re.IGNORECASE)
 
 # Matches "N registered exploit-style PoC test modules (M test files)"
 REGISTERED_STYLE_RE = re.compile(
@@ -77,6 +82,19 @@ SUITE_HEADER_RE = re.compile(r'Exploit PoC Test Suite \(\d+ Tests,')
 EXPLOIT_POCS_ALL_RE = re.compile(
     r'\d+ exploit PoCs? test files? \(all \d+ registered as runner modules'
 )
+
+# Matches "N tests, 20+ coverage areas, N failures" (README By-the-Numbers table)
+EXPLOIT_TEST_COUNT_TABLE_RE = re.compile(
+    r'\d+ exploit PoC modules \(\d+ source files\), \d+\+ coverage areas, \d+ failures'
+)
+
+# Matches "All N registered exploit-test entries" or "All N registered exploit-PoC modules"
+ALL_REGISTERED_ENTRIES_RE = re.compile(
+    r'All \d+ registered exploit-(?:test entries|PoC modules) live in'
+)
+
+# Matches "N-module `unified_audit_runner`" (backtick-wrapped variant used in README)
+# Handled by RUNNER_MODULE_COUNT_BT_RE defined above; applied in make_replacements.
 
 
 # ── Count sources ─────────────────────────────────────────────────────────────
@@ -205,6 +223,7 @@ def make_replacements(content: str,
     _sub(TABLE_EXPLOIT_ROW_RE,
          f'{non_exploit} non-exploit modules + {exploit_mods} exploit PoCs across 9 sections, 0 failures')
     _sub(RUNNER_MODULE_COUNT_RE, f'{total}-module unified_audit_runner')
+    _sub(RUNNER_MODULE_COUNT_BT_RE, f'{total}-module `unified_audit_runner`')
     _sub(REGISTERED_STYLE_RE,
          f'{exploit_mods} registered exploit-style PoC test modules ({exploit_files} test files)')
     _sub(EXPLOIT_FILES_REGISTERED_RE,
@@ -212,6 +231,22 @@ def make_replacements(content: str,
     _sub(SUITE_HEADER_RE, f'Exploit PoC Test Suite ({exploit_mods} Tests,')
     _sub(EXPLOIT_POCS_ALL_RE,
          f'{exploit_files} exploit PoC test files (all {exploit_mods} registered as runner modules')
+    _sub(EXPLOIT_TEST_COUNT_TABLE_RE,
+         f'{exploit_mods} exploit PoC modules ({exploit_files} source files), 20+ coverage areas, 0 failures')
+    _sub(ALL_REGISTERED_ENTRIES_RE,
+         f'All {exploit_mods} registered exploit-PoC modules live in')
+
+    # "N exploit PoCs" / "N exploit-PoCs" — short form without "modules" (3+ digit only)
+    def _replace_exploit_pocs_simple(m: re.Match) -> str:
+        nonlocal changes
+        # Preserve the spacing/hyphen style from the match
+        full = m.group(0)
+        replacement = re.sub(r'\d{3,}', str(exploit_mods), full, count=1)
+        if full != replacement:
+            changes += 1
+        return replacement
+
+    new = EXPLOIT_POCS_SIMPLE_RE.sub(_replace_exploit_pocs_simple, new)
 
     return new, changes
 
@@ -228,6 +263,18 @@ DOC_FILES = [
     'docs/ASSURANCE_LEDGER.md',
     '.github/workflows/security-audit.yml',
     '.github/workflows/audit-report.yml',
+    # Additional docs that contain canonical exploit PoC count references
+    # and are checked by check_version_sync.py. Must be kept in sync.
+    'docs/ATTACK_GUIDE.md',
+    'docs/AUDIT_COVERAGE.md',
+    'docs/AUDIT_PHILOSOPHY.md',
+    'docs/AUDIT_READINESS_REPORT_v1.md',
+    'docs/CAAS_REVIEWER_QUICKSTART.md',
+    'docs/BITCOIN_CORE_BACKEND_EVIDENCE.md',
+    'docs/EXTERNAL_AUDIT_BUNDLE.json',
+    'docs/AI_AUDIT_PROTOCOL.md',
+    'docs/FORTRESS_ROADMAP.md',
+    'docs/BACKEND_ASSURANCE_MATRIX.md',
 ]
 
 
@@ -262,7 +309,25 @@ def main() -> int:
     total_changed_files = 0
     total_changed_lines = 0
 
-    for rel in DOC_FILES:
+    # Combine fixed DOC_FILES with dynamic scan of all docs/*.md files.
+    # This ensures no file is missed when new docs are added.
+    # Skip changelog files that contain historical (non-current) counts.
+    SKIP_DYNAMIC = {
+        'CHANGELOG.md', 'AUDIT_CHANGELOG.md', 'ROADMAP.md',
+        'AUDIT_REPORT.md', 'RELEASE_NOTES.md',
+    }
+    dynamic_paths = []
+    docs_dir = BASE / 'docs'
+    if docs_dir.exists():
+        for p in sorted(docs_dir.glob('*.md')):
+            if p.name not in SKIP_DYNAMIC:
+                rel = str(p.relative_to(BASE))
+                if rel not in DOC_FILES:
+                    dynamic_paths.append(rel)
+
+    all_files = list(DOC_FILES) + dynamic_paths
+
+    for rel in all_files:
         path = BASE / rel
         if not path.exists():
             if args.verbose:

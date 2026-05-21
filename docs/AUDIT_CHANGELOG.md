@@ -1,5 +1,18 @@
 # Audit Changelog
 
+## 2026-05-21 — Fix: CT is_zero → is_zero_ct, RFC 6979 CT loop, shim recovery parse, noncefp callback (SIZ-1..4, RFC6979-CT, PASS3-001/002)
+
+- **adaptor.cpp (SIZ-1/T-006):** Removed VT `if (k.is_zero())` check before `ct::scalar_inverse`. The check used `fast::Scalar::is_zero()` (data-dependent early-exit) on the secret nonce k. It was also dead code: `adaptor_nonce()` guarantees k != 0 via strict-nonzero parsing, and the `r.is_zero()` guard above catches the k=0 degenerate path (R=infinity→r=0). Replaced with a CT-safe `s_hat.is_zero_ct()` check after the multiplication to detect the theoretical degenerate output.
+- **taproot.cpp (SIZ-2/SIZ-3/T-007):** Replaced `private_key.is_zero()` and `tweaked.is_zero()` with `private_key.is_zero_ct()` and `tweaked.is_zero_ct()` respectively. `fast::Scalar::is_zero()` has a data-dependent early-exit (C-07); `is_zero_ct()` reads all limbs unconditionally before comparing.
+- **ecdsa.cpp (RFC6979-CT/T-005):** Replaced the variable-length RFC 6979 retry loop (data-dependent early-return on success, iteration count ~2^-128 probability of being > 1) with a fixed 2-iteration structure using `ct::scalar_select` for CT nonce selection. Iteration count is now constant (always 2). Probability of needing iteration 2 is ~2^-128; probability of both candidates failing is ~2^-256.
+- **shim_recovery.cpp (PASS3-002/T-008):** `secp256k1_ecdsa_recoverable_signature_parse_compact` changed from `parse_bytes_strict_nonzero` to `parse_bytes_strict` for r and s. Now accepts r==0 or s==0 at parse time (matching upstream libsecp256k1 behavior); rejection occurs at `secp256k1_ecdsa_recover` time.
+- **shim_ecdsa.cpp (PASS3-001/T-009):** `secp256k1_ecdsa_sign` now fires `secp256k1_shim_call_illegal_cb` with a descriptive message before returning 0 when a custom `noncefp` is supplied.
+- **shim_recovery.cpp (PASS3-001/T-009):** `secp256k1_ecdsa_sign_recoverable` same callback fix.
+- **shim_schnorr.cpp (PASS3-001/T-009):** `secp256k1_schnorrsig_sign_custom` same callback fix.
+- **audit/test_regression_ct_secret_is_zero.cpp (NEW):** Regression coverage SIZ-1..4: adaptor round-trip correctness + taproot zero/normal key paths. Module `regression_ct_secret_is_zero`, section `ct_analysis`, advisory=false (requires SECP256K1_HAS_ADAPTOR).
+- **audit/test_regression_rfc6979_ct_loop.cpp (NEW):** Regression coverage RFC6979-CT: 200 sign+verify round-trips, determinism, nonce uniqueness. Module `regression_rfc6979_ct_loop`, section `ct_analysis`, advisory=false.
+- **compat/libsecp256k1_shim/tests/test_shim_recovery_and_noncefp.cpp (NEW):** Regression coverage PASS3-001/002: REC-1..4 (parse compat) and NFP-1..3 (noncefp callback). Module `shim_recovery_and_noncefp`, section `exploit_poc`, advisory=true (shim required).
+
 ## 2026-05-21 — Fix: BIP-324 privkey_ lifetime, from_compact deprecation, shim illegal callbacks (SEC-003/006, SHIM-003/004/006/008, PERF-003)
 
 - **bip324.cpp (SEC-006):** Added `SEC-006` markers to both `Bip324Session` constructors documenting the raw-byte lifetime window. `privkey_` raw bytes persist from constructor until `complete_handshake()` erases them. Full fix (store Scalar member, erase immediately after `ellswift_create`) tracked as future work. `complete_handshake()` already proactively erases `privkey_` on success and erases `sk` on all exit paths.
@@ -423,7 +436,7 @@ evidence upgrades, and changes to what the repository can honestly claim.
   FAST variable-time row now labeled `[diag FAST]` — clearly marked as not production-equivalent.
   This eliminates the invalid VT-Ultra vs CT-libsecp comparison from the ratio table.
 
-### Module count: 357 total (101 non-exploit + 258 exploit PoC)
+### Module count: 357 total (101 non-exploit + 265 exploit PoC)
 
 ---
 
@@ -569,7 +582,7 @@ evidence upgrades, and changes to what the repository can honestly claim.
 - `docs/SHIM_KNOWN_DIVERGENCES.md` created: complete list of intentional shim vs libsecp256k1 behavioral differences.
 - `CLAUDE.md` updated: Canonical Data Synchronization rules added (module counts via `sync_module_count.py`, benchmark data via canonical JSON, ConnectBlock claim wording rules).
 - `docs/BITCOIN_CORE_BACKEND_EVIDENCE.md`: GCC CT signing regression (0.82–0.85×) disclosed; commit SHA mismatch corrected.
-- Module counts synced via `sync_module_count.py`: 98 non-exploit + 258 exploit PoC = 350 total.
+- Module counts synced via `sync_module_count.py`: 98 non-exploit + 265 exploit PoC = 350 total.
 
 ---
 
@@ -1444,7 +1457,7 @@ All 4 wired into `unified_audit_runner.cpp` + `audit/CMakeLists.txt`.
 
 ### Documentation Sync
 
-- `sync_module_count.py` run: WHY/README updated to 258 exploit PoCs, 80 non-exploit, 312 total.
+- `sync_module_count.py` run: WHY/README updated to 265 exploit PoCs, 80 non-exploit, 312 total.
 - `sync_version_refs.py` run: 26 doc files updated from v3.60/v3.66 → v3.68.0.
 - CT pipeline count: "3" → "5" (LLVM ct-verif, Valgrind taint, ct-prover, dudect, ARM64 native) across README + WHY.
 - `docs/EXPLOIT_TEST_CATALOG.md`: `test_exploit_der_parsing_differential` updated to 13 tests.
@@ -3844,7 +3857,7 @@ tests PASS.**
   double-hash confusion (H(msg) ≠ H(H(msg))); domain prefix isolation (domain-A sig ≠ domain-B
   sig).  Committed `c843979c`.
 
-**Running total after this wave: 258 exploit PoC files, 59 new checks.**
+**Running total after this wave: 265 exploit PoC files, 59 new checks.**
 
 ---
 

@@ -332,6 +332,26 @@ RETROACTIVELY_COVERED: dict[str, tuple[list[str], str]] = {
         "RT-003: context.hpp derive_public_key uses ct::generator_mul for nullptr ctx. "
         "REL-007/PR-013/019: CI/doc fixes only.",
     ),
+    "8af91b7a02": (
+        ["audit/test_regression_ct_ops.cpp"],
+        "fix(werror): ECDSASignature::from_compact(array) overload inlined to avoid "
+        "deprecated→deprecated call chain. Both overloads remain [[deprecated]] per SEC-003. "
+        "No behavioral or security change — pure Werror fix. Covered by test_regression_ct_ops "
+        "which exercises the ECDSA signing and result-handling code paths that use these "
+        "overloads. The [[deprecated]] attribute only affects the compiler diagnostic, not "
+        "the runtime signature of from_compact.",
+    ),
+    "4bb75f2e50": (
+        ["audit/test_exploit_bitcoin_message_signing.cpp",
+         "audit/test_regression_ct_ops.cpp"],
+        "fix(werror): migrate all from_compact callers to parse_compact_strict in "
+        "message_signing.cpp, wallet.cpp, ufsecp_bip322.cpp, ultrafast_secp256k1.cpp, "
+        "secp256k1_wasm.cpp. For valid inputs, parse_compact_strict produces identical "
+        "results to from_compact (same Scalar::from_bytes path). The migration is purely "
+        "a Werror fix with no behavioral change for valid signatures. "
+        "Covered by test_exploit_bitcoin_message_signing (exercises message_signing.cpp "
+        "verify_message/recover_signer paths) and test_regression_ct_ops (ECDSA operations).",
+    ),
 }
 
 # Bot commits that auto-update evidence — skip.

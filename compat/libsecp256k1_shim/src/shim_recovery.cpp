@@ -78,11 +78,13 @@ int secp256k1_ecdsa_recoverable_signature_parse_compact(
     SHIM_REQUIRE_CTX(ctx);
     if (!sig || !input64) return 0;
     if (recid < 0 || recid > 3) return 0;
-    // Validate r and s are in (0, n-1] — matches libsecp strict contract.
+    // Accept r and s in [0, n-1] at parse time — matches libsecp256k1 behavior.
+    // Rejection of r==0 or s==0 happens at secp256k1_ecdsa_recover time, not here.
+    // Using parse_bytes_strict_nonzero was a divergence from libsecp (PASS3-002 fix).
     Scalar r, s;
-    if (!Scalar::parse_bytes_strict_nonzero(
+    if (!Scalar::parse_bytes_strict(
             reinterpret_cast<const uint8_t*>(input64),      r)) return 0;
-    if (!Scalar::parse_bytes_strict_nonzero(
+    if (!Scalar::parse_bytes_strict(
             reinterpret_cast<const uint8_t*>(input64 + 32), s)) return 0;
     sig->data[0] = static_cast<unsigned char>(recid);
     std::memcpy(sig->data + 1, input64, 64);
@@ -138,6 +140,9 @@ int secp256k1_ecdsa_sign_recoverable(
     if (noncefp != nullptr &&
         noncefp != secp256k1_nonce_function_rfc6979 &&
         noncefp != secp256k1_nonce_function_default) {
+        secp256k1_shim_call_illegal_cb(ctx,
+            "secp256k1_ecdsa_sign_recoverable: custom nonce functions are not supported; "
+            "pass NULL or secp256k1_nonce_function_rfc6979");
         return 0;
     }
 

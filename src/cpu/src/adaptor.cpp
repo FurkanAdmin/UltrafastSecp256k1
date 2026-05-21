@@ -276,19 +276,23 @@ ecdsa_adaptor_sign(const Scalar& private_key,
     }
 
     // s = k^-^1 * (z + r*x)  where z = msg_hash
+    // CT: do NOT branch on k.is_zero() here — fast::is_zero() has a secret-dependent
+    // early-exit. adaptor_nonce() guarantees k != 0 via strict-nonzero parsing; the
+    // r.is_zero() guard above also catches the k=0 degenerate path (R=infinity→r=0).
     Scalar const z = Scalar::from_bytes(msg_hash);
-    if (k.is_zero()) {
-        return ECDSAAdaptorSig{Point::infinity(), Scalar::zero(), Scalar::zero()};
-    }
     Scalar k_inv = ct::scalar_inverse(k);  // CT: k is secret; non-const for secure_erase
     // CT: k_inv and private_key are secrets — use branchless CT arithmetic
-    Scalar const s_hat = ct::scalar_mul(k_inv,
-                             ct::scalar_add(z, ct::scalar_mul(r, private_key)));
+    Scalar s_hat = ct::scalar_mul(k_inv,
+                       ct::scalar_add(z, ct::scalar_mul(r, private_key)));
 
     detail::secure_erase(&k, sizeof(k));
     detail::secure_erase(&k_inv, sizeof(k_inv));
     detail::secure_erase(&binding, sizeof(binding));
 
+    if (s_hat.is_zero_ct()) {
+        detail::secure_erase(&s_hat, sizeof(s_hat));
+        return ECDSAAdaptorSig{Point::infinity(), Scalar::zero(), Scalar::zero()};
+    }
     return ECDSAAdaptorSig{R_hat, s_hat, r};
 }
 

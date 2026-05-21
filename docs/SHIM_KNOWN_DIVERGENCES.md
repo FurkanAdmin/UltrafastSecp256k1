@@ -180,12 +180,17 @@ For the complete compatibility test matrix see `compat/libsecp256k1_shim/tests/`
 ## secp256k1_ecdsa_recoverable_signature_parse_compact — r/s zero check
 
 - **Upstream behavior:** Accepts r=0 or s=0 at parse time; rejects at recover time.
-- **Shim behavior:** Uses `parse_bytes_strict_nonzero` — rejects r=0 or s=0 at parse time.
-  Stricter than upstream.
-- **Reason:** Consistent with the internal invariant that parsed secret-adjacent scalars
-  are non-zero. The extra strictness has no practical impact (r=0 or s=0 signatures are
-  astronomically rare and always invalid).
-- **Impact:** Callers parsing r=0 or s=0 recoverable compact signatures (astronomically rare).
+- **Shim behavior:** **Fixed 2026-05-21 (PASS3-002).** Now uses `parse_bytes_strict` —
+  accepts r=0 or s=0 at parse time, matching upstream libsecp256k1. Rejection of degenerate
+  r/s values happens at `secp256k1_ecdsa_recover` time.
+- **Previous shim behavior:** Used `parse_bytes_strict_nonzero` — rejected r=0 or s=0 at
+  parse time (stricter than upstream, divergence).
+- **Reason for fix:** Behavioral parity with upstream libsecp256k1; the previous divergence
+  had no security benefit (zero r/s signatures are always invalid; rejecting earlier vs later
+  makes no difference in practice).
+- **Impact:** No impact for callers using valid signatures. Callers that parse r=0 or s=0
+  compact bytes now get parse return 1 (like libsecp) instead of 0.
+- **Test:** `compat/libsecp256k1_shim/tests/test_shim_recovery_and_noncefp.cpp` REC-1..4.
 
 ---
 
@@ -206,13 +211,20 @@ For the complete compatibility test matrix see `compat/libsecp256k1_shim/tests/`
 
 ---
 
-## secp256k1_schnorrsig_sign_custom — non-BIP-340 nonce function
+## secp256k1_ecdsa_sign / secp256k1_ecdsa_sign_recoverable / secp256k1_schnorrsig_sign_custom — custom nonce function
 
-- **Upstream behavior:** Any `extraparams->noncefp` is dispatched.
-- **Shim behavior:** Only `secp256k1_nonce_function_bip340` (or NULL) is accepted.
-  Any other non-NULL `noncefp` returns 0.
-- **Reason:** Same as ECDSA sign custom nonce rejection.
-- **Impact:** Callers with custom BIP-340 nonce functions.
+- **Upstream behavior:** Any `noncefp` / `extraparams->noncefp` is dispatched (called with the
+  message, key, and counter to produce a nonce).
+- **Shim behavior:** Only the standard nonce functions are accepted (NULL, `rfc6979`, `default`
+  for ECDSA; NULL, `bip340` for Schnorr). **Updated 2026-05-21 (PASS3-001):** any other non-NULL
+  `noncefp` now fires the illegal callback with a descriptive message before returning 0.
+  Previously returned 0 silently (divergence from upstream callback behavior).
+- **Reason:** The shim uses RFC 6979 / BIP-340 nonce generation internally and cannot forward
+  an arbitrary nonce function. Fail-closed so callers relying on a specific nonce function see
+  an error rather than silently receiving RFC 6979 output.
+- **Impact:** Callers with custom nonce functions. Bitcoin Core uses NULL (RFC 6979 default) —
+  unaffected. Callers with callbacks installed now receive the callback notification.
+- **Test:** `compat/libsecp256k1_shim/tests/test_shim_recovery_and_noncefp.cpp` NFP-1..3.
 
 ---
 

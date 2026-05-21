@@ -30,7 +30,7 @@ It is not a trust request. It is a verification package.
 ## What this repository contains
 
 - **Core engine** — CPU/GPU/embedded secp256k1 implementation (`src/cpu`, `src/cuda`, `src/opencl`, `src/metal`).
-- **Compatibility shims** — opt-in drop-in paths for existing projects (`compat/libsecp256k1_shim`, `compat/libsecp256k1_bchn_shim`).
+- **Compatibility shims** — opt-in API-compatible paths for existing projects (`compat/libsecp256k1_shim`, `compat/libsecp256k1_bchn_shim`; not API-identical — see FAQ §drop-in for migration notes).
 - **Bindings/FFI** — language integration surfaces (`bindings/`): C, Python, Node.js, Go, Swift, Rust, Java, Dart, C#, WASM, Android.
 - **CAAS** — continuous audit and evidence system (`audit/`, `ci/`); not runtime code.
 - **Reviewer docs** — scoped evidence, known limitations, replay commands (`docs/`).
@@ -79,10 +79,11 @@ python3 ci/caas_runner.py --profile bitcoin-core-backend --json -o btc.json
 
 **CT signing (CT-vs-CT, production-equivalent, GCC 14.2.0, 2026-05-11):** **1.24× ECDSA · 1.09× Schnorr** vs libsecp256k1. Canonical data: [`docs/bench_unified_2026-05-11_gcc14_x86-64.json`](docs/bench_unified_2026-05-11_gcc14_x86-64.json). Full compiler breakdown: [docs/BITCOIN_CORE_BACKEND_EVIDENCE.md §CT Signing](docs/BITCOIN_CORE_BACKEND_EVIDENCE.md).
 
-> **ConnectBlock (primary block-validation workload):**
-> **With Release+LTO (required for the positive result — see cmake preset `ultrafast-bench`):** Ultra outperforms libsecp256k1 on all three measured workloads (+0.9–1.5%).
-> **Without LTO:** ~0.5–1.0% slower on all three workloads (LTO is not optional for the positive result).
-> Taproot key-path signing is 10–35% faster (both with and without LTO). Full numbers: [docs/BITCOIN_CORE_BENCH_RESULTS.json](docs/BITCOIN_CORE_BENCH_RESULTS.json).
+> **ConnectBlock (primary block-validation workload):** within ±1.5% of libsecp256k1 depending on build configuration.
+> - With Release+LTO (GCC 14.2.0, required for any positive result): **+0.9–1.5%** across all workload profiles (AllEcdsa, AllSchnorr, Mixed)
+> - Without LTO: **−0.5–1.0%** on all profiles (larger code footprint causes i-cache pressure)
+> - Taproot key-path signing is 10–35% faster with Release+LTO (not measured without LTO)
+> - Canonical data: [docs/BITCOIN_CORE_BENCH_RESULTS.json](docs/BITCOIN_CORE_BENCH_RESULTS.json) (commit 48e7c02f)
 
 ---
 
@@ -223,7 +224,7 @@ This project: `code → test → execution → evidence → continuous verificat
 We do not rely on trust. We provide reproducible evidence.
 
 - Every exploit attempt becomes a permanent regression test
-- Every commit runs 1,000,000+ assertions across 112 non-exploit audit modules and 264 exploit PoCs ( 376 modules total; count via `python3 ci/sync_module_count.py`; canonical data: `docs/canonical_numbers.json`)
+- Every commit runs 1,000,000+ assertions across 114 non-exploit audit modules and 265 exploit PoCs ( 379 modules total; count via `python3 ci/sync_module_count.py`; canonical data: `docs/canonical_numbers.json`)
 - Every claim maps to a test in [docs/AUDIT_TRACEABILITY.md](docs/AUDIT_TRACEABILITY.md)
 - Every performance number has pinned compiler/driver/toolkit versions and raw logs
 
@@ -262,7 +263,7 @@ Benchmark numbers and historical milestones are maintained in [`docs/BENCHMARKS.
 
 > TL;DR is above. This section covers what differentiates this library in depth.
 
-- **Continuous adversarial audit system** -- every exploit attempt becomes a permanent regression test; 1,000,000+ assertions per release evidence run, 264 exploit PoCs runner modules in `unified_audit_runner.cpp` (some source files contain multiple registered test functions; all wired, verified by `ci/check_exploit_wiring.py`) across 200+ attack vectors, a block-based PR/push gate, release CAAS gate, and manual deep-assurance workflows — security hardens through executable evidence, not snapshot PDFs ([→ how it works](#engineering-quality--self-audit-culture))
+- **Continuous adversarial audit system** -- every exploit attempt becomes a permanent regression test; 1,000,000+ assertions per release evidence run, 265 exploit PoCs runner modules in `unified_audit_runner.cpp` (some source files contain multiple registered test functions; all wired, verified by `ci/check_exploit_wiring.py`) across 200+ attack vectors, a block-based PR/push gate, release CAAS gate, and manual deep-assurance workflows — security hardens through executable evidence, not snapshot PDFs ([→ how it works](#engineering-quality--self-audit-culture))
 - **High-performance CPU secp256k1 engine** -- optimized generator multiply, scalar multiply, hashing, and serialization pipelines across x86-64, ARM64, RISC-V, and embedded targets ([see bench_unified ratio table](docs/BENCHMARKS.md))
 - **Built for modern secp256k1 workloads** -- signing, verification, wallet derivation, threshold protocols, adaptor signatures, ZK primitives, address generation, and large-scale public-key pipelines in one engine
 - **Dual-layer security** -- variable-time FAST path for throughput, constant-time CT path for secret-key operations
@@ -377,8 +378,8 @@ This top-level narrative maps directly to the assurance ledger: CT secret-key ro
 | Metric | Value |
 |--------|-------|
 | Internal audit assertions per build | **~1,000,000+** |
-| Audit modules (`unified_audit_runner`) | **112 non-exploit modules + 264 exploit PoCs across 9 sections, 0 failures** |
-| Exploit PoC test files | **261 tests, 20+ coverage areas, 0 failures** |
+| Audit modules (`unified_audit_runner`) | **114 non-exploit modules + 265 exploit PoCs across 9 sections, 0 failures** |
+| Exploit PoC test files | **265 exploit-PoC modules (258 source files), 20+ coverage areas, 0 failures** |
 | CI/CD workflows | **54 GitHub Actions workflows** |
 | Build matrix (arch × config × OS) | **7 × 17 × 5 = 595 combinations** |
 | Differential tests (per push + manual) | **~1,300,000+ checks per deep-assurance run** |
@@ -405,11 +406,11 @@ This top-level narrative maps directly to the assurance ledger: CT secret-key ro
 - Performance evidence is tracked through manual/release deep-assurance workflows instead of every-push benchmark fan-out
 - Audit results are logged as **structured artifacts** (JSON reports, per-platform logs), not just pass/fail signals
 - Differential tests run on every push and via manual deep-assurance workflows; no separate nightly schedule
-- All 112 non-exploit audit modules and all 264 exploit PoCs return `AUDIT-READY (self-generated)` status as of the last CAAS gate run. Zero failures — see pinned evidence: [`docs/EXTERNAL_AUDIT_BUNDLE.json`](docs/EXTERNAL_AUDIT_BUNDLE.json).
+- All 114 non-exploit audit modules and all 265 exploit PoCs return `AUDIT-READY (self-generated)` status as of the last CAAS gate run. Zero failures — see pinned evidence: [`docs/EXTERNAL_AUDIT_BUNDLE.json`](docs/EXTERNAL_AUDIT_BUNDLE.json).
 
-### Exploit PoC Test Suite (264 Tests, 20+ Coverage Areas)
+### Exploit PoC Test Suite (265 Tests, 20+ Coverage Areas)
 
-In addition to the 372-module `unified_audit_runner`, UltrafastSecp256k1 ships **264 exploit-style PoC modules files** that actively try to break the library across its highest-risk surfaces. Each `audit/test_exploit_*.cpp` target builds and runs standalone so failures stay easy to attribute and reproduce.
+In addition to the 379-module `unified_audit_runner`, UltrafastSecp256k1 ships **265 exploit-style PoC modules files** that actively try to break the library across its highest-risk surfaces. Each `audit/test_exploit_*.cpp` target builds and runs standalone so failures stay easy to attribute and reproduce.
 
 | Coverage Area | Representative attack focus |
 |---------------|-----------------------------|
@@ -428,7 +429,7 @@ In addition to the 372-module `unified_audit_runner`, UltrafastSecp256k1 ships *
 | Self-Test / Recovery | self-test API behavior and recovery boundary cases |
 | Batch Verify | aggregate verification math correctness |
 
-> All 261 registered exploit-test entries live in `audit/test_exploit_*.cpp`. Build with `python3 ci/configure_build.py audit` (or `cmake -S . -B out/audit -G Ninja -DCMAKE_BUILD_TYPE=Release`) and run them standalone or via `ctest`.
+> All 265 registered exploit-PoC modules live in `audit/test_exploit_*.cpp` (258 source files; some files register multiple modules). Build with `python3 ci/configure_build.py audit` (or `cmake -S . -B out/audit -G Ninja -DCMAKE_BUILD_TYPE=Release`) and run them standalone or via `ctest`.
 
 ### Self-Audit Document Index
 
@@ -436,7 +437,7 @@ In addition to the 372-module `unified_audit_runner`, UltrafastSecp256k1 ships *
 |----------|---------|
 | [WHY_ULTRAFASTSECP256K1.md](docs/WHY_ULTRAFASTSECP256K1.md) | Full audit infrastructure, CI pipeline index, formal verification evidence |
 | [docs/AUDIT_PHILOSOPHY.md](docs/AUDIT_PHILOSOPHY.md) | Audit philosophy, continuous evidence model, design rationale, common objections answered |
-| [AUDIT_REPORT.md](docs/AUDIT_REPORT.md) | Historical baseline audit (641,194 core checks). Current: 372 modules, 0 failures |
+| [AUDIT_REPORT.md](docs/AUDIT_REPORT.md) | Historical baseline audit (641,194 core checks). Current: 376 modules, 0 failures |
 | [AUDIT_COVERAGE.md](docs/AUDIT_COVERAGE.md) | Per-module coverage matrix |
 | [THREAT_MODEL.md](docs/THREAT_MODEL.md) | Layer-by-layer risk analysis |
 | [SECURITY.md](SECURITY.md) | Vulnerability disclosure policy |
@@ -839,7 +840,7 @@ g++ myapp.cpp $(pkg-config --cflags --libs ufsecp) -o myapp
 
 ## secp256k1 GPU Acceleration (CUDA / OpenCL / Metal / ROCm)
 
-UltrafastSecp256k1 is the **only open-source library** that provides full secp256k1 ECDSA + Schnorr sign/verify on GPU across four backends (as of February 2026; if you know of another, [please let us know](https://github.com/shrec/UltrafastSecp256k1/issues)):
+UltrafastSecp256k1 provides full secp256k1 ECDSA + Schnorr sign/verify on GPU across four backends (CUDA, OpenCL, Metal, ROCm). As of February 2026, no other open-source library was known to the authors to cover all four backends; corrections are welcome ([open an issue](https://github.com/shrec/UltrafastSecp256k1/issues)):
 
 | Backend | Hardware | kG/s | ECDSA Sign | ECDSA Verify | Schnorr Sign | Schnorr Verify | FROST Verify |
 |---------|----------|------|------------|--------------|--------------|----------------|-------------|
@@ -912,7 +913,7 @@ Full signature support across CPU and GPU:
 - **Batch verification**: ECDSA and Schnorr batch verify
 - **Multi-scalar**: Shamir's trick (k_1xG + k_2xQ) for fast verification
 
-### CPU Signature Benchmarks (x86-64, Clang 19, AVX2, Release)
+### CPU Signature Benchmarks (x86-64, Clang 19, AVX2, Release) [archived — see docs/bench_unified_2026-05-11_gcc14_x86-64.json for current GCC 14.2.0 numbers]
 
 | Operation | Time | Throughput |
 |-----------|------:|----------:|
@@ -924,7 +925,7 @@ Full signature support across CPU and GPU:
 | Key Generation (fast) | 5.5 us | 182,000 op/s |
 | ECDH | 23.9 us | 41,800 op/s |
 
-*Schnorr sign is ~25% faster than ECDSA sign due to simpler nonce derivation (no modular inverse). Measured single-core, pinned, 2026-02-21.*
+*All rows above are the FAST (variable-time) path — NOT the production CT signing path. Schnorr sign is ~25% faster than ECDSA sign due to simpler nonce derivation. Measured single-core, pinned, Clang 19, 2026-02-21. Current GCC 14.2.0 canonical data: [docs/bench_unified_2026-05-11_gcc14_x86-64.json](docs/bench_unified_2026-05-11_gcc14_x86-64.json).*
 
 ---
 
@@ -1001,7 +1002,7 @@ bool ok = zk::range_verify(commitment, rp);
 
 ### CPU: x86-64 vs ARM64 vs RISC-V
 
-| Operation | x86-64 (Clang 21, AVX2) | ARM64 (Cortex-A76) | RISC-V (Milk-V Mars) |
+| Operation | x86-64 (Clang 19, AVX2) [archived] | ARM64 (Cortex-A76) | RISC-V (Milk-V Mars) |
 |-----------|-------------------------:|--------------------:|---------------------:|
 | Field Mul | 17 ns | 74 ns | 95 ns |
 | Field Square | 14 ns | 50 ns | 70 ns |
@@ -1388,7 +1389,7 @@ Two security profiles are **always active** -- no flag-based selection:
 ### CT / Hardened Profile (`ct::` namespace)
 
 - Constant-time arithmetic -- no secret-dependent branches or memory access
-- ~5-7x performance penalty vs FAST
+- ~1.1–1.9× performance penalty vs FAST for primitive operations (see CT overhead table in docs/BENCHMARKS.md)
 - Use for: signing, private key handling, nonce generation, ECDH
 
 **Choose the appropriate profile for your use case.** Using FAST with secret data is a security vulnerability.
@@ -1586,7 +1587,7 @@ libFuzzer harnesses cover core arithmetic (`cpu/fuzz/`):
 
 ### Cross-Platform Audit Results
 
-The `unified_audit_runner` executes **112 non-exploit audit modules + 264 exploit PoCs** across 9 sections
+The `unified_audit_runner` executes **114 non-exploit audit modules + 265 exploit PoCs** across 9 sections
 (mathematical invariants, constant-time analysis, differential testing, standard
 vectors, fuzzing, protocol security, ABI safety, performance validation).
 
@@ -1722,7 +1723,7 @@ cosign verify-blob SHA256SUMS \
 | [GPU Validation Matrix](docs/GPU_VALIDATION_MATRIX.md) | Per-backend op coverage and validation status |
 | [Feature Maturity](docs/FEATURE_MATURITY.md) | Per-feature GPU/CT/fuzz/tier status table |
 | [Supported Guarantees](include/ufsecp/SUPPORTED_GUARANTEES.md) | ABI stability tiers and commitment levels |
-| [Audit Coverage](docs/AUDIT_COVERAGE.md) | Full audit report with 112 non-exploit modules + 264 exploit PoCs and platform verdicts |
+| [Audit Coverage](docs/AUDIT_COVERAGE.md) | Full audit report with 114 non-exploit modules + 265 exploit PoCs and platform verdicts |
 | [Audit Guide](docs/AUDIT_GUIDE.md) | How to run and interpret audit suite |
 | [Test Matrix](docs/TEST_MATRIX.md) | Comprehensive test coverage map for auditors |
 | [ARM64 Audit & Benchmark](docs/ARM64_AUDIT_BENCHMARK.md) | ARM64 platform certification and performance analysis |

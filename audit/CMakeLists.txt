@@ -4869,3 +4869,50 @@ if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)
         SKIP_RETURN_CODE 77
         LABELS "audit;regression;shim;security;sec-003;shim-003;shim-004;shim-006;shim-008;perf-003")
 endif()
+
+# PASS3-001/002: recoverable sig parse compat + noncefp illegal callback fix.
+# Requires secp256k1_shim. advisory=true in unified runner.
+if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)
+    add_executable(test_shim_recovery_and_noncefp_standalone
+        ${CMAKE_CURRENT_SOURCE_DIR}/../compat/libsecp256k1_shim/tests/test_shim_recovery_and_noncefp.cpp)
+    target_link_libraries(test_shim_recovery_and_noncefp_standalone PRIVATE fastsecp256k1)
+    if(TARGET secp256k1_shim)
+        target_link_libraries(test_shim_recovery_and_noncefp_standalone PRIVATE secp256k1_shim)
+    endif()
+    target_include_directories(test_shim_recovery_and_noncefp_standalone PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../compat/libsecp256k1_shim/include)
+    add_test(NAME shim_recovery_and_noncefp
+        COMMAND test_shim_recovery_and_noncefp_standalone)
+    set_tests_properties(shim_recovery_and_noncefp PROPERTIES TIMEOUT 30
+        SKIP_RETURN_CODE 77
+        LABELS "audit;regression;shim;security;pass3-001;pass3-002")
+    target_sources(unified_audit_runner PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../compat/libsecp256k1_shim/tests/test_shim_recovery_and_noncefp.cpp)
+endif()
+
+# SIZ-1..4: CT is_zero → is_zero_ct fixes in adaptor.cpp and taproot.cpp.
+# C++ API only — no shim/GPU dependency. advisory=false.
+if(SECP256K1_HAS_ADAPTOR)
+    add_executable(test_regression_ct_secret_is_zero_standalone
+        test_regression_ct_secret_is_zero.cpp)
+    audit_target_defaults(test_regression_ct_secret_is_zero_standalone)
+    target_compile_definitions(test_regression_ct_secret_is_zero_standalone PRIVATE
+        STANDALONE_TEST SECP256K1_HAS_ADAPTOR=1)
+    add_test(NAME regression_ct_secret_is_zero
+        COMMAND test_regression_ct_secret_is_zero_standalone)
+    set_tests_properties(regression_ct_secret_is_zero PROPERTIES TIMEOUT 30
+        LABELS "audit;regression;ct;security;siz-1;siz-2;siz-3;siz-4")
+    target_sources(unified_audit_runner PRIVATE test_regression_ct_secret_is_zero.cpp)
+endif()
+
+# RFC6979-CT: fixed 2-iteration CT nonce loop (T-005).
+# C++ API only — no shim/GPU dependency. advisory=false.
+add_executable(test_regression_rfc6979_ct_loop_standalone
+    test_regression_rfc6979_ct_loop.cpp)
+audit_target_defaults(test_regression_rfc6979_ct_loop_standalone)
+target_compile_definitions(test_regression_rfc6979_ct_loop_standalone PRIVATE STANDALONE_TEST)
+add_test(NAME regression_rfc6979_ct_loop
+    COMMAND test_regression_rfc6979_ct_loop_standalone)
+set_tests_properties(regression_rfc6979_ct_loop PROPERTIES TIMEOUT 60
+    LABELS "audit;regression;ct;rfc6979;security;rfc6979-ct")
+target_sources(unified_audit_runner PRIVATE test_regression_rfc6979_ct_loop.cpp)

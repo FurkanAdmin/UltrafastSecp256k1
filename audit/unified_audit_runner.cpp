@@ -219,6 +219,9 @@ int test_regression_ct_blinding_nonce_path_run();    // CT nonce path uses gener
 int test_regression_ct_scalar_inverse_zero_run();   // SEC-001: CT scalar_inverse zero-branch removal (2026-05-21)
 int test_regression_ct_ops_run();                   // SEC-002/007/008/010, CT-004/005: CT ops regressions (2026-05-21)
 int test_regression_bip324_privkey_lifetime_run();  // SEC-006: Bip324Session privkey_ lifetime documentation (2026-05-21)
+int test_regression_ct_secret_is_zero_run();        // SIZ-1..4: adaptor CT nonce + taproot is_zero_ct fixes (2026-05-21)
+int test_regression_rfc6979_ct_loop_run();          // RFC6979-CT: fixed 2-iteration CT nonce loop (2026-05-21)
+int test_shim_recovery_and_noncefp_run();           // PASS3-001/002: recovery parse compat + noncefp callback (2026-05-21)
 
 // ============================================================================
 // Forward declarations -- Wycheproof & batch-randomness (Track I3, I6-3)
@@ -1258,6 +1261,17 @@ static const AuditModule ALL_MODULES[] = {
     // === 2026-05-21 SHIM-003/004/006/008, SEC-003, PERF-003 ===
     // advisory=true: depends on libsecp256k1 shim being linked (stub returns ADVISORY_SKIP_CODE when absent).
     { "shim_security_edge_cases", "SHIM-003/004/006/008+SEC-003+PERF-003: NULL msg msglen==0 allowed, context_clone callback, batch msglen illegal, ellswift_xdh NULL hashfp, deprecated from_compact, small-batch raw ptr", "exploit_poc", test_shim_security_edge_cases_run, true },
+    // === 2026-05-21 SIZ-1..4: CT is_zero → is_zero_ct in adaptor + taproot ===
+    // advisory=false: C++ API only, no shim/GPU dependency.
+#if SECP256K1_HAS_ADAPTOR
+    { "regression_ct_secret_is_zero", "SIZ-1..4: adaptor.cpp VT is_zero() removed before ct::scalar_inverse (T-006); taproot.cpp is_zero()→is_zero_ct() on private_key and tweaked (T-007); adaptor round-trip + taproot edge cases", "ct_analysis", test_regression_ct_secret_is_zero_run, false },
+#endif
+    // === 2026-05-21 RFC6979-CT: fixed 2-iteration CT nonce loop ===
+    // advisory=false: C++ API only, no shim/GPU dependency.
+    { "regression_rfc6979_ct_loop", "RFC6979-CT: rfc6979_nonce loop replaced with fixed 2-iteration CT path + ct::scalar_select; iteration count no longer data-dependent; correctness verified via 200 sign+verify round-trips", "ct_analysis", test_regression_rfc6979_ct_loop_run, false },
+    // === 2026-05-21 PASS3-001/002: recovery parse compat + noncefp callback ===
+    // advisory=true: depends on libsecp256k1 shim being linked.
+    { "shim_recovery_and_noncefp", "PASS3-001/002: recoverable sig parse accepts r==0/s==0 (REC-1..4); ecdsa_sign/recoverable/schnorr_sign_custom fire illegal_callback for custom noncefp before returning 0 (NFP-1..3)", "exploit_poc", test_shim_recovery_and_noncefp_run, true },
 };
 
 static constexpr int NUM_MODULES = sizeof(ALL_MODULES) / sizeof(ALL_MODULES[0]);

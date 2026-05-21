@@ -57,7 +57,7 @@ lags behind the generated validation surfaces, prefer the generated counts.
 | `test_frost_kat.cpp` | -- | FROST t-of-n threshold signing known-answer tests |
 | `test_wycheproof_ecdsa.cpp` | -- | Wycheproof ECDSA: Google Project Wycheproof test vectors |
 | `test_wycheproof_ecdh.cpp` | -- | Wycheproof ECDH: Google Project Wycheproof test vectors |
-| `unified_audit_runner.cpp` | 249 modules (60 non-exploit + 264 exploit PoCs) | Unified audit: all current modules in single binary (includes GPU null-guard paths) |
+| `unified_audit_runner.cpp` | 249 modules (60 non-exploit + 265 exploit PoCs) | Unified audit: all current modules in single binary (includes GPU null-guard paths) |
 
 ### CPU Unit Tests (`src/cpu/tests/`)
 
@@ -104,13 +104,13 @@ lags behind the generated validation surfaces, prefer the generated counts.
 |------|---------|-------|
 | `opencl/tests/test_opencl.cpp` | OpenCL | Kernel correctness |
 | `opencl/tests/opencl_extended_test.cpp` | OpenCL | Extended operations |
-| `opencl/src/opencl_audit_runner.cpp` | OpenCL | Unified GPU audit (27 modules, 8 sections) |
+| `opencl/src/opencl_audit_runner.cpp` | OpenCL | Unified GPU audit ( 379 modules, 8 sections) |
 | `metal/tests/test_metal_host.cpp` | Metal | Metal shader correctness |
-| `metal/src/metal_audit_runner.mm` | Metal | `secp256k1_metal_audit`: unified GPU audit (27 modules, 8 sections) |
+| `metal/src/metal_audit_runner.mm` | Metal | `secp256k1_metal_audit`: unified GPU audit ( 379 modules, 8 sections) |
 | `src/cuda/src/test_ct_smoke.cu` | CUDA | CT smoke tests incl. ZK knowledge + DLEQ prove/verify (9 tests) |
 | `src/cuda/src/gpu_ct_leakage_probe.cu` | CUDA | Fixed-vs-random device-cycle Welch t-test for CT generator/signing kernels with JSON evidence output |
 | `src/cuda/src/test_suite.cu` | CUDA | `cuda_selftest`: kernel correctness, field + scalar + point ops |
-| `src/cuda/src/gpu_audit_runner.cu` | CUDA | `gpu_audit`: unified GPU audit (27 modules, 8 sections) |
+| `src/cuda/src/gpu_audit_runner.cu` | CUDA | `gpu_audit`: unified GPU audit ( 379 modules, 8 sections) |
 | `metal/app/metal_test.mm` | Metal | `secp256k1_metal_test`: shader correctness, compute pipeline |
 | `metal/app/bench_metal.mm` | Metal | `secp256k1_metal_bench_full`: comprehensive Metal benchmark |
 | `compat/libsecp256k1_shim/tests/shim_test.cpp` | CPU | `secp256k1_shim_test`: libsecp256k1 API compatibility shim |
@@ -850,6 +850,9 @@ ctest --test-dir build-audit -R "exploit" --output-on-failure
 | `regression_shim_security_v8` | `audit/test_regression_shim_security_v8.cpp` | v8: P1-SEC-NEW-001 ecdh strict privkey (Rule 11) + RED-TEAM-008 ecdsa_verify on-curve + P2-SEC-NEW-002 ecdh pubkey on-curve + NEW-006 schnorr ct::scalar_cneg |
 | `regression_ecdsa_batch_curve_check` | `audit/test_regression_ecdsa_batch_curve_check.cpp` | CA-001: secp256k1_ecdsa_verify_batch rejects invalid-curve pubkeys (y^2 != x^3+7) in both small-batch (n<8) and large-batch (n>=8) paths (BCK-1..6) |
 | `regression_fe52_var_paths` | `audit/test_regression_fe52_var_paths.cpp` | PERF-VAR: FE52 mul_var/mul_assign_var/square_var/square_inplace_var produce correct results matching CT paths — removes TEMPORARY CT fallback (VAR-1..4) |
+| `regression_ct_secret_is_zero` | `audit/test_regression_ct_secret_is_zero.cpp` | SIZ-1..4: adaptor CT nonce (VT is_zero removed before ct::scalar_inverse) + taproot is_zero→is_zero_ct fixes; adaptor round-trip + taproot edge cases |
+| `regression_rfc6979_ct_loop` | `audit/test_regression_rfc6979_ct_loop.cpp` | RFC6979-CT: rfc6979_nonce fixed 2-iteration CT loop + ct::scalar_select; 200 sign+verify round-trips, determinism, nonce uniqueness |
+| `shim_recovery_and_noncefp` | `compat/libsecp256k1_shim/tests/test_shim_recovery_and_noncefp.cpp` | PASS3-001/002: recoverable sig parse accepts r=0/s=0 (REC-1..4); ecdsa_sign/recoverable/schnorr_sign_custom fire illegal_callback for custom noncefp (NFP-1..3) |
 
 ## Upstream Libsecp256k1 Parity Tests (batch 3 — v3.69+)
 

@@ -374,44 +374,50 @@ Scalar rfc6979_nonce(const Scalar& private_key,
     hmac.init_key32(K);
     hmac.compute_short(V, 32, V);          // V = HMAC(K2, V)
 
-    // Step h: generate candidate -- reuses K2 midstate!
-    // Hoist t/buf33 outside loop: stack alloc once, reuse each iteration.
+    // Step h: generate candidate — CT-safe fixed 2-iteration approach.
+    // CT: the original retry loop used early-return on success, making the
+    // iteration count data-dependent (~2^-128 probability of retry, but
+    // structurally non-CT). Fix: always run exactly 2 iterations; use
+    // ct::scalar_select to pick the first valid candidate without branching.
+    // Probability of needing iteration 2 is ~2^-128 (k >= n or k == 0).
+    // Probability of both failing is ~2^-256 (caller handles zero return).
     std::array<uint8_t, 32> t;
     uint8_t buf33[33];
-    for (int attempt = 0; attempt < 100; ++attempt) {
-        hmac.compute_short(V, 32, V);      // V = HMAC(K2, V)
+    Scalar cand1{};
 
-        std::memcpy(t.data(), V, 32);
-        // RFC 6979 §3.2(h): k = bits2int(T); retry if k == 0 or k >= n.
-        Scalar candidate;
-        if (Scalar::parse_bytes_strict_nonzero(t.data(), candidate)) {
-            secure_erase(t.data(), t.size());
-            secure_erase(V, sizeof(V));
-            secure_erase(K, sizeof(K));
-            secure_erase(x_bytes.data(), x_bytes.size());
-            secure_erase(buf97, sizeof(buf97));
-            secure_erase(&hmac, sizeof(hmac));
-            return candidate;
-        }
+    // Iteration 1: V = HMAC(K2, V)
+    hmac.compute_short(V, 32, V);
+    std::memcpy(t.data(), V, 32);
+    bool const ok1 = Scalar::parse_bytes_strict_nonzero(t.data(), cand1);
 
-        // Retry: K = HMAC(K, V||0x00), V = HMAC(K, V)
-        std::memcpy(buf33, V, 32);
-        buf33[32] = 0x00;
-        hmac.compute_short(buf33, 33, K);
-        secure_erase(buf33, sizeof(buf33));
-        hmac.init_key32(K);
-        hmac.compute_short(V, 32, V);
-    }
+    // Advance HMAC state unconditionally (CT: must execute regardless of ok1)
+    std::memcpy(buf33, V, 32);
+    buf33[32] = 0x00;
+    hmac.compute_short(buf33, 33, K);
+    secure_erase(buf33, sizeof(buf33));
+    hmac.init_key32(K);
+    hmac.compute_short(V, 32, V);
+
+    // Iteration 2: V = HMAC(K3, V)
+    Scalar cand2{};
+    hmac.compute_short(V, 32, V);
+    std::memcpy(t.data(), V, 32);
+    (void)Scalar::parse_bytes_strict_nonzero(t.data(), cand2);
+
+    // CT select: mask = ~0ULL if ok1, else 0ULL (two's-complement of bool)
+    // ct::scalar_select(a, b, mask) returns a when mask == all-ones, else b
+    std::uint64_t const mask1 = static_cast<std::uint64_t>(
+        -static_cast<std::int64_t>(static_cast<int>(ok1)));
+    Scalar const result = ct::scalar_select(cand1, cand2, mask1);
+
     secure_erase(t.data(), t.size());
     secure_erase(buf33, sizeof(buf33));
-
-    // Should never reach -- zeroize anyway
     secure_erase(V, sizeof(V));
     secure_erase(K, sizeof(K));
     secure_erase(x_bytes.data(), x_bytes.size());
     secure_erase(buf97, sizeof(buf97));
     secure_erase(&hmac, sizeof(hmac));
-    return Scalar::zero();
+    return result;
 }
 
 // -- Hedged RFC 6979 ----------------------------------------------------------

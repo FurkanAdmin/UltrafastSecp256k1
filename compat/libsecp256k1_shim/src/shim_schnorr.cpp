@@ -217,8 +217,13 @@ int secp256k1_schnorrsig_sign_custom(
         noncefp = extraparams->noncefp;
         ndata   = extraparams->ndata;
     }
-    // Fail-closed: reject non-canonical nonce functions.
-    if (noncefp != nullptr && noncefp != secp256k1_nonce_function_bip340) return 0;
+    // Fail-closed: reject non-canonical nonce functions. Fire illegal callback (PASS3-001 fix).
+    if (noncefp != nullptr && noncefp != secp256k1_nonce_function_bip340) {
+        secp256k1_shim_call_illegal_cb(ctx,
+            "secp256k1_schnorrsig_sign_custom: custom nonce functions are not supported; "
+            "pass NULL or secp256k1_nonce_function_bip340");
+        return 0;
+    }
     if (msglen > 0 && !msg) {
         secp256k1_shim_call_illegal_cb(ctx, "secp256k1_schnorrsig_sign_custom: NULL msg with nonzero msglen");
         return 0;
