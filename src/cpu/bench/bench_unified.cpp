@@ -138,6 +138,7 @@ extern "C" {
 #include <cstdio>
 #include <cstdint>
 #include <cstring>
+#include <ctime>
 #include <chrono>
 #include <string>
 #include <vector>
@@ -202,8 +203,42 @@ struct BenchReport {
         FILE* f = fopen(path, "w");
         if (!f) return false;
 
+        // Detect turbo boost status at write time (Linux intel_pstate / cpufreq/boost).
+        // "disabled" = no_turbo=1 or boost=0 (controlled run).
+        // "enabled"  = no_turbo=0 or boost=1 (uncontrolled, numbers may vary).
+        // "unknown"  = sysfs not readable (non-Linux, non-Intel, or permission denied).
+        const char* turbo_status = "unknown";
+        {
+            FILE* tf = fopen("/sys/devices/system/cpu/intel_pstate/no_turbo", "r");
+            if (tf) {
+                int val = -1;
+                if (fscanf(tf, "%d", &val) == 1)
+                    turbo_status = (val == 1) ? "disabled" : "enabled";
+                fclose(tf);
+            } else {
+                FILE* bf = fopen("/sys/devices/system/cpu/cpufreq/boost", "r");
+                if (bf) {
+                    int val = -1;
+                    if (fscanf(bf, "%d", &val) == 1)
+                        turbo_status = (val == 0) ? "disabled" : "enabled";
+                    fclose(bf);
+                }
+            }
+        }
+
+        // Current date (UTC) for traceability.
+        char date_buf[16] = "unknown";
+        {
+            time_t t = time(nullptr);
+            struct tm* tm_utc = gmtime(&t);
+            if (tm_utc)
+                strftime(date_buf, sizeof(date_buf), "%Y-%m-%d", tm_utc);
+        }
+
         fprintf(f, "{\n");
         fprintf(f, "  \"metadata\": {\n");
+        fprintf(f, "    \"generated_by\": \"bench_unified --json\",\n");
+        fprintf(f, "    \"date\": \"%s\",\n", date_buf);
         fprintf(f, "    \"cpu\": \"%s\",\n", cpu_brand);
         fprintf(f, "    \"compiler\": \"%s\",\n", compiler);
         fprintf(f, "    \"arch\": \"%s\",\n", arch);
@@ -212,6 +247,7 @@ struct BenchReport {
         fprintf(f, "    \"passes\": %d,\n", passes);
         fprintf(f, "    \"warmup\": %d,\n", warmup);
         fprintf(f, "    \"pool_size\": %d,\n", pool_size);
+        fprintf(f, "    \"turbo\": \"%s\",\n", turbo_status);
         fprintf(f, "    \"run_mode\": \"%s\"\n", quick_mode ? "quick" : "full");
         fprintf(f, "  },\n");
 

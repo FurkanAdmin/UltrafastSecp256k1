@@ -1,5 +1,20 @@
 # Audit Changelog
 
+## 2026-05-21 — Fix: doc sync, stale paths, canonical benchmark JSON machine-generation (REL-001..011, BENCH-003/006, CI-001)
+
+- **docs/AUDIT_COVERAGE.md:** Updated hardcoded module counts 372→379 (total), 91→114 (non-exploit) in Verdict line and Summary table. These counts were not matched by any `sync_module_count.py` pattern; two new regex patterns added (VERDICT_MODULES_RE, SUMMARY_NONEXPLOIT_RE) to catch these formats in future runs.
+- **ci/sync_module_count.py:** Added `VERDICT_MODULES_RE` (matches `-- N modules, N failure classes`) and `SUMMARY_NONEXPLOIT_RE` (matches `| Audit Modules | N (non-exploit modules) |`) so future module count changes auto-propagate to AUDIT_COVERAGE.md.
+- **SECURITY.md:** `scripts/audit_gate.py --disclosure-sla` → `ci/audit_gate.py --disclosure-sla` (stale path after scripts/→ci/ migration).
+- **docs/AUDIT_REPORT.md:** Replaced hardcoded "326 modules" with a reference to AUDIT_COVERAGE.md and current count, removing the stale snapshot number.
+- **CHANGELOG.md:** Updated `(scripts/)` → `(ci/)` in Python audit script suite description.
+- **packaging/README.md:** `libufsecp3` → `libufsecp4` (runtime package name), `find_package(ufsecp 3 REQUIRED)` → version 4.
+- **packaging/debian/:** Renamed `libsecp256k1-fast3.install` → `libsecp256k1-fast4.install` to match binary package name.
+- **packaging/cocoapods/UltrafastSecp256k1.podspec:** `HEADER_SEARCH_PATHS` `cpu/include` → `src/cpu/include` (build-breaking path error after tree migration).
+- **src/cpu/bench/bench_unified.cpp `write_json()`:** Added `generated_by: "bench_unified --json"`, `date` (UTC), and `turbo` (detected from sysfs intel_pstate or cpufreq/boost) fields to JSON metadata. Also added `<ctime>` include. Future machine-generated artifacts will carry provenance metadata distinguishing them from hand-crafted files.
+- **docs/bench_unified_2026-05-21_gcc14_x86-64.json (NEW):** Machine-generated canonical benchmark artifact (taskset -c 0 nice -20, GCC 14.2.0, 11-pass IQR, 64-key pool). Replaces three prior artifacts: `2026-05-11` (hand-crafted schema, non-reproducible), `2026-05-15` (undocumented turbo, 10% ratio divergence), `2026-05-15_no-lto` (incomplete methodology). CT signing ratios: ECDSA 1.27×, Schnorr 1.13× vs libsecp256k1 (turbo lock unconfirmed).
+- **docs/canonical_numbers.json:** Updated `_canonical_bench_artifact` → 2026-05-21 artifact. Updated `ct_signing_gcc` ratios (ECDSA 1.24→1.27, Schnorr 1.09→1.13) from new machine-generated run. Cleared misleading NOTE about 2026-05-16 inconsistency.
+- **docs/BENCHMARKS.md:** All references to old 2026-05-11 artifact updated to 2026-05-21. P1-PERF-001 label changed from `release-grade` to `diagnostic — gcc -O2 only, not Release+LTO`. CT sign ratios updated to 1.27×/1.13×.
+
 ## 2026-05-21 — Fix: batch sign null aux rejection, fail-closed cleanup, shim pubkey_cmp NULL ctx, musig agg CT accumulator (SEC-006/008, SHIM-005/MUSIG-CT)
 
 - **src/cpu/src/impl/ufsecp_ecdsa.cpp (SEC-006):** `ufsecp_schnorr_sign_batch` now rejects `aux_rands32=NULL` with `UFSECP_ERR_NULL_ARG`. Previously the function silently fell back to zero-entropy auxiliary bytes (`kZeroAux`), degrading BIP-340 hedged-nonce security without any error signal. The null guard is now part of the standard upfront null check.

@@ -54,7 +54,7 @@ Pod::Spec.new do |s|
   s.pod_target_xcconfig = {
     "CLANG_CXX_LANGUAGE_STANDARD" => "c++20",
     "HEADER_SEARCH_PATHS"         => [
-      "$(PODS_TARGET_SRCROOT)/cpu/include",
+      "$(PODS_TARGET_SRCROOT)/src/cpu/include",
       "$(PODS_TARGET_SRCROOT)/include",
     ].join(" "),
     "GCC_PREPROCESSOR_DEFINITIONS" => [

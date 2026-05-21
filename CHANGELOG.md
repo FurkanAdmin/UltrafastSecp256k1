@@ -101,8 +101,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   MR-1..MR-7) targeting wNAF OOB, divsteps mask, scalar inverse, window sign-magnitude,
   field reduction constant, dubious identity shortcut, nonce bit-length. Source integrity
   scanner: `test_mutation_artifact_scan.cpp` (6 checks, MA-1..MA-4). Commit `736e753f`.
-- **Python audit script suite** (`scripts/`) — 8 dynamic + 1 static analysis scripts, 9 Python
-  CTest targets total. All run via `--lib path/to/libufsecp.so`. All PASS.
+- **Python audit script suite** (`ci/`) — 8 dynamic + 1 static analysis scripts, 9 Python
+  CTest targets total (`scripts/` is a legacy mirror; canonical path is `ci/`). All run via `--lib path/to/libufsecp.so`. All PASS.
   - `differential_cross_impl.py` (1000+ checks): drives library alongside coincurve + python-ecdsa
     for random (sk, msg) pairs; catches wrong low-S normalization, pubkey parity bugs, ECDH
     mismatches. CTest `py_differential_crossimpl`. Committed `e94523bb` / `ad32e1d1`.

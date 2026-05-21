@@ -93,6 +93,12 @@ ALL_REGISTERED_ENTRIES_RE = re.compile(
     r'All \d+ registered exploit-(?:test entries|PoC modules) live in'
 )
 
+# Matches "-- N modules, N failure classes" (AUDIT_COVERAGE.md Verdict line)
+VERDICT_MODULES_RE = re.compile(r'(-- )\d+( modules, \d+ failure classes)')
+
+# Matches "| Audit Modules        | N (non-exploit modules) |" (AUDIT_COVERAGE.md Summary table)
+SUMMARY_NONEXPLOIT_RE = re.compile(r'(\| Audit Modules\s+\| )\d+( \(non-exploit modules\) \|)')
+
 # Matches "N-module `unified_audit_runner`" (backtick-wrapped variant used in README)
 # Handled by RUNNER_MODULE_COUNT_BT_RE defined above; applied in make_replacements.
 
@@ -235,6 +241,26 @@ def make_replacements(content: str,
          f'{exploit_mods} exploit PoC modules ({exploit_files} source files), 20+ coverage areas, 0 failures')
     _sub(ALL_REGISTERED_ENTRIES_RE,
          f'All {exploit_mods} registered exploit-PoC modules live in')
+
+    # "-- N modules, N failure classes" (AUDIT_COVERAGE.md Verdict line)
+    def _replace_verdict_modules(m: re.Match) -> str:
+        nonlocal changes
+        replacement = m.group(1) + str(total) + m.group(2)
+        if m.group(0) != replacement:
+            changes += 1
+        return replacement
+
+    new = VERDICT_MODULES_RE.sub(_replace_verdict_modules, new)
+
+    # "| Audit Modules | N (non-exploit modules) |" (AUDIT_COVERAGE.md Summary table)
+    def _replace_summary_nonexploit(m: re.Match) -> str:
+        nonlocal changes
+        replacement = m.group(1) + str(non_exploit) + m.group(2)
+        if m.group(0) != replacement:
+            changes += 1
+        return replacement
+
+    new = SUMMARY_NONEXPLOIT_RE.sub(_replace_summary_nonexploit, new)
 
     # "N exploit PoCs" / "N exploit-PoCs" — short form without "modules" (3+ digit only)
     def _replace_exploit_pocs_simple(m: re.Match) -> str:

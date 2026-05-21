@@ -266,7 +266,7 @@ A machine-readable contact record per **RFC 9116** is published at
 These SLAs are **commitments**, not best-effort goals. If we miss an
 SLA we file a public note in `docs/AUDIT_CHANGELOG.md` explaining
 why; this is verified by the CAAS sub-gate
-`scripts/audit_gate.py --disclosure-sla` (planned).
+`ci/audit_gate.py --disclosure-sla` (planned).
 
 ### Severity Guidelines
 

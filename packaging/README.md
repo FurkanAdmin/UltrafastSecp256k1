@@ -19,7 +19,7 @@ cd build && cpack -G DEB
 ```
 
 Produces:
-- `libufsecp3_<ver>_<arch>.deb` -- shared library
+- `libufsecp4_<ver>_<arch>.deb` -- shared library
 - `libufsecp-dev_<ver>_<arch>.deb` -- headers + static lib + cmake/pkgconfig
 
 ## Fedora / RHEL / CentOS (.rpm)
@@ -66,12 +66,12 @@ sudo ldconfig
 
 After install, applications can find the library via:
 - **pkg-config**: `pkg-config --cflags --libs ufsecp`
-- **CMake**: `find_package(ufsecp 3 REQUIRED)`
+- **CMake**: `find_package(ufsecp 4 REQUIRED)`
 
 ## Package naming convention
 
 | Distro | Runtime | Development |
 |--------|---------|-------------|
-| Debian/Ubuntu | `libufsecp3` | `libufsecp-dev` |
+| Debian/Ubuntu | `libufsecp4` | `libufsecp-dev` |
 | Fedora/RHEL | `libufsecp` | `libufsecp-devel` |
 | Arch | `libufsecp` | (included in main package) |
