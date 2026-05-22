@@ -171,6 +171,7 @@
                 "SECP256K1_BUILD_ZK": "OFF",
                 "SECP256K1_BUILD_ECIES": "OFF",
                 "SECP256K1_BUILD_BIP352": "OFF",
+                "SECP256K1_BUILD_LTC_SP": "OFF",
                 "SECP256K1_BUILD_ADAPTOR": "OFF",
                 "SECP256K1_BUILD_WALLET": "OFF",
                 "SECP256K1_BUILD_PIPPENGER": "ON",

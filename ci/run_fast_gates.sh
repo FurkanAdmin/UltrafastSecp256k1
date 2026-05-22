@@ -139,6 +139,12 @@ run "Nonce erase coverage (BIP-327)"           ci/check_nonce_erase_coverage.py
 run "Doc drift (badges, removed files)"        ci/check_doc_drift.py
 run "Bench/doc consistency (banned patterns)" ci/check_bench_doc_consistency.py
 
+# Profile manifest cross-check: ci/profiles.json -> CMakePresets.json -> ci/caas_runner.py.
+# Fast (<1s) — catches the class of bug where a chain-specific preset disables an
+# optional module but a dependent module remains ON (e.g. LTC_SP needs BIP352)
+# before the actual cmake --preset invocation fails at configure time.
+run "Profile manifest consistency" ci/profile_manifest.py --quiet
+
 # (check_advisory_skip_returns.sh moved to MANDATORY_GATES — CI-004 fix)
 
 if [[ "${FAILED}" -gt 0 ]]; then
