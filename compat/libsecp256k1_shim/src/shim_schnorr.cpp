@@ -382,6 +382,8 @@ int secp256k1_schnorrsig_verify(
     // SHIM-003 fix: upstream libsecp256k1 allows NULL msg when msglen == 0 (zero-length
     // message is a valid BIP-340 construct). Only fire illegal callback when msg is NULL
     // with a non-zero msglen, which would cause a null dereference in schnorr_verify.
+    // (Main's varlen-verify commit a3b77fde used a shorter callback string; the SHIM-003
+    // form on dev is more diagnostic — keep it.)
     if (!msg && msglen > 0) {
         secp256k1_shim_call_illegal_cb(ctx, "secp256k1_schnorrsig_verify: NULL msg with non-zero msglen");
         return 0;

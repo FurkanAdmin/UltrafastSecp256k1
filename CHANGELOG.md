@@ -5,76 +5,38 @@ All notable changes to UltrafastSecp256k1 are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [4.0.0] - 2026-05-13
+## [4.0.0] - 2026-05-16
 
-### Changed
-- **`scripts/` → `ci/` path migration** — all CI/tooling scripts (`scripts/*.py`, `scripts/*.sh`)
-  are now canonically located under `ci/`. The `scripts/` directory remains as a legacy mirror
-  for the duration of v4.0 but should not be used in new references. Historical changelog
-  entries that reference `scripts/` paths reflect the location at the time of each commit.
+> **Bitcoin Core secondary backend candidate — CPU path, verification package.**
+> This is not a trust request. It is a verification package.
 
-### Added
-- **Audit report infrastructure overhaul** — unified report schema v1.0.0, build provenance,
-  artifact analysis, bug capsule format, and CI gating policy. Committed `d906a77d`.
-  - `ci/report_provenance.py` — collects git SHA, dirty flag, submodules, toolchain
-    (compiler versions), build flags from CMakeCache.txt, platform info.
-  - `ci/report_schema.py` — unified report schema v1.0.0 with `NullableField` (replaces
-    `"unknown"` strings), `SkipReason`, `Severity` enum (blocking/advisory), `ReportBuilder`.
-  - `ci/artifact_analyzer.py` — multi-report analysis: ingest, regression diff,
-    platform divergence detection, flake detection, SARIF 2.1.0 + Markdown + timeline exports.
-  - `ci/bug_capsule_gen.py` — generates regression tests + exploit PoC C++ + CMake
-    fragments from JSON bug capsule definitions.
-  - `ci/ci_gate_detect.py` — impact-based hard/light CI gate detection from changed files.
-  - `schemas/bug_capsule.schema.json` — JSON Schema for structured bug records.
-  - `docs/AUDITOR_QUICKSTART.md` — "3 commands, 3 artifacts" guide for independent reviewers.
-  - `docs/LAYER_ROUTING_MATRIX.md` — CT/FAST routing for all ~103 ABI functions.
-  - `docs/CI_GATING_POLICY.md` — Tier0/Tier1/Tier2 CI architecture with impact-based gating.
+### Performance (GCC 14.2.0 · Release+LTO · Intel i5-14400F · hard turbo lock)
 
-### Security
-- **[CRIT-1/MED-1] OpenCL `ecdsa_sign` / `schnorr_sign` kernels now route through CT path** —
-  `scalar_mul_generator_impl` (4-bit windowed, secret-dependent branches) on nonce and private key
-  replaced by `ct_ecdsa_sign_impl` / `ct_schnorr_sign_impl` (branchless Montgomery ladder).
-  New file `secp256k1_ct_extended.cl`; `ExtendedCL::init` now loads this instead of
-  `secp256k1_extended.cl`. Kernel interface (`ecdsa_sign`, `schnorr_sign` names and signatures)
-  unchanged — no caller impact.
-- **[HIGH-2] `test_ct_sidechannel_smoke_run` ESP32 skip path returns `ADVISORY_SKIP_CODE`** —
-  was returning `0` (PASS) instead of `77` (SKIP), causing false audit pass on ESP32 builds.
-- **[MED-2] OpenCL `ecdh_batch` host-side key erase uses `secure_erase`** — replaced hand-rolled
-  `volatile` zero loop with `secp256k1::detail::secure_erase` to prevent compiler elision.
-- **[HIGH-1] CUDA batch signing kernels explicitly call `ct_ecdsa_sign` / `ct_schnorr_sign`** —
-  removes naming ambiguity with the non-CT `ecdsa_sign` from `ecdsa.cuh`.
+| Workload | Ultra | libsecp256k1 | Delta |
+|---|---|---|---|
+| CT ECDSA sign | 21.6 µs | 59.7 µs | **+2.76×** |
+| CT Schnorr sign (BIP-340) | 18.1 µs | 46.5 µs | **+2.57×** |
+| Schnorr verify | 84.3 µs | 84.3 µs | equal |
+| ConnectBlock ECDSA 2000 sigs (LTO) | 254 ms | 257 ms | **+1.2%** |
+| ConnectBlock Schnorr 2000 sigs (LTO) | 253 ms | 255 ms | **+0.9%** |
+| SignSchnorrWithMerkleRoot (bench_bitcoin) | 95 µs | 113 µs | **+18%** |
 
-### Known Security Limitations (v1 — ABI-constrained)
-- **[MED-3] `ufsecp_musig2_partial_sign` cannot cross-validate `signer_index` against `privkey`** —
-  the `keyagg` blob (`UFSECP_MUSIG2_KEYAGG_LEN = 165`) stores only aggregation coefficients, not
-  individual public keys, so verifying that `privkey` corresponds to `signer_index` is not possible
-  at this layer. A mismatched `signer_index` produces an invalid partial signature that fails at
-  aggregation (DoS at worst; no key extraction). **Full fix is a v2 ABI change**: bump
-  `UFSECP_MUSIG2_KEYAGG_LEN` to include per-signer compressed pubkeys (33 bytes each).
-  Callers MUST ensure `signer_index` matches the pubkey used during `ufsecp_musig2_key_agg`.
+*Canonical: [bench_unified_2026-05-16_gcc14_x86-64.json](docs/bench_unified_2026-05-16_gcc14_x86-64.json) · [BITCOIN_CORE_BENCH_RESULTS.json](docs/BITCOIN_CORE_BENCH_RESULTS.json)*
 
-### Fixed
-- **`research-monitor.yml` workflow parse error** — `secrets.*` is not accessible in GitHub
-  Actions `if:` expression context. All schedule runs were silently blocked. Replaced with
-  `env.*` references (secrets are still injected via the `env:` block). Cron `10 7 * * *`
-  schedule will now fire correctly from `main`.
-- **Dead code cleanup in `scalar.cpp`** — removed unused `carry_hi` variable in the 32-bit
-  fallback schoolbook multiply path. No functional change.
-- **CT branch leak in `ct::ecdsa_sign_recoverable`** — branchy `is_low_s()` call replaced
-  with branchless `ct::scalar_is_high()` + conditional negate. Committed `0a93ff4b`.
-- **OpenCL `field_reduce()` missing rare carry** — added carry propagation for values where
-  the reduction constant `k = 2^32 + 977` generates an overflow beyond the first limb.
-  Committed `0a93ff4b`.
+Without LTO: ConnectBlock ~0.5–1.0% slower (i-cache pressure). LTO required for Ultra to win.
 
-- **BIP-340 SchnorrSnarkWitness** — foreign-field witness generator for PLONK/Halo2/Circom
-  circuits. Decomposes a BIP-340 Schnorr signature into 5×52-bit `ForeignFieldLimbs`:
-  public inputs (msg, R.x, s, P.x) and private witness (R.y, P.y, e = BIP0340/challenge).
-  - C++ API: `secp256k1::zk::schnorr_snark_witness()` in `zk.hpp`
-  - C ABI: `ufsecp_zk_schnorr_snark_witness()` in `ufsecp.h`
-  - GPU batch ABI: `ufsecp_gpu_zk_schnorr_snark_witness_batch()` in `ufsecp_gpu.h`
-    (GPU backend interface ready; native CUDA/OpenCL/Metal kernels pending)
-  - FFI coverage tests: 12 checks (valid sig, witness fields, limb bounds, null/tampered)
-  - Commit: `d5e8c916`
+### Security & Audit Evidence
+
+**Headline (curated, from `dbd5711` on main):**
+- **262 exploit PoC** security probes, 20+ CVE/attack classes — all pass
+- **369 total audit modules** (262 exploit PoC + 107 non-exploit)
+- **CAAS autonomy: 100/100** (8/8 gates)
+- **Bitcoin Core test suite: 749/749** (GCC 14.2.0, May 2026)
+- Constant-time signing: ECDSA, Schnorr, MuSig2, FROST, BIP-324 XDH
+- libsecp256k1 shim parity: DER BIP-66, Schnorr BIP-340, ECDH, ElligatorSwift, MuSig2
+- Reproducible builds: pinned compiler/toolchain, deterministic LTO
+
+**Detail (dev-history form):**
 
 ### Security / Audit
 - **Point::scalar_mul exploit PoC** — `test_exploit_scalar_mul.cpp` (59 checks, SM-1..SM-12)
@@ -211,129 +173,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (commit `00522b57`): ellswift API calls wrapped in `#ifdef SECP256K1_BIP324`; both tests
   now compile and pass in builds without BIP-324 enabled.
 
-### GPU Backend
-- **Bulletproof parity (OpenCL + Metal)**: resolved the last remaining PARITY-EXCEPTION. OpenCL: removed `#if 0` guard in `secp256k1_zk.cl`; fixed `range_verify_full_impl` address-space qualifiers (`__global const AffinePoint*` for `bp_G`/`bp_H`, with per-iteration private copy before `scalar_mul_impl`); wired `bulletproof_verify_batch` host dispatch via `range_proof_poly_batch` kernel (matches CUDA poly-check behavior). Metal: wired `bulletproof_verify_batch` host dispatch via `range_proof_poly_batch` kernel; host converts 324-byte proof wire format to `RangeProofPolyMetal` GPU structs. Full CUDA ↔ OpenCL ↔ Metal parity — zero `Unsupported` stubs remaining.
-- **OpenCL parity**: wired `zk_knowledge_verify_batch`, `zk_dleq_verify_batch`, `bip324_aead_encrypt_batch`, `bip324_aead_decrypt_batch` in `gpu_backend_opencl.cpp` — 4 new kernels matching CUDA surface.
-- **Metal parity**: wired `zk_knowledge_verify_batch`, `zk_dleq_verify_batch`, `bip324_aead_encrypt_batch`, `bip324_aead_decrypt_batch` in `gpu_backend_metal.mm` — all four Metal kernels were already present in `secp256k1_kernels.metal`; dispatch code now connected. Also fixed `zk_knowledge_verify_batch` Metal kernel: was incorrectly treating pubkey buffer as a scalar (scalar×G); corrected to `lift_x` to recover the full point from x-coordinate.
-- **Metal parity — `bip352_scan_batch` + `ecdsa_snark_witness_batch`**: implemented the two remaining GPU parity gaps on Metal. `bip352_scan_pipeline` MSL kernel performs GLV scalar decomposition → tagged SHA-256 with precomputed BIP0352/SharedSecret midstate → hash×G + spend_pt → 64-bit prefix per output. `ecdsa_snark_witness_batch` MSL kernel produces 760-byte foreign-field PLONK witness records (11×32 scalar bytes + 10×5 `ulong` 52-bit FF limbs + valid flag), layout bit-for-bit identical to CUDA and OpenCL. Full host dispatch wired in `gpu_backend_metal.mm` via `sec1_33_to_metal_affine` + `be32_to_metal_scalar` helpers. All 13 public GPU ABI operations (`ufsecp_gpu_*`) now fully implemented on CUDA, OpenCL, and Metal — zero `Unsupported` stubs on any backend. Commit `151d09fc`.
-- **CUDA 13 compatibility**: replaced deprecated `cudaDeviceProp::clockRate` / `::memoryClockRate` fields (removed in CUDA 13) with `cudaDeviceGetAttribute(cudaDevAttrClockRate/MemoryClockRate)` under `#if CUDART_VERSION >= 13000` guard. Backward-compatible with CUDA 12. Reported by @craigraw compiling with CUDA 13 on RTX 5080.
+### Platform Support
 
+Linux x86-64-v3 · Linux ARM64 · Linux RISC-V 64 · macOS ARM64 · Windows x86-64 · Android ARM64
 
+### Reviewer Entry Path
 
-> Full ABI audit coverage: 155 `ufsecp_*` + 23 `ufsecp_gpu_*` functions, 352-module unified runner (AUDIT-READY), GPU C ABI null-guard path integration.
+1. [](docs/BITCOIN_CORE_BACKEND_EVIDENCE.md)
+2. [](docs/BENCHMARKS.md)
+3. [](docs/AUDIT_CHANGELOG.md)
+4. [](docs/SHIM_KNOWN_DIVERGENCES.md)
+5. Replay: `python3 ci/verify_external_audit_bundle.py --allow-commit-mismatch`
 
-### Added
+### Note on Scope
 
-- **ZK adversarial exploit test** (`test_exploit_zk_adversarial.cpp`) — 14 tests covering malformed/forged ZK proof inputs: garbage bytes, all-zero proof, scalar overflow (s ≥ n), truncated data, identity pubkey, identity generator, degenerate G==H DLEQ, wrong commitment for range proof, DLEQ overflow e, exhaustive 64-byte-flip sensitivity. Closes audit coverage gap #2.
-- **Pedersen adversarial exploit test** (`test_exploit_pedersen_adversarial.cpp`) — 12 tests covering switch commitment security and adversarial balance attacks: switch roundtrip, zero-blind equivalence, switch binding, zero-commit→identity, negation cancellation, imbalanced verify_sum (theft detection), blind_sum subtraction, switch-as-normal rejection, double-spend detection, generator J independence. Closes audit coverage gap #3.
-- **Cross-library differential test** (`test_cross_libsecp256k1`) wired into audit label set (`audit;exploit;differential;libsecp`) so it participates in the unified audit runner when `SECP256K1_BUILD_CROSS_TESTS=ON`.
-
-### Fixed
-
-- **Stable binding validation closure** -- aligned the shared `validate_bindings.sh` flow and wrapper smoke suites across C#, Java, Swift, Python, Go, Rust, Node.js, PHP, Ruby, Dart, and the default React Native contract lane. Fixed wrapper/API drift, zero-length FFI buffer edge cases, Dart `NativeFinalizer` usage, and local Dart smoke-runner execution issues uncovered during the pass.
-- **CUDA `jacobian_add_mixed_unchecked` infinity flag** — missing `r->infinity = false` assignment
-  in the normal (non-infinity-input) code path caused generator table entries `table[3..15]` built
-  by `build_generator_table` to carry uninitialized infinity flags. Scalars with many consecutive
-  high nibbles (e.g. `n-1`, all-`0xF` pattern) heavily hit `table[15]` and produced wrong public
-  keys. All 52/52 CUDA signing tests now pass.
-
-### Changed
-
-- **Binding docs and packaging notes** -- synchronized canonical binding docs, examples, package names, and validation framing to the verified state: Dart is documented as `ultrafast_secp256k1`, React Native as `react-native-ultrafast-secp256k1`, and the central bindings matrix now reflects smoke-validated coverage instead of stale compile-only/optional wording.
-- **CUDA signing paths — `scalar_mul_generator_const` → `scalar_mul_generator_w8`** across all
-  signing kernels (`ecdsa.cuh`, `schnorr.cuh`, `bip32.cuh`, `pedersen.cuh`, `zk.cuh`).
-  w=8 uses 32 windows of 8-bit lookups instead of 64 windows of 4-bit lookups (w=4):
-  - ECDSA Sign: **220.9 → 198.3 ns/op** (−10.2%, beats OpenCL 211.3 ns)
-  - Schnorr Sign: equivalent speedup via the same generator multiplication hotspot
-  - `scalar_mul_generator_const` (w=4) retained for audit/benchmark comparisons.
-
-### Added
-
-- **BIP-39 Mnemonic Seed Phrases** (`bip39.hpp`/`bip39.cpp`) -- entropy-to-mnemonic conversion
-  (12/15/18/21/24 words), mnemonic validation (word count, membership, checksum), seed derivation
-  via PBKDF2-HMAC-SHA512 (2048 rounds), mnemonic-to-entropy roundtrip. OS CSPRNG entropy source.
-  2048-word English wordlist from official BIP-39 specification. 57 tests across 8 test functions.
-  Registered in `run_selftest` (module 10/25) and `unified_audit_runner` (protocol_security).
-- **Zero-Knowledge Proof Layer** (`zk.hpp`/`zk.cpp`) -- non-interactive Schnorr knowledge proofs,
-  DLEQ (discrete log equality) proofs, and Bulletproof range proofs (64-bit). All proving
-  operations use CT layer (constant-time); verification uses FAST layer (public data).
-  Fiat-Shamir via tagged SHA-256. Nothing-up-my-sleeve generators (no trusted setup).
-- **ZK Batch Operations** -- `batch_range_verify()` for efficient multi-proof verification,
-  `batch_commit()` for Pedersen commitment generation.
-- **MSM-optimized Bulletproof verifier** -- multi-scalar multiplication (Pippenger) merges
-  144 points into a single MSM; Montgomery batch inversion for s_coeff (1 inv + 126 muls vs
-  64 inversions). 1.93x speedup (5,079 -> 2,634 us).
-- **GPU ZK kernels** -- Pedersen commitment (`pedersen.cuh`) and ZK proof primitives (`zk.cuh`)
-  for CUDA backend.
-- **GPU ZK + BIP-324 C ABI** -- 5 new `ufsecp_gpu_*` batch operations wired through the full
-  GpuBackend → C ABI stack: `zk_knowledge_verify_batch`, `zk_dleq_verify_batch`,
-  `bulletproof_verify_batch`, `bip324_aead_encrypt_batch`, `bip324_aead_decrypt_batch`.
-  CUDA fully implemented; OpenCL/Metal stubs with `TODO(parity)`. Shared BIP-324 device
-  code extracted to `src/cuda/include/bip324.cuh` (ChaCha20-Poly1305 AEAD).
-  GPU C ABI total: 8 → 13 backend-neutral batch operations.
-- **GPU CT ZK proving** (`ct_zk.cuh`) -- constant-time knowledge proof and DLEQ proof
-  on CUDA, using the full CT scalar multiplication layer. Deterministic nonce derivation
-  with SHA-256 tagged hash and XOR hedging. Batch kernels for both operations.
-- **OpenCL ZK proving/verification** (`secp256k1_zk.cl`) -- knowledge proof, DLEQ proof,
-  batch prove/verify kernels. Uses fast-path wNAF-5 scalar multiplication.
-- **Metal ZK proving/verification** (`secp256k1_zk.h`, kernels 19-22) -- knowledge proof,
-  DLEQ proof with batch kernels. Uses branchless `affine_select` scalar multiplication.
-- **GPU ZK test coverage** -- `test_ct_smoke.cu` expanded to 9 tests: CT knowledge prove+verify
-  and CT DLEQ prove+verify round-trips verified on GPU (RTX 5060 Ti, Blackwell SM 12.0).
-- **ZK Benchmarks** in `bench_unified` Section 8.5: Pedersen commit, Knowledge prove/verify,
-  DLEQ prove/verify, Bulletproof range prove/verify with throughput numbers.
-- **24 ZK tests** in `test_zk.cpp`: knowledge proof, DLEQ, Bulletproof range proof correctness,
-  soundness, serialization, batch verification, edge cases.
-- **Unified Wallet API** (`wallet.hpp`/`wallet.cpp`) -- chain-agnostic key management, address
-  generation, message signing, and public key recovery. Single `wallet::` namespace works
-  identically across Bitcoin, Ethereum, Tron, and all 28 supported coins.
-- **Bitcoin message signing** (`message_signing.hpp`/`message_signing.cpp`) -- BIP-137/Electrum
-  compatible: `bitcoin_message_hash()`, `bitcoin_sign_message()`, `bitcoin_verify_message()`,
-  `bitcoin_recover_message()`, `bitcoin_sig_to_base64()`, `bitcoin_sig_from_base64()`.
-- **P2SH-P2WPKH** (nested/wrapped SegWit) address generation -- `address_p2sh_p2wpkh()`,
-  `coin_address_p2sh_p2wpkh()`, `wallet::get_address_p2sh_p2wpkh()`. Produces `3...` addresses
-  for backward-compatible SegWit (BIP-49).
-- **P2SH** (pay-to-script-hash) address primitive -- `address_p2sh()`, `coin_address_p2sh()`
-  from raw 20-byte script hash.
-- **P2WSH** (witness script hash) address primitive -- `address_p2wsh()` from 32-byte witness
-  script hash (SegWit v0, `bc1q...` 32-byte program).
-- **CashAddr encoding** (Bitcoin Cash BIP-0185) -- `cashaddr_encode()`, `address_cashaddr()`,
-  `coin_address_cashaddr()`, `wallet::get_address_cashaddr()`. Produces `bitcoincash:q...` addresses.
-- **Tron (TRX) coin descriptor** -- coin_type=195, `TRON_BASE58` encoding (Keccak-256 hash +
-  `0x41` prefix + Base58Check). 28th coin in registry.
-- **5 wallet address helpers** -- `get_address_p2pkh()`, `get_address_p2wpkh()`,
-  `get_address_p2sh_p2wpkh()`, `get_address_p2tr()`, `get_address_cashaddr()`.
-- **`chain_id` field** in `CoinParams` for EIP-155 signing (Ethereum=1, BSC=56, Polygon=137, etc.).
-- **19 new tests** -- 12 in `test_coins.cpp` (P2SH-P2WPKH, CashAddr, P2SH, Tron), 7 in
-  `test_wallet.cpp` (key management, signing, address formats, recovery).
-
-### Fixed
-
-- **CUDA `pedersen.cuh`** -- fixed `.d[]` -> `.limbs[]` member access on `ScalarData`/`FieldElementData`
-  (7+ occurrences), removed calls to non-existent `field_normalize()`, removed duplicate
-  `field_sqrt()` definition (already in `secp256k1.cuh`). These bugs existed since file creation
-  but were never triggered because no test included `pedersen.cuh` before.
-- **CUDA `zk.cuh`** -- fixed `.d[]` -> `.limbs[]` on `Scalar` and `FieldElement` in
-  `knowledge_verify_device`, `dleq_verify_device`, and `range_verify_inner`. Fixed undefined
-  `SCALAR_ONE` constant with inline initializer.
-
-### Changed
-
-- `coin_address()` CASHADDR dispatch now correctly routes to `coin_address_cashaddr()` --
-  Bitcoin Cash addresses generate via CashAddr instead of falling through to Base58Check.
-- All 28 coins now generate addresses correctly (was 27; BCH fixed, Tron added).
-- **ARM64 Android hash dispatch** -- `hash_accel` now routes `sha256_33`, `sha256_32`,
-  `hash160_33`, and `sha256_compress_dispatch` through ARMv8 SHA-256 instructions when
-  building for AArch64 targets with SHA2 support. On RK3588 / Android NDK r27.2 this reduced
-  `ecdsa_sign` from 25.89 us to 22.22 us, `schnorr_sign` (precomputed) from 17.73 us to 16.67 us,
-  and `ct::ecdsa_sign` from 70.50 us to 67.11 us, with verify paths remaining effectively flat.
-- **x86 Schnorr batch verify allocation path** -- `batch_verify.cpp` now reserves the
-  full batch size for the uncached x-only pubkey cache instead of capping capacity at 64.
-  Local i5-14400F reruns reduced uncached `schnorr_batch_verify` from 20.27 us/sig to about
-  19.94-20.06 us/sig at N=128 and from 18.56 us/sig to about 18.01-18.45 us/sig at N=192,
-  with `comprehensive` remaining green.
-
----
+CPU backend (x86-64, ARM64, RISC-V). GPU backends are diagnostic/experimental — not part of the Bitcoin Core evaluation profile.
 
 ## [3.22.0] - 2026-03-10
 

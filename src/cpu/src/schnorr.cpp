@@ -199,6 +199,9 @@ static Scalar schnorr_challenge_scalar_varlen(const uint8_t* r32,
                                               std::size_t msglen) {
     // PERF-001: SBO — avoid heap alloc for messages up to 512 bytes (covers
     // typical Tapscript leaf hashes and other short messages without malloc).
+    // Functionally identical to the vector-based variant on main (same tagged
+    // hash input bytes); the SBO version was added on dev after the varlen
+    // feature landed on main.
     static constexpr std::size_t kSBOMax = 512;
     uint8_t stack_buf[64 + kSBOMax];
     std::unique_ptr<uint8_t[]> heap_buf;

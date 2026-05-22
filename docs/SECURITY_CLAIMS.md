@@ -2,6 +2,26 @@
 
 **UltrafastSecp256k1 v4.0.0** -- FAST / CT Dual-Layer Architecture (CPU + GPU)
 
+### 2026-05-22 address.cpp — silent-payments t_k generator-mul is now CT (merged from main e4e17305)
+
+- **P-SP-CT-001** (`silent_payment_create` and `silent_payment_scan` in
+  `src/cpu/src/address.cpp`): The output-point computation `P = B_spend + t_k · G`
+  now uses `ct::generator_mul(t_k)` in both `silent_payment_create` (output key
+  derivation) and the per-output check inside `silent_payment_scan`. Previously
+  used the variable-time GLV path via `Point::generator().scalar_mul(t_k)`.
+  `t_k = SHA-256("BIP0352/SharedSecret" || S || ser32(k))` is derived from the
+  shared secret `S = b_scan · A_sum`, so it depends on the scan private key;
+  variable-time generator multiplication on `t_k` therefore leaks timing
+  information about the scan key. The CT path closes that side channel and
+  also adopts the precomputed comb table (~25× speedup on cold path).
+- **No API change**: Same `SilentPaymentOutput` / scan-result shape; same
+  produced output bytes for honest inputs (verified by the
+  `test_v4_features` silent-payment encode/decode/scan pipeline and the
+  in-tree LtcSpScanner parity test).
+- **Originated**: main commit `e4e17305 perf(silent-payments): ct::generator_mul
+  replaces generator().scalar_mul — 3× create, 2× scan`. Merged into dev
+  on 2026-05-22.
+
 ### 2026-05-21 ecdsa.cpp / musig2.cpp / frost.cpp — P2-CT-001/002/003/007 nonce candidate scalar erase
 
 - **P2-CT-001** (`rfc6979_nonce`): Both `cand1` and `cand2` nonce candidate scalars are

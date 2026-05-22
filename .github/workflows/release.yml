@@ -85,17 +85,20 @@ jobs:
 
       - name: Build audit shared library
         run: |
-          cmake -S . -B out/release-caas -G Ninja \
+          cmake -S . -B out/release -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CXX_COMPILER=g++-14 \
             -DBUILD_TESTING=OFF \
             -DSECP256K1_BUILD_PROTOCOL_TESTS=OFF \
             -DSECP256K1_BUILD_FUZZ_TESTS=OFF
-          cmake --build out/release-caas --target ufsecp_shared -j"$(nproc 2>/dev/null || echo 4)"
+          cmake --build out/release --target ufsecp_shared -j"$(nproc 2>/dev/null || echo 4)"
 
       - name: Release CAAS evidence gates
         env:
-          UFSECP_LIB_PATH: ${{ github.workspace }}/out/release-caas
+          # Matches the build dir at "Build audit shared library" step above
+          # (out/release). Older "out/release-caas" value would not exist at
+          # runtime — fixed on main in a2b35afd / 16f7a795.
+          UFSECP_LIB_PATH: ${{ github.workspace }}/out/release
         run: |
           python3 ci/build_project_graph.py --rebuild
           python3 tools/source_graph_kit/source_graph.py build -i
@@ -270,9 +273,9 @@ jobs:
           python-version: '3.12'
 
       - name: Install Python audit dependencies
+        shell: bash
         run: |
-          PYTHON=$(command -v python3 || command -v python)
-          "$PYTHON" -m pip install --require-hashes \
+          python3 -m pip install --require-hashes \
             -r .github/requirements/audit-deps.txt
 
       # -- Configure --
@@ -1991,7 +1994,7 @@ jobs:
           tag_name: ${{ env.RELEASE_TAG }}
           name: "UltrafastSecp256k1 ${{ env.RELEASE_TAG }}"
           body: ${{ steps.notes.outputs.NOTES }}
-          draft: false
+          draft: true
           prerelease: ${{ contains(env.RELEASE_TAG, '-rc') || contains(env.RELEASE_TAG, '-beta') || contains(env.RELEASE_TAG, '-alpha') }}
           fail_on_unmatched_files: false
           # NOTE: dist/**/* already includes .sigstore files created by
@@ -2021,12 +2024,12 @@ jobs:
           if [ -z "$WEBHOOK" ]; then echo "No webhook configured, skipping"; exit 0; fi
           NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           PYTHON=$(command -v python3 || command -v python)
-          JSON=$("$PYTHON" -c "
+          JSON=$(NOW="$NOW" "$PYTHON" -c "
           import json, os
           tag    = os.environ['TAG']
           repo   = os.environ['REPO']
           status = os.environ['STATUS']
-          now    = os.environ['NOW']
+          now    = os.environ.get('NOW', '')
           color  = 3066993 if status == 'success' else 15158332
           url    = f'https://github.com/{repo}/releases/tag/{tag}'
           desc   = f'**Tag:** \`{tag}\`\n**Status:** {status}\n\n[View Release]({url})'
@@ -2034,6 +2037,6 @@ jobs:
             'url': url, 'color': color, 'description': desc,
             'footer': {'text': 'UltrafastSecp256k1 CI'}, 'timestamp': now}]}
           print(json.dumps(payload))
-          " NOW="$NOW")
+          ")
           CURL=$(command -v curl || { echo "::error::curl not found on PATH"; exit 1; })
           "$CURL" -sS -H "Content-Type: application/json" -d "$JSON" "$WEBHOOK"

@@ -1,6 +1,26 @@
 # Secret Lifecycle Review
 
-**Last updated**: 2026-05-21 | **Version**: 4.0.0
+**Last updated**: 2026-05-22 | **Version**: 4.0.0
+
+### 2026-05-22 address.cpp — silent-payments t_k path adopts ct::generator_mul (merged from main e4e17305)
+
+- **`src/cpu/src/address.cpp` `silent_payment_create` / `silent_payment_scan` (P-SP-CT-001)**:
+  The expected output point `P = B_spend + t_k · G` previously used
+  `Point::generator().scalar_mul(t_k)` (variable-time GLV) on `t_k` derived from
+  `tagged_hash("BIP0352/SharedSecret", S || ser32(k))` where `S = b_scan · A_sum`.
+  Because `S` (and therefore `t_k`) depends on the scan private key, `t_k` is
+  secret-adjacent and a variable-time generator multiply on it leaks timing
+  information about the scan key. Both call sites now use
+  `ct::generator_mul(t_k)` which (a) is constant-time and (b) uses the
+  precomputed comb table (~33 µs vs ~826 µs cold FAST path).
+  **Lifecycle**: `t_k` is a stack-local `Scalar` consumed by `ct::generator_mul`
+  and `expected_x` computation; it is implicitly destroyed at end of loop scope.
+  The existing `secure_erase(&a_sum, ...)`, `secure_erase(S_comp.data(), ...)`,
+  `secure_erase(t_hash.data(), t_hash.size())` calls in `silent_payment_create`
+  cover the upstream secret-bearing material; no new erase is required for
+  `t_k` because no copy escapes the local stack frame.
+  Originated in main commit `e4e17305` (perf+CT). No corresponding change
+  needed in the scan loop's erase sequence.
 
 ### 2026-05-21 ecdsa.cpp / musig2.cpp / frost.cpp — P2-CT-001/002/003/007 nonce candidate scalar zeroization
 
