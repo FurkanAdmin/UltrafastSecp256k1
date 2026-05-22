@@ -2709,8 +2709,16 @@ __global__ void point_dbl_kernel(const JacobianPoint* a, JacobianPoint* r, int c
 __global__ void scalar_mul_batch_kernel(const JacobianPoint* points, const Scalar* scalars, 
                                          JacobianPoint* results, int count);
 
-// Extern declaration for batch kernel to allow access from gpu_backend_cuda translation unit                                         
+// Extern declaration for ct_generator_mul_batch_kernel so the host TU
+// (src/gpu/src/gpu_backend_cuda.cu) can launch it without "undefined
+// identifier" link error. Originally landed in PR #274 by @FurkanAdmin;
+// this version adds the matching #if !SECP256K1_CUDA_LIMBS_32 guard so
+// the declaration is consistent with the kernel's actual definition
+// at src/cuda/src/secp256k1.cu:91 (which lives inside the same guard).
+// Without this, a SECP256K1_CUDA_LIMBS_32=1 build still link-fails.
+#if !SECP256K1_CUDA_LIMBS_32
 __global__ void ct_generator_mul_batch_kernel(const Scalar* scalars, JacobianPoint* results, int count);
+#endif
 
 // Generator multiplication kernel (optimized for G * k)
 __global__ void generator_mul_batch_kernel(const Scalar* scalars, JacobianPoint* results, int count);
