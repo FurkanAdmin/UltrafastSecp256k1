@@ -757,7 +757,7 @@ python -c "import ufsecp; ufsecp.selftest()"  # Expected: "OK"
 git clone https://github.com/shrec/UltrafastSecp256k1.git && cd UltrafastSecp256k1
 
 # Recommended: canonical build under out/release
-python3 scripts/configure_build.py release
+python3 ci/configure_build.py release
 cmake --build out/release -j
 
 # Or classic one-liner:
@@ -830,7 +830,7 @@ cd libufsecp && makepkg -si
 
 ```bash
 # For development/testing, use out/release instead of the bare 'build' dir:
-# python3 scripts/configure_build.py release
+# python3 ci/configure_build.py release
 cmake -S . -B out/release -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX=/usr \

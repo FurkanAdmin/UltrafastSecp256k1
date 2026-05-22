@@ -57,6 +57,14 @@ TABLE_EXPLOIT_ROW_RE = re.compile(
     r'\d+ non-exploit modules \+ \d+ exploit PoCs across \d+ sections, \d+ failures'
 )
 
+# Matches "N non-exploit modules + N exploit-PoC modules (N total)" — WHY doc table row
+TABLE_WHY_DOC_RE = re.compile(
+    r'\d+ non-exploit modules \+ \d+ exploit-PoC modules \(\d+ total\)'
+)
+
+# Matches "All N exploit PoCs modules pass" (plural variant — different from ALL_EXPLOIT_RE)
+ALL_EXPLOIT_PLURAL_RE = re.compile(r'\bAll \d{1,3} exploit PoCs modules pass\b', re.IGNORECASE)
+
 # Matches "N-module unified_audit_runner" (plain and backtick-wrapped variants)
 RUNNER_MODULE_COUNT_RE = re.compile(r'\b\d{3}-module unified_audit_runner\b')
 RUNNER_MODULE_COUNT_BT_RE = re.compile(r'\b\d{3}-module `unified_audit_runner`')
@@ -241,6 +249,13 @@ def make_replacements(content: str,
          f'{exploit_mods} exploit PoC modules ({exploit_files} source files), 20+ coverage areas, 0 failures')
     _sub(ALL_REGISTERED_ENTRIES_RE,
          f'All {exploit_mods} registered exploit-PoC modules live in')
+
+    # "N non-exploit modules + N exploit-PoC modules (N total)" — WHY doc table
+    _sub(TABLE_WHY_DOC_RE,
+         f'{non_exploit} non-exploit modules + {exploit_mods} exploit-PoC modules ({total} total)')
+
+    # "All N exploit PoCs modules pass" (plural variant)
+    _sub(ALL_EXPLOIT_PLURAL_RE, f'All {exploit_mods} exploit PoCs modules pass')
 
     # "-- N modules, N failure classes" (AUDIT_COVERAGE.md Verdict line)
     def _replace_verdict_modules(m: re.Match) -> str:

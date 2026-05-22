@@ -299,12 +299,12 @@ jobs:
         id: audit_gate
         run: python3 ci/audit_gate.py --json -o caas_audit_gate.json
 
-      - name: Security autonomy check (100/100 required)
+      - name: Security autonomy check (100/100 or advisory-skip if GPU/infra absent)
         id: security_autonomy
         if: always()
         run: |
           python3 ci/security_autonomy_check.py --json -o caas_autonomy.json; rc=$?
-          [ $rc -eq 77 ] && { echo "::notice::security_autonomy advisory-skip (exit 77 — GPU/infrastructure absent)"; exit 0; } || exit $rc
+          [ $rc -eq 77 ] && { echo "::notice::security_autonomy advisory-skip (exit 77 — GPU/infrastructure absent; score not verifiable on this runner)"; exit 0; } || exit $rc
 
       - name: Annotate autonomy report on failed audit gate (CI-015)
         # CI-015 fix: if audit_gate failed, the autonomy.json may still show 100/100

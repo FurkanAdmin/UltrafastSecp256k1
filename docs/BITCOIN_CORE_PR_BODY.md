@@ -73,23 +73,20 @@ Differential testing against bitcoin-core/secp256k1 reference:
 | Schnorr sign (Taproot/Merkle) | 113,410 ns | 83,930 ns | **1.35×** |
 | ECDSA sign | 165,140 ns | 149,520 ns | **1.10×** |
 | P2TR ScriptPath verify | 83,812 ns | 76,451 ns | **1.10×** |
-| ConnectBlockAllSchnorr | 255.3 ms/blk | 253.0 ms/blk | **+0.9%** |
-| ConnectBlockAllEcdsa | 257.4 ms/blk | 254.3 ms/blk | **+1.2%** |
-| ConnectBlockMixed | 257.7 ms/blk | 253.9 ms/blk | **+1.5%** |
+| ConnectBlockAllSchnorr | 255.3 ms/blk | 253.0 ms/blk | **+0.9%** ±0.5% err |
+| ConnectBlockAllEcdsa | 257.4 ms/blk | 254.3 ms/blk | **+1.2%** ±0.2% err |
+| ConnectBlockMixed | 257.7 ms/blk | 253.9 ms/blk | **+1.5%** ±0.3% err |
 | P2WPKH verify | 45,777 ns | 45,978 ns | ≈parity (0.4% slower, within noise margin) |
 
-Full data with err% in `docs/BITCOIN_CORE_BENCH_RESULTS.json` (commit `48e7c02f`, 2026-05-12,
-hard turbo lock, GCC 14.2.0). All CT signing paths use `generator_mul_blinded` for nonce
-multiplication (DPA defense active when `secp256k1_context_randomize` is called).
-No external third-party audit has been conducted — all CT verification is self-generated CI tooling.
+Full data in `docs/BITCOIN_CORE_BENCH_RESULTS.json` (benchmark run 2026-05-12, hard turbo lock, GCC 14.2.0; P1 security fixes applied through 2026-05-22, current dev HEAD `f6b92035`). All CT signing paths use `generator_mul_blinded` for nonce multiplication (DPA defense active when `secp256k1_context_randomize` is called). No external third-party audit has been conducted — all CT verification is self-generated CI tooling.
 
 ### Known gaps and honest statements
 
+- **Without LTO (development builds): ConnectBlock is ~0.5–1.0% slower than libsecp256k1.** The positive results above require `-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON`. Development builds (`RelWithDebInfo`) will show a small regression due to larger code footprint (~1.3 MB vs libsecp ~400 KB causing i-cache pressure). Release builds with LTO recover and surpass libsecp.
 - macOS ARM64 CI covers shim build + test only; full GPU suite remains Linux x86-64
 - Formal verification is not claimed; software-tool CT verification only (LLVM ct-verif, Valgrind, dudect)
 - No external third-party security audit has been conducted
 - Thread safety: each context is independent; concurrent use of distinct contexts is safe
-- Without LTO: ConnectBlock ~0.5–1.0% slower due to instruction-cache pressure from larger code footprint (~1.3 MB vs libsecp ~400 KB); gap closes with LTO
 - ConnectBlock benchmark uses governor=performance, taskset -c 0, hard turbo lock (intel_pstate/no_turbo=1, sudo pinned, 2026-05-12).
 
 ### How to verify independently
@@ -98,7 +95,7 @@ No external third-party audit has been conducted — all CT verification is self
 # Clone and check out the evidence commit
 git clone https://github.com/shrec/UltrafastSecp256k1
 cd UltrafastSecp256k1
-git checkout 48e7c02fff02d823d2396f7eb05e425dfb3689e4
+git checkout f6b920354495e3b369862ef90f21006b69f9e31a
 
 # Reproduce the evidence bundle
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \

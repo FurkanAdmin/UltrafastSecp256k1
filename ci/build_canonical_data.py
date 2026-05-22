@@ -138,7 +138,7 @@ def main() -> int:
                 print("\n[DRIFT DETECTED]")
                 for k, (old, new_v) in drift.items():
                     print(f"  {k}: {old!r} → {new_v!r}")
-                print("Run: python3 scripts/sync_all_docs.py")
+                print("Run: python3 ci/sync_docs_from_canonical.py && python3 ci/sync_module_count.py && python3 ci/sync_canonical_numbers.py")
                 return 1
             print("\n[OK] canonical_data.json is up-to-date")
         else:

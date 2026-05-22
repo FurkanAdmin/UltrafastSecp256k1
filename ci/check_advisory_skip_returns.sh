@@ -122,6 +122,24 @@ done <<< "${ADVISORY_IDS}"
 
 echo "  Checked ${CHECKED} advisory binaries (${MISSING} not built in this configuration)"
 
+# CI-015: if MISSING > 0, explicitly list the missing module IDs so developers
+# can confirm whether the gap is expected (not built in this config) or a naming bug.
+if [ "${MISSING}" -gt 0 ]; then
+    MISSING_IDS=()
+    while IFS= read -r mod_id; do
+        [ -z "${mod_id}" ] && continue
+        bin="${BUILD}/audit/test_${mod_id}_standalone"
+        [ -f "${bin}" ] || bin="${BUILD}/audit/${mod_id}_standalone"
+        [ -f "${bin}" ] || bin="${BUILD}/audit/test_exploit_${mod_id}_standalone"
+        [ -f "${bin}" ] || MISSING_IDS+=("${mod_id}")
+    done <<< "${ADVISORY_IDS}"
+    echo "  NOTE ${MISSING} advisory module(s) not found as binaries — Rule 16 NOT verified for these:"
+    for mid in "${MISSING_IDS[@]}"; do
+        echo "    - ${mid}"
+    done
+    echo "  (This is expected when those modules are not compiled in this build config.)"
+fi
+
 if [ "${CHECKED}" -eq 0 ]; then
     echo "  SKIP no standalone advisory binaries present in ${BUILD}"
     exit 77

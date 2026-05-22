@@ -428,6 +428,15 @@ RETROACTIVELY_COVERED: dict[str, tuple[list[str], str]] = {
         "(c9c92a4a→next) and wired to unified_audit_runner as section shim_regression "
         "(advisory=true since it requires the shim to be linked).",
     ),
+    "f6b9203544": (
+        ["audit/test_regression_shim_security_v9.cpp"],
+        "SHIM-NEW-012b: secp256k1_ecdsa_signature_serialize_der NULL output/outputlen/sig now "
+        "fires secp256k1_shim_call_illegal_cb matching libsecp256k1 ARG_CHECK behaviour. "
+        "serialize_compact was fixed in commit 93010b66. This commit fixes serialize_der "
+        "which was missed in that batch. test_regression_shim_security_v9.cpp (wired to "
+        "unified_audit_runner as regression_shim_security_v9, advisory=true) covers both "
+        "serialize_compact and serialize_der NULL arg callback tests (v9-012/015).",
+    ),
 }
 
 # Bot commits that auto-update evidence — skip.

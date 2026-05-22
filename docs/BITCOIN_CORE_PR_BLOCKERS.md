@@ -1,8 +1,9 @@
 # Bitcoin Core PR Readiness — Current Status Matrix
 
-**Commit:** `48e7c02f` (dev branch, 2026-05-12)
-**Date:** 2026-05-13
-**Overall PR Readiness:** **~99%** (all 10 original + 3 surface blockers closed)
+**Commit:** `f6b92035` (dev branch, 2026-05-22)
+**Date:** 2026-05-22
+**Last updated:** 2026-05-22 — includes P1 security fixes landed 2026-05-22 (schnorr_adaptor_extract CT, OpenCL Rule 14, shim NULL callbacks, orphan test resolution, sync_module_count regex fixes)
+**Overall PR Readiness:** **~85%** (code fixes done; documentation, DOI badge, benchmark desync remain)
 
 ---
 
