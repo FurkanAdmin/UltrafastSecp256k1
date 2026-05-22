@@ -332,7 +332,18 @@ int secp256k1_ecdsa_signature_serialize_der(
     const secp256k1_ecdsa_signature *sig)
 {
     SHIM_REQUIRE_CTX(ctx);
-    if (!output || !outputlen || !sig) return 0;
+    if (!output) {
+        secp256k1_shim_call_illegal_cb(ctx, "secp256k1_ecdsa_signature_serialize_der: output is NULL");
+        return 0;
+    }
+    if (!outputlen) {
+        secp256k1_shim_call_illegal_cb(ctx, "secp256k1_ecdsa_signature_serialize_der: outputlen is NULL");
+        return 0;
+    }
+    if (!sig) {
+        secp256k1_shim_call_illegal_cb(ctx, "secp256k1_ecdsa_signature_serialize_der: sig is NULL");
+        return 0;
+    }
 
     // Max DER integer: 0x02 + len(1) + 0x00 pad(1) + 32 data = 35 bytes
     unsigned char r_der[35]{}, s_der[35]{};
