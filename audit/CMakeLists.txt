@@ -5124,3 +5124,27 @@ add_test(NAME regression_gpu_ecdh_extended_ct
 set_tests_properties(regression_gpu_ecdh_extended_ct PROPERTIES TIMEOUT 30
     LABELS "audit;regression;ct;ecdh;gpu;security;p1-sec-001")
 target_sources(unified_audit_runner PRIVATE test_regression_gpu_ecdh_extended_ct.cpp)
+
+# ---------------------------------------------------------------------------
+# Per-file -Wno-deprecated-declarations suppression for tests that
+# INTENTIONALLY exercise ufsecp_musig2_partial_sign (v1) to verify the ABI
+# contract / regression-guard behaviour. The export carries [[deprecated]]
+# (P1-SEC-002 / MED-3 — see include/ufsecp/ufsecp.h) so external callers see
+# the migration warning at compile time; these audit tests are the
+# authoritative regression coverage and must stay buildable under -Werror.
+set(_v1_musig2_v1_callers_unfortunately
+    test_adversarial_protocol.cpp
+    test_exploit_musig2_nonce_erasure_le32_ecdh.cpp
+    test_exploit_musig2_parallel_session_cross.cpp
+    test_exploit_musig2_partial_forgery.cpp
+    test_ffi_round_trip.cpp
+    test_regression_musig2_abi_signer_index.cpp
+    test_regression_musig2_zero_psig.cpp
+)
+foreach(_src IN LISTS _v1_musig2_v1_callers_unfortunately)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_src}")
+        set_source_files_properties("${_src}" PROPERTIES
+            COMPILE_OPTIONS "-Wno-deprecated-declarations")
+    endif()
+endforeach()
+unset(_v1_musig2_v1_callers_unfortunately)

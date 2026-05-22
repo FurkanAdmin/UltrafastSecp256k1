@@ -165,6 +165,13 @@ ufsecp_error_t ufsecp_musig2_partial_sign(
     // Zero output before any processing so every error path is fail-closed (MZP-3 / Rule 3).
     std::memset(partial_sig32_out, 0, 32);
     ctx_clear_err(ctx);
+    // P1-SEC-002 / MED-3 (RED-002): v1 cannot cross-validate
+    // privkey<->signer_index because parse_musig2_keyagg does not restore
+    // individual_pubkeys from the 165-byte blob. The compile-time
+    // UFSECP_DEPRECATED attribute on this function's declaration in
+    // include/ufsecp/ufsecp.h surfaces this to every external caller.
+    // Migrate to ufsecp_musig2_partial_sign_v2 which validates at the ABI
+    // boundary via a pubkeys array.
     // BUG-1 FIX: consume (zero) secnonce on EVERY exit path — success, error, or exception.
     // BIP-327 mandates this; failing to do so allows nonce reuse if the caller retries after
     // an error (e.g. wrong privkey supplied first, correct privkey supplied second).
@@ -299,8 +306,25 @@ ufsecp_error_t ufsecp_musig2_partial_sign_v2(
     secp256k1::detail::secure_erase(&sk, sizeof(sk));
 
     // Validation passed: delegate to the canonical signing function.
-    return ufsecp_musig2_partial_sign(ctx, secnonce, privkey, keyagg, session,
-                                      signer_index, partial_sig32_out);
+    // Suppress the [[deprecated]] warning here — v2 is the SAFE wrapper and
+    // intentionally drives v1 as its signing backend after pubkey<->signer_index
+    // cross-validation. External callers using v1 directly still see the
+    // compile-time warning at their call site.
+#if defined(__GNUC__) || defined(__clang__)
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#elif defined(_MSC_VER)
+#  pragma warning(push)
+#  pragma warning(disable: 4996)
+#endif
+    ufsecp_error_t rc = ufsecp_musig2_partial_sign(ctx, secnonce, privkey, keyagg, session,
+                                                    signer_index, partial_sig32_out);
+#if defined(__GNUC__) || defined(__clang__)
+#  pragma GCC diagnostic pop
+#elif defined(_MSC_VER)
+#  pragma warning(pop)
+#endif
+    return rc;
 }
 
 ufsecp_error_t ufsecp_musig2_partial_verify(

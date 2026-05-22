@@ -1,5 +1,35 @@
 # Audit Changelog
 
+## 2026-05-22 — Fix: TASK-007 MuSig2 v1 [[deprecated]] restored + TASK-009 Pearson χ² for hedged-nonce bias
+
+- **`include/ufsecp/ufsecp.h` `ufsecp_musig2_partial_sign` (TASK-007 / P1-SEC-002 /
+  MED-3):** restored `UFSECP_DEPRECATED("Use ufsecp_musig2_partial_sign_v2() — v1
+  cannot validate signer_index at the ABI boundary; v2 takes a pubkeys array and
+  performs constant-time cross-validation")` on the v1 export. The attribute was
+  previously removed to keep -Werror builds green, but the only internal call to
+  v1 (from `ufsecp_musig2_partial_sign_v2`'s delegation in
+  `src/cpu/src/impl/ufsecp_musig2.cpp` after pubkey<->signer_index validation) is
+  now wrapped in `#pragma GCC diagnostic ignored "-Wdeprecated-declarations"`
+  push/pop so v2's compile stays clean. The seven audit-test files that
+  intentionally call v1 to verify ABI compat (test_adversarial_protocol,
+  test_ffi_round_trip, test_regression_musig2_abi_signer_index,
+  test_regression_musig2_zero_psig, test_exploit_musig2_nonce_erasure_le32_ecdh,
+  test_exploit_musig2_parallel_session_cross, test_exploit_musig2_partial_forgery)
+  get per-source `-Wno-deprecated-declarations` via
+  `set_source_files_properties` in `audit/CMakeLists.txt`. Result: external
+  callers of v1 now get a compile-time warning that points them at v2;
+  internal call sites that have to retain v1 for ABI-coverage reasons stay
+  buildable under -Werror.
+- **`audit/test_exploit_hedged_nonce_bias.cpp::test_r_distribution` (TASK-009 /
+  P1-TEST-102):** replaced the prior `max_count <= 14` heuristic (N=500,
+  ~8.6σ ceiling — passed by 7× non-uniform RNGs) with a proper Pearson χ²
+  statistic Σᵢ (Oᵢ − Eᵢ)² / Eᵢ over the 256-bucket first-byte distribution.
+  N raised to 16,384 so expected count per bucket is 64 (Cochran's rule
+  satisfied). Threshold = χ²(255, α=10⁻⁶) ≈ 362.5, which a uniform RNG passes
+  with probability 1 − 10⁻⁶ and a ≥ 1-bit-bias RNG fails decisively. Closes
+  the gap the Minerva / TPM-FAIL header in this file cited — the test can
+  now detect the bias class it claims to cover.
+
 ## 2026-05-22 — Fix: SHIM-013 ecdsa_verify cache consistency + SHIM-014 cache slot salt + TASK-010 CT zero-skip → 77
 
 - **`compat/libsecp256k1_shim/src/shim_ecdsa.cpp::secp256k1_ecdsa_verify` (SHIM-013):**

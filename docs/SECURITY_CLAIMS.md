@@ -2,6 +2,28 @@
 
 **UltrafastSecp256k1 v4.0.0** -- FAST / CT Dual-Layer Architecture (CPU + GPU)
 
+### 2026-05-22 — TASK-007: ufsecp_musig2_partial_sign v1 ABI deprecation
+
+- **P1-SEC-002 / MED-3 / RED-002** (`include/ufsecp/ufsecp.h`,
+  `src/cpu/src/impl/ufsecp_musig2.cpp`): the v1 partial-sign export now
+  carries `UFSECP_DEPRECATED("...")` again — external callers receive a
+  compile-time warning directing them to
+  `ufsecp_musig2_partial_sign_v2()`, which validates signer_index against
+  privkey via a constant-time pubkey comparison at the ABI boundary. v1
+  remains functional for backwards compatibility (forcing immediate
+  breakage has too much blast radius for a stabilisation push); the
+  compile-time warning makes the security gap impossible to miss for any
+  caller that recompiles. The v2 export and the seven internal audit
+  tests that intentionally exercise v1 to verify ABI contract coverage
+  retain access via `#pragma diagnostic` suppression / per-source
+  `-Wno-deprecated-declarations` so the rest of the codebase stays
+  buildable under -Werror.
+- **No API change** for callers already on v2. Callers still on v1 are
+  encouraged to migrate; the wrong-signer-index forgery vector (a
+  malicious coordinator who places the victim's pubkey at the wrong
+  position in the keyagg blob) remains exploitable against v1 callers
+  until they migrate. Tracking IDs P1-SEC-002 / MED-3 / RED-002.
+
 ### 2026-05-22 address.cpp — silent-payments t_k generator-mul is now CT (merged from main e4e17305)
 
 - **P-SP-CT-001** (`silent_payment_create` and `silent_payment_scan` in

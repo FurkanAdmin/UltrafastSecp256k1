@@ -1,6 +1,26 @@
 # FFI Hostile-Caller Coverage
 
-**Last updated**: 2026-03-23 | **Version**: 4.0.0
+**Last updated**: 2026-05-22 | **Version**: 4.0.0
+
+### 2026-05-22 — TASK-007: ufsecp_musig2_partial_sign v1 ABI deprecation restored
+
+`include/ufsecp/ufsecp.h` `ufsecp_musig2_partial_sign` once again carries
+`UFSECP_DEPRECATED(...)` directing callers to
+`ufsecp_musig2_partial_sign_v2()` for the safe path. The attribute was
+previously dropped to keep -Werror builds green; this commit's compromise:
+* v2's internal delegation to v1 (already validated) is wrapped in a
+  `#pragma GCC diagnostic ignored "-Wdeprecated-declarations"` push/pop;
+* seven audit-test files that intentionally call v1 to verify the ABI
+  contract get per-source `-Wno-deprecated-declarations` via
+  `set_source_files_properties` in `audit/CMakeLists.txt`
+  (test_adversarial_protocol, test_ffi_round_trip,
+  test_regression_musig2_abi_signer_index, test_regression_musig2_zero_psig,
+  test_exploit_musig2_nonce_erasure_le32_ecdh,
+  test_exploit_musig2_parallel_session_cross,
+  test_exploit_musig2_partial_forgery).
+External callers get the compile-time warning that points them at v2 —
+loud, unambiguous, and impossible to miss; internal call sites stay
+buildable under -Werror.
 
 Documents the hostile-caller test coverage for the C ABI (`ufsecp_*` functions). All tests are in `audit/test_adversarial_protocol.cpp`:
 - Section G (FFI Hostile-Caller) — original 97-function coverage
