@@ -577,7 +577,8 @@ For the complete compatibility test matrix see `compat/libsecp256k1_shim/tests/`
   (RFC 6979 / BIP-340 hedged) but without the extra input mixed in. For production Bitcoin
   Core usage (extra_input32 = NULL or ignored), there is no difference.
 - **Test:** TODO — differential test against libsecp256k1-zkp that verifies nonce bytes
-  differ when extra_input32 is non-NULL.
+  differ when extra_input32 is non-NULL. No differential test currently exists — callers
+  should not rely on extra_input32 for entropy in this shim.
 
 ---
 
@@ -639,3 +640,23 @@ For the complete compatibility test matrix see `compat/libsecp256k1_shim/tests/`
 - **Open:** Consider adding explicit NULL-ctx guard firing the illegal callback for parity.
   Tracked as SHIM-MUSIG-CTX-001 (open).
 - **Test:** Covered indirectly by context-flag tests in `test_regression_shim_security_v7_run`.
+
+---
+
+## secp256k1_ec_pubkey_tweak_mul vs secp256k1_ec_pubkey_tweak_add (zero tweak)
+
+- **Upstream behavior:** `tweak_mul` rejects zero tweak (returns 0); `tweak_add` accepts zero tweak (point unchanged, returns 1)
+- **Shim behavior:** Matches upstream — `tweak_mul` uses `parse_bytes_strict_nonzero` (rejects zero); `tweak_add` uses `parse_bytes_strict` (accepts zero)
+- **Reason:** Intentional asymmetry matching libsecp256k1 v0.5+ semantics; multiplying by zero always produces infinity (invalid pubkey), while adding zero is a no-op
+- **Impact:** Callers must not pass a zero tweak to `tweak_mul`; zero tweak to `tweak_add` is well-defined
+- **Test:** `test_differential_tweak_zero` (to be added)
+
+---
+
+## secp256k1_keypair_sec (BIP-340 normalization)
+
+- **Upstream behavior:** libsecp256k1 stores the BIP-340-normalized private key in the keypair (negates if P.y is odd); `keypair_sec` returns the normalized key
+- **Shim behavior:** The shim stores the raw private key; negation is applied at sign time. `keypair_sec` returns the raw (possibly non-BIP-340-normalized) key
+- **Reason:** Normalization-at-store vs normalization-at-sign is semantically equivalent for signing but differs in what `keypair_sec` returns for odd-Y keys
+- **Impact:** If a caller extracts the private key via `keypair_sec` and compares it to the original, they may observe a different value for keys where P.y is odd
+- **Test:** `test_differential_keypair_sec` (to be added)

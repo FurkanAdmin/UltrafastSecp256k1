@@ -21,15 +21,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 | ConnectBlock Schnorr 2000 sigs (LTO) | 253 ms | 255 ms | **+0.9%** |
 | SignSchnorrWithMerkleRoot (bench_bitcoin) | 95 µs | 113 µs | **+18%** |
 
-*Canonical: [bench_unified_2026-05-16_gcc14_x86-64.json](docs/bench_unified_2026-05-16_gcc14_x86-64.json) · [BITCOIN_CORE_BENCH_RESULTS.json](docs/BITCOIN_CORE_BENCH_RESULTS.json)*
+*Canonical: [bench_unified_2026-05-21_gcc14_x86-64.json](docs/bench_unified_2026-05-21_gcc14_x86-64.json) · [BITCOIN_CORE_BENCH_RESULTS.json](docs/BITCOIN_CORE_BENCH_RESULTS.json)*
 
 Without LTO: ConnectBlock ~0.5–1.0% slower (i-cache pressure). LTO required for Ultra to win.
 
 ### Security & Audit Evidence
 
-**Headline (curated, from `dbd5711` on main):**
-- **262 exploit PoC** security probes, 20+ CVE/attack classes — all pass
-- **369 total audit modules** (262 exploit PoC + 107 non-exploit)
+**Headline (curated, from `dbde5711` on main):**
+- **270 exploit PoC** security probes, 20+ CVE/attack classes — all pass
+- **395 total audit modules** (270 exploit PoC + 125 non-exploit)
 - **CAAS autonomy: 100/100** (8/8 gates)
 - **Bitcoin Core test suite: 749/749** (GCC 14.2.0, May 2026)
 - Constant-time signing: ECDSA, Schnorr, MuSig2, FROST, BIP-324 XDH

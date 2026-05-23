@@ -28,6 +28,20 @@ Current verified state:
 | RR-008 | Application-layer signature replay | Out-of-scope (caller responsibility) | Caller | The library signs the bytes it is given. Semantic deduplication, nonce tracking, and replay protection are application-layer responsibilities. Documented in [THREAT_MODEL.md](THREAT_MODEL.md) §6. |
 | RR-009 | Sybil attack on MuSig2/FROST quorum policy | Out-of-scope (caller responsibility) | Caller | Threshold and participant policy are caller decisions. The library implements the cryptographic protocol correctly given a quorum; it cannot detect a hostile participant set. Documented in [THREAT_MODEL.md](THREAT_MODEL.md) §6. |
 | RR-010 | MuSig2 ABI signer-index bypass (MED-3) | Open, tracked, out-of-scope for Bitcoin Core PR | MuSig2/ABI | `ufsecp_musig2_partial_sign` via ABI-deserialized `keyagg_cache` (165-byte blob) does not validate that the caller's `privkey` corresponds to `signer_index`, because `individual_pubkeys` is not serialized in the blob. A wrong signer index produces a non-zero partial sig that fails aggregation (DoS) but does not leak keys. Tracked by `audit/test_regression_musig2_signer_index_validation.cpp` sub-test MSI-4 (`advisory=true`). Fix requires ABI-breaking extension of `UFSECP_MUSIG2_KEYAGG_LEN` to include per-signer pubkey commitments. Out of scope for Bitcoin Core backend PR (Bitcoin Core does not use MuSig2 signing). |
+| RR-NEW-01 | `ct::scalar_inverse` non-CT on platforms without `__int128` (SEC-001-INCOMPLETE) | Accepted, non-blocking for Bitcoin Core PR | CT/portability | On platforms without `__int128` support (WASM target, MSVC 32-bit), `ct::scalar_inverse` falls back to a `fast::` multiplication chain which is variable-time. Not applicable to Bitcoin Core PR targets (x86-64 and ARM64 have `__int128`). Build system requires `__int128` for CT builds; static assert enforced in the CT path. See SEC-001-INCOMPLETE. |
+
+---
+
+## RR-NEW-01: ct::scalar_inverse — non-CT on platforms without __int128
+
+- **Severity:** P2
+- **Affected function:** `ct::scalar_inverse`
+- **Condition:** Platforms without `__int128` support (WASM target, MSVC 32-bit)
+- **Behavior:** Falls back to `fast::` multiplication chain which is variable-time
+- **Impact for Bitcoin Core PR:** Not applicable — Bitcoin Core targets x86-64 and ARM64 where `__int128` is available. WASM and MSVC 32-bit are not signing targets in this context.
+- **Mitigation:** Build system requires __int128 for CT builds. Static assert added in CT path.
+- **Status:** Accepted risk for non-supported platforms. No action required for Bitcoin Core backend.
+- **Tracking:** SEC-001-INCOMPLETE
 
 ---
 

@@ -64,7 +64,7 @@ UFSECP_API unsigned int ufsecp_version(void);
 /** Return ABI version at runtime (same as UFSECP_ABI_VERSION). */
 UFSECP_API unsigned int ufsecp_abi_version(void);
 
-/** Return human-readable version string, e.g. "3.8.0". */
+/** Return human-readable version string, e.g. "4.0.0". */
 UFSECP_API const char* ufsecp_version_string(void);
 
 #ifdef __cplusplus
