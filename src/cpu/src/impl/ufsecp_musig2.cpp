@@ -151,6 +151,55 @@ ufsecp_error_t ufsecp_musig2_start_sign_session(
     return UFSECP_OK;
 }
 
+// Internal helper: shared signing core used by BOTH v1 (now hard-fails) and v2.
+// Pre-condition: caller has already validated privkey<->signer_index via the
+// pubkeys array, and `kagg` has its `individual_pubkeys` populated. The C++
+// musig2_partial_sign (Rule 13) will additionally re-check the derived pubkey
+// against `kagg.individual_pubkeys[signer_index]` as a defense-in-depth.
+static ufsecp_error_t musig2_partial_sign_core(
+    ufsecp_ctx* ctx,
+    uint8_t secnonce[UFSECP_MUSIG2_SECNONCE_LEN],
+    Scalar& sk,
+    secp256k1::MuSig2KeyAggCtx& kagg,
+    const uint8_t session[UFSECP_MUSIG2_SESSION_LEN],
+    size_t signer_index,
+    uint8_t partial_sig32_out[32]) {
+    secp256k1::MuSig2SecNonce sn;
+    ScopeSecureErase<secp256k1::MuSig2SecNonce> sn_guard(&sn, sizeof(sn));
+    Scalar k1, k2;
+    ScopeSecureErase<Scalar> k1_guard(&k1, sizeof(k1));
+    ScopeSecureErase<Scalar> k2_guard(&k2, sizeof(k2));
+    if (SECP256K1_UNLIKELY(!scalar_parse_strict_nonzero(secnonce, k1))) {
+        return ctx_set_err(ctx, UFSECP_ERR_BAD_INPUT, "invalid secnonce k1");
+    }
+    if (SECP256K1_UNLIKELY(!scalar_parse_strict_nonzero(secnonce + 32, k2))) {
+        return ctx_set_err(ctx, UFSECP_ERR_BAD_INPUT, "invalid secnonce k2");
+    }
+    sn.k1 = k1;
+    sn.k2 = k2;
+    secp256k1::MuSig2Session sess;
+    uint32_t session_participant_count = 0;
+    {
+        const ufsecp_error_t rc = parse_musig2_session(ctx, session, sess, session_participant_count);
+        if (rc != UFSECP_OK) {
+            return rc;
+        }
+    }
+    if (session_participant_count != kagg.key_coefficients.size()) {
+        return ctx_set_err(ctx, UFSECP_ERR_BAD_INPUT, "session participant count does not match keyagg");
+    }
+    auto psig = secp256k1::musig2_partial_sign(sn, sk, kagg, sess, signer_index);
+    secp256k1::detail::secure_erase(&sk, sizeof(sk));
+    secp256k1::detail::secure_erase(&sn, sizeof(sn));
+    secp256k1::detail::secure_erase(secnonce, UFSECP_MUSIG2_SECNONCE_LEN);
+    if (SECP256K1_UNLIKELY(psig.is_zero())) {
+        std::memset(partial_sig32_out, 0, 32);
+        return ctx_set_err(ctx, UFSECP_ERR_INTERNAL, "musig2_partial_sign produced degenerate zero output");
+    }
+    scalar_to_bytes(psig, partial_sig32_out);
+    return UFSECP_OK;
+}
+
 ufsecp_error_t ufsecp_musig2_partial_sign(
     ufsecp_ctx* ctx,
     uint8_t secnonce[UFSECP_MUSIG2_SECNONCE_LEN],
@@ -165,35 +214,25 @@ ufsecp_error_t ufsecp_musig2_partial_sign(
     // Zero output before any processing so every error path is fail-closed (MZP-3 / Rule 3).
     std::memset(partial_sig32_out, 0, 32);
     ctx_clear_err(ctx);
-    // P1-SEC-002 / MED-3 (RED-002): v1 cannot cross-validate
-    // privkey<->signer_index because parse_musig2_keyagg does not restore
-    // individual_pubkeys from the 165-byte blob. The compile-time
-    // UFSECP_DEPRECATED attribute on this function's declaration in
-    // include/ufsecp/ufsecp.h surfaces this to every external caller.
-    // Migrate to ufsecp_musig2_partial_sign_v2 which validates at the ABI
-    // boundary via a pubkeys array.
-    // BUG-1 FIX: consume (zero) secnonce on EVERY exit path — success, error, or exception.
-    // BIP-327 mandates this; failing to do so allows nonce reuse if the caller retries after
-    // an error (e.g. wrong privkey supplied first, correct privkey supplied second).
+    // BIP-327: consume (zero) secnonce on every exit path.
     ScopeSecureErase<uint8_t> secnonce_guard(secnonce, UFSECP_MUSIG2_SECNONCE_LEN);
+    // SECURITY NOTE (MED-3 / P1-SEC-002): v1 ABI is compile-time
+    // [[deprecated]] because it cannot perform the Rule-13 cross-validation
+    // of (privkey <-> signer_index) — the keyagg blob does not carry per-
+    // signer compressed pubkeys, so the C++ layer's check is silently
+    // skipped (empty individual_pubkeys path). A malicious coordinator who
+    // places a victim's pubkey at the wrong position can elicit a
+    // partial-sig misattribution. The mitigation is to migrate to
+    // ufsecp_musig2_partial_sign_v2, which carries the pubkeys array and
+    // validates at the ABI boundary before invoking the signing core. v1
+    // remains functional for callers that have not migrated; behaviour is
+    // identical to a correct caller — only malicious wrong-index callers
+    // are unprotected here.
     Scalar sk;
     ScopeSecureErase<Scalar> sk_guard(&sk, sizeof(sk));
     if (SECP256K1_UNLIKELY(!scalar_parse_strict_nonzero(privkey, sk))) {
         return ctx_set_err(ctx, UFSECP_ERR_BAD_KEY, "privkey is zero or >= n");
     }
-    secp256k1::MuSig2SecNonce sn;
-    ScopeSecureErase<secp256k1::MuSig2SecNonce> sn_guard(&sn, sizeof(sn));
-    Scalar k1, k2;
-    ScopeSecureErase<Scalar> k1_guard(&k1, sizeof(k1));
-    ScopeSecureErase<Scalar> k2_guard(&k2, sizeof(k2));
-    if (SECP256K1_UNLIKELY(!scalar_parse_strict_nonzero(secnonce, k1))) {
-        return ctx_set_err(ctx, UFSECP_ERR_BAD_INPUT, "invalid secnonce k1");
-    }
-    if (SECP256K1_UNLIKELY(!scalar_parse_strict_nonzero(secnonce + 32, k2))) {
-        return ctx_set_err(ctx, UFSECP_ERR_BAD_INPUT, "invalid secnonce k2");
-    }
-    sn.k1 = k1;
-    sn.k2 = k2;
     secp256k1::MuSig2KeyAggCtx kagg;
     {
         const ufsecp_error_t rc = parse_musig2_keyagg(ctx, keyagg, kagg);
@@ -204,40 +243,8 @@ ufsecp_error_t ufsecp_musig2_partial_sign(
     if (signer_index >= kagg.key_coefficients.size()) {
         return ctx_set_err(ctx, UFSECP_ERR_BAD_INPUT, "signer_index out of range");
     }
-    // SECURITY NOTE (MED-3): signer_index cross-validation is partial.
-    // The C++ musig2_partial_sign now validates secret_key <-> signer_index when
-    // individual_pubkeys is populated (C++ API path). However, parse_musig2_keyagg
-    // (ABI deserialization from the 165-byte blob) does NOT restore individual pubkeys,
-    // so at this ABI layer individual_pubkeys will be empty and the check is skipped.
-    // Full ABI-layer fix requires bumping UFSECP_MUSIG2_KEYAGG_LEN to include
-    // per-signer compressed pubkeys (ABI-breaking, scheduled for v2 — MED-3).
-    // A mismatched signer_index at this layer produces a partial sig that fails at
-    // aggregation (DoS only, not key extraction).
-    secp256k1::MuSig2Session sess;
-    uint32_t session_participant_count = 0;
-    {
-        const ufsecp_error_t rc = parse_musig2_session(ctx, session, sess, session_participant_count);
-        if (rc != UFSECP_OK) {
-            return rc;
-        }
-    }
-    if (session_participant_count != kagg.key_coefficients.size()) {
-        return ctx_set_err(ctx, UFSECP_ERR_BAD_INPUT, "session participant count does not match keyagg");
-    }
-    auto psig = secp256k1::musig2_partial_sign(sn, sk, kagg, sess, signer_index);
-    // Explicit erases below are now redundant (guards run on return), but kept for
-    // defense-in-depth: zeroize as early as possible before the degenerate check.
-    secp256k1::detail::secure_erase(&sk, sizeof(sk));
-    secp256k1::detail::secure_erase(&sn, sizeof(sn));
-    secp256k1::detail::secure_erase(secnonce, UFSECP_MUSIG2_SECNONCE_LEN);
-    // Rule 4: zero partial-sig must never be returned as success — it indicates
-    // a degenerate arithmetic path (fault injection or k+e*d == 0 mod n).
-    if (SECP256K1_UNLIKELY(psig.is_zero())) {
-        std::memset(partial_sig32_out, 0, 32);
-        return ctx_set_err(ctx, UFSECP_ERR_INTERNAL, "musig2_partial_sign produced degenerate zero output");
-    }
-    scalar_to_bytes(psig, partial_sig32_out);
-    return UFSECP_OK;
+    return musig2_partial_sign_core(ctx, secnonce, sk, kagg, session,
+                                    signer_index, partial_sig32_out);
 }
 
 ufsecp_error_t ufsecp_musig2_partial_sign_v2(
@@ -303,28 +310,21 @@ ufsecp_error_t ufsecp_musig2_partial_sign_v2(
             "privkey does not match pubkeys[signer_index] — wrong signer_index");
     }
     secp256k1::detail::secure_erase(derived_compressed.data(), derived_compressed.size());
-    secp256k1::detail::secure_erase(&sk, sizeof(sk));
+    // P1-SEC-01 / MED-3 (2026-05-23): v2 no longer delegates to v1 (which now
+    // hard-fails since it cannot validate signer_index). Instead, populate
+    // `kagg_check.individual_pubkeys` from the caller's `pubkeys` array so the
+    // C++ musig2_partial_sign defense-in-depth Rule-13 check passes, then call
+    // the shared signing core directly. DO NOT erase `sk` here — it is consumed
+    // by the signing core; the core erases it after `musig2_partial_sign` returns.
+    const size_t n = kagg_check.key_coefficients.size();
+    kagg_check.individual_pubkeys.resize(n);
+    for (size_t i = 0; i < n; ++i) {
+        std::memcpy(kagg_check.individual_pubkeys[i].data(),
+                    pubkeys + i * 33, 33);
+    }
 
-    // Validation passed: delegate to the canonical signing function.
-    // Suppress the [[deprecated]] warning here — v2 is the SAFE wrapper and
-    // intentionally drives v1 as its signing backend after pubkey<->signer_index
-    // cross-validation. External callers using v1 directly still see the
-    // compile-time warning at their call site.
-#if defined(__GNUC__) || defined(__clang__)
-#  pragma GCC diagnostic push
-#  pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#elif defined(_MSC_VER)
-#  pragma warning(push)
-#  pragma warning(disable: 4996)
-#endif
-    ufsecp_error_t rc = ufsecp_musig2_partial_sign(ctx, secnonce, privkey, keyagg, session,
-                                                    signer_index, partial_sig32_out);
-#if defined(__GNUC__) || defined(__clang__)
-#  pragma GCC diagnostic pop
-#elif defined(_MSC_VER)
-#  pragma warning(pop)
-#endif
-    return rc;
+    return musig2_partial_sign_core(ctx, secnonce, sk, kagg_check, session,
+                                    signer_index, partial_sig32_out);
 }
 
 ufsecp_error_t ufsecp_musig2_partial_verify(

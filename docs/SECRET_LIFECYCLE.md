@@ -1,6 +1,36 @@
 # Secret Lifecycle Review
 
-**Last updated**: 2026-05-22 | **Version**: 4.0.0
+**Last updated**: 2026-05-23 | **Version**: 4.1.0
+
+### 2026-05-23 musig2.cpp + ufsecp_musig2.cpp — P1-SEC-01 / MED-3 partial mitigation
+
+- **`src/cpu/src/musig2.cpp` `musig2_partial_sign`**: Rule-13
+  cross-validation block remains conditional on `individual_pubkeys`
+  being non-empty AND `signer_index` in range. When both conditions
+  hold (the standard C++ caller path via `musig2_key_agg`), the CT
+  `ct::generator_mul(secret_key)` → `to_compressed()` comparison fires
+  as defense-in-depth. When the field is empty (an ABI-deserialized
+  caller that did not populate it), the check is silently skipped and
+  the v1 ABI surface remains protected only by the caller getting the
+  signer_index right.
+  **Lifecycle**: the `secret_key` parameter (Scalar reference) is read
+  for the CT byte comparison via `ct::generator_mul(secret_key)` →
+  `to_compressed()`. No additional stack copies are introduced; the
+  derived 33-byte compressed pubkey is a stack array that exits scope
+  when the validation block returns. No new `secure_erase` required —
+  the compressed pubkey is public-domain material.
+- **`src/cpu/src/impl/ufsecp_musig2.cpp` v1 + v2 share a core helper**:
+  Both ABI entries now use a new internal static helper
+  `musig2_partial_sign_core` that handles secnonce parsing, session
+  parsing, and the C++ signing call. v1 calls core directly (no pubkey
+  cross-validation — deprecated path, known limitation). v2 populates
+  `kagg_check.individual_pubkeys` from its caller-supplied pubkeys array
+  before calling core, which lets the C++ Rule-13 check fire. Lifecycle
+  of `sk`, `k1`, `k2`, and `MuSig2SecNonce sn` is unchanged: all four
+  are ScopeSecureErase-guarded and zeroized on every exit path; the
+  `secnonce` byte buffer is zeroized by an outer guard at the ABI entry.
+- **No CT boundary change.** All comparisons and arithmetic on
+  `secret_key` remain constant-time.
 
 ### 2026-05-22 address.cpp — silent-payments t_k path adopts ct::generator_mul (merged from main e4e17305)
 

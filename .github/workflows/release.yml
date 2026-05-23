@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to release (e.g. v4.0.0)'
+        description: 'Tag to release (e.g. v4.1.0)'
         required: true
 
 permissions:
@@ -20,7 +20,7 @@ env:
   RELEASE_VERSION: ${{ startsWith(github.event.inputs.tag || github.ref_name, 'v') && format('{0}', github.event.inputs.tag || github.ref_name) || github.ref_name }}
 
 # ----------------------------------------------------------------------------
-# Global: version is always derived from the git tag (e.g. v4.0.0 -> 4.0.0)
+# Global: version is always derived from the git tag (e.g. v4.1.0 -> 4.0.0)
 # All binding configs use 0.0.0-dev as placeholder; CI overrides at build time.
 # ----------------------------------------------------------------------------
 
@@ -83,15 +83,29 @@ jobs:
           python3 ci/test_audit_scripts.py --quick
           python3 ci/validate_assurance.py
 
-      - name: Build audit shared library
+      - name: Build audit shared library + unified_audit_runner
+        # BUILD_TESTING=ON is required so unified_audit_runner target exists.
+        # This also enables the standalone advisory test binaries the Rule 16
+        # check (next step) enumerates.
         run: |
           cmake -S . -B out/release -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CXX_COMPILER=g++-14 \
-            -DBUILD_TESTING=OFF \
+            -DBUILD_TESTING=ON \
+            -DSECP256K1_BUILD_TESTS=OFF \
             -DSECP256K1_BUILD_PROTOCOL_TESTS=OFF \
             -DSECP256K1_BUILD_FUZZ_TESTS=OFF
           cmake --build out/release --target ufsecp_shared -j"$(nproc 2>/dev/null || echo 4)"
+          cmake --build out/release --target unified_audit_runner -j"$(nproc 2>/dev/null || echo 4)"
+
+      - name: Rule 16 enforcement (advisory skip-return) — release-grade
+        # P1-CI-01 fix (2026-05-23): post-build Rule 16 enforcement via the
+        # shared ci/rule16_enforce.sh wrapper. The release build uses
+        # BUILD_TESTING=ON; when standalone targets are present the gate
+        # enforces hard. Soft-skip when standalone targets are absent.
+        env:
+          UFSECP_BUILD_DIR: ${{ github.workspace }}/out/release
+        run: bash ci/rule16_enforce.sh
 
       - name: Release CAAS evidence gates
         env:

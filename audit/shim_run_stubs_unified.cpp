@@ -36,6 +36,12 @@ int test_shim_recovery_and_noncefp_run()             { return ADVISORY_SKIP_CODE
 // runner only when SECP256K1_BUILD_COMPAT_SHIM is defined.
 int test_regression_ecdsa_verify_cache_consistency_run() { return ADVISORY_SKIP_CODE; }
 // SHIM-NEW-012/015: serialize NULL callbacks + seckey NULL callbacks
+// 2026-05-24: weak attribute removed (MSVC ignores it, causing duplicate-symbol
+// link errors). Strong symbol. The real test_regression_shim_security_v9.cpp's
+// __else branch deliberately defines NO body when __has_include fails, so this
+// stub is the sole definer in that case. When __has_include succeeds (shim
+// path reachable), the test's real body is in target_sources but shim_run_stubs
+// is NOT (CMakeLists if/else is mutually exclusive). No conflict either way.
 int test_regression_shim_security_v9_run()           { return ADVISORY_SKIP_CODE; }
 // test_regression_p2_ct_shim_fixes_run is always provided by test_regression_p2_ct_shim_fixes.cpp
 // SHIM-NONCEGEN-001: extra_input32 behavioral freeze (secp256k1_musig_nonce_gen ignores extra_input32)

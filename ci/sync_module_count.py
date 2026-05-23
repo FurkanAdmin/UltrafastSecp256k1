@@ -339,6 +339,15 @@ DOC_FILES = [
     'docs/AI_AUDIT_PROTOCOL.md',
     'docs/FORTRESS_ROADMAP.md',
     'docs/BACKEND_ASSURANCE_MATRIX.md',
+    # Citation metadata: .zenodo.json description carries hardcoded counts
+    # (e.g. "270 exploit proof-of-concept regression tests") which previously
+    # drifted. Scan and substitute via the same regex set.
+    '.zenodo.json',
+    # CHANGELOG: NOT in this list. The regex set targets generic patterns
+    # ("\d+ modules skipped", "\d+ exploit PoC modules", etc.) which match
+    # historical section text and over-rewrite it. CHANGELOG.md is checked
+    # by ci/check_changelog_canonical_consistency.py instead, which only
+    # validates the topmost ([Unreleased] or most recent [X.Y.Z]) section.
 ]
 
 

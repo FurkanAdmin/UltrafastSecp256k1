@@ -123,12 +123,14 @@ INVARIANTS = [
             "ufsecp_frost_sign to prevent over-committed signer count."
         ),
     },
-    # Regression guard: signer_index bounds check in musig2_partial_sign
+    # Regression guard: signer_index bounds check in musig2_partial_sign.
+    # Accepts either `kagg` (v1 form) or `kagg_check` (v2 form) as the parsed-
+    # keyagg variable name.
     {
         "id": "MUSIG2_SIGNER_INDEX",
         "function": "ufsecp_musig2_partial_sign",
         "description": "MuSig2 signer_index out-of-range check",
-        "pattern": re.compile(r'signer_index\s*>=\s*kagg\.key_coefficients\.size\(\)'),
+        "pattern": re.compile(r'signer_index\s*>=\s*kagg(?:_check)?\.key_coefficients\.size\(\)'),
         "must_be_present": True,
         "rationale": (
             "Regression guard: the signer_index >= kagg.key_coefficients.size() check "

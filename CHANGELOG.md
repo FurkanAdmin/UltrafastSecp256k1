@@ -5,6 +5,70 @@ All notable changes to UltrafastSecp256k1 are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.1.0] - 2026-05-23
+
+> **Audit hardening + benchmark methodology release.** Closes 5 P1 review items
+> (MED-3 MuSig2 ABI bypass, canonical bench turbo-lock, CHANGELOG diagnostic
+> drift, .zenodo.json metadata drift, Rule 16 post-build enforcement). No ABI
+> break — minor bump per SemVer (new fail-closed behavior on a previously
+> deprecated v1 ABI path; v2 callers are unaffected).
+
+### Security
+- **P1-SEC-01 / MED-3 closed** (`src/cpu/src/musig2.cpp`,
+  `src/cpu/src/impl/ufsecp_musig2.cpp`). The C++ `musig2_partial_sign` now
+  fail-closes (`Scalar::zero()`) when `key_agg_ctx.individual_pubkeys` is
+  empty — previously the Rule-13 cross-validation block was skipped,
+  allowing an ABI-deserialized caller to sign as ANY claimed signer index.
+  `ufsecp_musig2_partial_sign` (v1) now hard-fails at entry with a
+  migration message; `ufsecp_musig2_partial_sign_v2` inlines the signing
+  path through a new helper `musig2_partial_sign_core` after populating
+  `individual_pubkeys` from its `pubkeys` parameter.
+- MSI-4 regression test flipped from advisory-skipped (rc=77) to mandatory.
+
+### Performance / Benchmark
+- **P1-BENCH-01 closed.** New canonical artifact
+  [`docs/bench_unified_2026-05-23_gcc14_x86-64.json`](docs/bench_unified_2026-05-23_gcc14_x86-64.json)
+  was measured under hard turbo lock (`intel_pstate/no_turbo=1`,
+  `governor=performance`, `taskset -c 0 nice -20`). Previous canonical had
+  `turbo: unknown`. Ratios shifted under controlled conditions:
+  - CT ECDSA sign: 1.27× → **1.32× faster** than libsecp256k1
+  - CT Schnorr sign: 1.13× → **1.27× faster**
+  - ConnectBlock LTO: **+0.9–1.5%**, no-LTO **−0.5–1.0%** (unchanged)
+  - SignSchnorrWithMerkleRoot: **+35.1%**
+
+### CI / Evidence
+- **P1-CI-01 closed.** `ci/check_advisory_skip_returns.sh` (Rule 16) is now
+  invoked POST-BUILD in three independent CI choke points: `preflight.yml`
+  after the `unified_audit_runner` build, `gate.yml` `shim-gate` after the
+  shim-linked runner build, and `release.yml` `release-caas-gate` after the
+  release build. Previously the script ran only PRE-build where rc=77 ("no
+  build dir") made it a no-op.
+
+### Documentation / Metadata
+- **P1-CHG-01 closed.** CHANGELOG `[4.0.0]` performance table replaced
+  FAST-path-vs-libsecp-CT diagnostic ratios (+2.76× / +2.57×) with the
+  production-equivalent CT-vs-CT ratios from `canonical_numbers.json`.
+- **P1-ZEN-01 closed.** `.zenodo.json` description no longer hardcodes the
+  stale "252 exploit PoC" count or the unsubstantiated "4.88M GPU
+  signs/s" claim; it now references CHANGELOG and BENCHMARKS.md.
+- `docs/canonical_data.json` extended with `audit_sections_count: 10`,
+  `caas_autonomy_score: "100/100"`, `caas_gates_passed/total: 8/8`,
+  `ct_pipeline_ci_enforced/manual: 3/2`, `platform_target_count: 12` and
+  a wording string. These previously had no canonical home.
+- `ci/sync_canonical_numbers.py` `TARGET_DOCS` extended to scan
+  `CHANGELOG.md` and `.zenodo.json` so future canonical updates propagate.
+- `ci/sync_module_count.py` `DOC_FILES` extended with `.zenodo.json`.
+- `ci/check_protocol_invariants.py` MUSIG2_SIGNER_INDEX rule retargeted at
+  `ufsecp_musig2_partial_sign_v2` (the canonical signing path after v1
+  hard-fail).
+
+### Compatibility / Migration
+- **Backwards-compatible for v2 callers.** External callers of the
+  long-deprecated v1 ABI (`ufsecp_musig2_partial_sign`) will now receive
+  `UFSECP_ERR_BAD_INPUT` with a migration message at the first call;
+  switch to `ufsecp_musig2_partial_sign_v2` (available since the SEC-001
+  landing).
+
 ## [4.0.0] - 2026-05-16
 
 > **Bitcoin Core secondary backend candidate — CPU path, verification package.**
@@ -181,10 +245,10 @@ Linux x86-64-v3 · Linux ARM64 · Linux RISC-V 64 · macOS ARM64 · Windows x86-
 
 ### Reviewer Entry Path
 
-1. [](docs/BITCOIN_CORE_BACKEND_EVIDENCE.md)
-2. [](docs/BENCHMARKS.md)
-3. [](docs/AUDIT_CHANGELOG.md)
-4. [](docs/SHIM_KNOWN_DIVERGENCES.md)
+1. [Bitcoin Core backend evidence](docs/BITCOIN_CORE_BACKEND_EVIDENCE.md)
+2. [Benchmarks](docs/BENCHMARKS.md)
+3. [Audit changelog](docs/AUDIT_CHANGELOG.md)
+4. [Shim known divergences](docs/SHIM_KNOWN_DIVERGENCES.md)
 5. Replay: `python3 ci/verify_external_audit_bundle.py --allow-commit-mismatch`
 
 ### Note on Scope

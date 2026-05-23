@@ -44,6 +44,11 @@
 #define STANDALONE_TEST
 #endif
 
+// SHIM-GUARD (2026-05-23): when the libsecp256k1 shim include path is not on
+// the compiler's search path, compile this file to an empty translation unit
+// and let shim_run_stubs_unified.cpp provide the advisory-skip _run() symbol.
+#if !defined(__has_include) || __has_include("secp256k1.h")
+
 #include "secp256k1.h"
 #include "secp256k1_musig.h"
 
@@ -237,3 +242,21 @@ int test_regression_musig_noncegen_extra_input_run() {
 #ifdef STANDALONE_TEST
 int main() { return test_regression_musig_noncegen_extra_input_run(); }
 #endif
+
+#else  // __has_include("secp256k1.h") failed
+
+// Mirrors test_regression_shim_security_v9.cpp — see that file for the
+// full rationale on STANDALONE_TEST vs unified_audit_runner branching.
+#ifdef STANDALONE_TEST
+#include <cstdio>
+#ifndef ADVISORY_SKIP_CODE
+#define ADVISORY_SKIP_CODE 77
+#endif
+int test_regression_musig_noncegen_extra_input_run() {
+    std::printf("[regression_musig_noncegen_extra_input] SKIP — shim header not in include path\n");
+    return ADVISORY_SKIP_CODE;
+}
+int main() { return test_regression_musig_noncegen_extra_input_run(); }
+#endif
+
+#endif  // __has_include("secp256k1.h")

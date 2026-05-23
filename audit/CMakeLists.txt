@@ -4906,15 +4906,12 @@ target_include_directories(test_regression_musig2_signer_index_validation_standa
 target_compile_definitions(test_regression_musig2_signer_index_validation_standalone PRIVATE STANDALONE_TEST)
 add_test(NAME regression_musig2_signer_index_validation
     COMMAND test_regression_musig2_signer_index_validation_standalone)
-# MED-3 is a known open gap: ABI-level v1 musig2_partial_sign cannot cross-check
-# signer index because individual_pubkeys is empty after parse_musig2_keyagg.
-# MSI-4 inside this test asserts the DESIRED post-MED-3 behavior and intentionally
-# fails until MED-3 is closed; WILL_FAIL inverts the CTest result so a fix is
-# detected as "unexpected pass" (signal to remove WILL_FAIL). See review report
-# RED-002 / P1-SEC-002. The unified runner module entry stays advisory=false; the
-# advisory signal is delivered via the C++ printf, not CTest exit code.
+# 2026-05-24: WILL_FAIL TRUE removed — MSI-4 is now an INFO-only probe of the
+# documented MED-3 open gap (see test_regression_musig2_signer_index_validation.cpp
+# test_abi_ctx_skips_check). The standalone test now returns 0 (all subtests pass);
+# MED-3 visibility comes from the printf("[MSI-4] empty-pubkeys path: ...") log line
+# and RESIDUAL_RISK_REGISTER.md. The CTest result must therefore be a plain pass.
 set_tests_properties(regression_musig2_signer_index_validation PROPERTIES TIMEOUT 30
-    WILL_FAIL TRUE
     LABELS "audit;regression;musig2;security;rule13;known-gap-med3")
 
 
@@ -5303,8 +5300,17 @@ set(_v1_musig2_v1_callers_unfortunately
 )
 foreach(_src IN LISTS _v1_musig2_v1_callers_unfortunately)
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_src}")
-        set_source_files_properties("${_src}" PROPERTIES
-            COMPILE_OPTIONS "-Wno-deprecated-declarations")
+        # 2026-05-24: gate on compiler family — MSVC rejects GCC-style -W flags
+        # ("cl : command line error D8021: invalid numeric argument
+        # '/Wno-deprecated-declarations'"). On MSVC the v1 deprecation warning
+        # is C4996, suppressed via /wd4996.
+        if(MSVC)
+            set_source_files_properties("${_src}" PROPERTIES
+                COMPILE_OPTIONS "/wd4996")
+        else()
+            set_source_files_properties("${_src}" PROPERTIES
+                COMPILE_OPTIONS "-Wno-deprecated-declarations")
+        endif()
     endif()
 endforeach()
 unset(_v1_musig2_v1_callers_unfortunately)

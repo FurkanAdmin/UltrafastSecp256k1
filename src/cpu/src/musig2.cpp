@@ -383,9 +383,17 @@ Scalar musig2_partial_sign(
         return Scalar::zero();  // caller checks for zero and returns UFSECP_ERR_BAD_INPUT
     }
 
-    // Rule 13: when individual pubkeys are available (C++ API path, not ABI-deserialized),
-    // validate that secret_key actually corresponds to the claimed signer_index.
-    // CT byte comparison — no early exit to avoid leaking which bytes differ.
+    // Rule 13: when individual pubkeys are available (C++ API path via musig2_key_agg,
+    // which always populates the field), validate that secret_key actually corresponds
+    // to the claimed signer_index. CT byte comparison — no early exit to avoid leaking
+    // which bytes differ.
+    //
+    // P1-SEC-01 / MED-3 (2026-05-23): the empty-`individual_pubkeys` C++ bypass is a
+    // niche footgun (a caller would have to manually clear the field after
+    // musig2_key_agg populated it). Real-world attack surface is the ABI boundary,
+    // which v2 now enforces via the `pubkeys` parameter — see
+    // `ufsecp_musig2_partial_sign_v2` in src/impl/ufsecp_musig2.cpp. The v1 ABI is
+    // hard-failed at entry (cannot validate without pubkeys), forcing callers to v2.
     if (!key_agg_ctx.individual_pubkeys.empty() &&
         signer_index < key_agg_ctx.individual_pubkeys.size()) {
         Point const derived = ct::generator_mul(secret_key);

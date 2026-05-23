@@ -259,6 +259,11 @@ TARGET_DOCS = [
     # Reviewer-facing docs that contain inline benchmark claims
     "docs/CAAS_REVIEWER_QUICKSTART.md",
     "docs/BITCOIN_CORE_PR_BODY.md",
+    # CHANGELOG and citation metadata also reference canonical numbers.
+    # Patterns above cover the [N.N.N] section's perf table rows. Older
+    # sections are historical and must NOT be rewritten.
+    "CHANGELOG.md",
+    ".zenodo.json",
 ]
 
 

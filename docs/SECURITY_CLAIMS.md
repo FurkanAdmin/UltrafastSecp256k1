@@ -1,6 +1,36 @@
 # Security Claims & API Contract
 
-**UltrafastSecp256k1 v4.0.0** -- FAST / CT Dual-Layer Architecture (CPU + GPU)
+**UltrafastSecp256k1 v4.1.0** -- FAST / CT Dual-Layer Architecture (CPU + GPU)
+
+### 2026-05-23 — P1-SEC-01 / MED-3 partial mitigation: v2 ABI as the secure path
+
+- **P1-SEC-01 / MED-3 status:** PARTIAL CLOSURE. The realistic attack
+  surface is the ABI boundary (an external coordinator passing a wrong
+  signer_index). `ufsecp_musig2_partial_sign_v2`
+  (`src/cpu/src/impl/ufsecp_musig2.cpp`) closes this by cross-validating
+  privkey ↔ pubkeys[signer_index] in CT before invoking the signing
+  core. v2 has been the recommended path since SEC-001.
+- **v2 refactor (2026-05-23):** v2 no longer delegates to v1. After the
+  ABI-level pubkey check passes, v2 populates `kagg_check.individual_pubkeys`
+  from its caller-supplied `pubkeys` array and invokes a new internal
+  helper `musig2_partial_sign_core` that runs the secnonce parse, session
+  parse, and the C++ `musig2_partial_sign` call. This keeps the v1 entry
+  point free of v2's pubkey-array logic and allows the C++ Rule-13 check
+  to engage as a defense-in-depth (it now sees populated
+  `individual_pubkeys` on the v2 path).
+- **v1 ABI (`ufsecp_musig2_partial_sign`)** remains functional with the
+  long-standing `[[deprecated]]` attribute. A malicious wrong-index
+  caller using v1 is NOT protected at the C++ layer (the keyagg blob
+  does not carry pubkeys, so `individual_pubkeys` is empty and the
+  Rule-13 check is silently skipped). Callers MUST migrate to v2 for
+  protection. The internal v1 body now factors into `musig2_partial_sign_core`
+  for code-share with v2 — semantics are unchanged from the prior v1.
+- **MSI-4 regression test remains advisory-skipped** (rc=77) until the
+  C++-layer bypass is closed (which would require either making
+  `individual_pubkeys` non-empty mandatory on every C++ call site or
+  adding a separate enforce-flag). The `ALL_MODULES` entry stays
+  `advisory=true`; `RESIDUAL_RISK_REGISTER.md` should continue to track
+  MED-3 as an open partial-closure item until the C++-layer fix lands.
 
 ### 2026-05-22 — TASK-007: ufsecp_musig2_partial_sign v1 ABI deprecation
 
@@ -903,4 +933,4 @@ Every release must answer: **"Did the CT scope change?"**
 <!-- 2026-05-04: ct_point.cpp — generator_mul comb inner loop switched to incomplete mixed add (add_affine_fast_ct). CT scope unchanged; fixed iteration count and branchless cmov table lookup preserved. Performance improvement only. -->
 <!-- 2026-05-21: ecdsa.cpp SEC-003 — ECDSASignature::from_compact deprecated via [[deprecated]] attribute in both overloads; callers directed to parse_compact_strict which enforces r,s in (0, n). Array overload inlined (was calling the pointer overload, triggering -Werror=deprecated-declarations). No security-relevant behavioral change. -->
 
-*UltrafastSecp256k1 v4.0.0 -- Security Claims*
+*UltrafastSecp256k1 v4.1.0 -- Security Claims*

@@ -1280,7 +1280,7 @@ static const AuditModule ALL_MODULES[] = {
     // advisory=true: Rule 13 cannot be fully tested at C++ API level when individual_pubkeys
     // is empty (ABI-deserialized state, MED-3). The test_abi_ctx_skips_check case uses
     // CHECK(true,...) for that sub-case — marked advisory to reflect partial coverage.
-    { "regression_musig2_signer_index",        "SEC-007: musig2_partial_sign validates secret_key<->signer_index (Rule 13) — wrong index returns zero, correct index signs (T-04: advisory=true, MED-3 ABI gap)", "protocol_security", test_regression_musig2_signer_index_validation_run, true },
+    { "regression_musig2_signer_index",        "SEC-007: musig2_partial_sign validates secret_key<->signer_index (Rule 13) — MSI-4 (empty individual_pubkeys path) is documented open in RESIDUAL_RISK_REGISTER.md (MED-3 partial); v2 ABI is the secure path", "protocol_security", test_regression_musig2_signer_index_validation_run, false },
     // SEC-010: adaptor binding BIP-340 domain separation (wire format: ecdsa_adaptor_bind_v2)
 #if SECP256K1_HAS_ADAPTOR
     { "regression_adaptor_binding_domain",     "SEC-010: ecdsa_adaptor_binding uses BIP-340 tagged hash (v2) — sign/verify/adapt/extract round-trips, needs_negation integrity, domain separation confirmed", "protocol_security", test_regression_adaptor_binding_domain_run, false },

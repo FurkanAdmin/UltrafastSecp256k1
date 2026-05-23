@@ -1,6 +1,6 @@
 # FFI Hostile-Caller Coverage
 
-**Last updated**: 2026-05-22 | **Version**: 4.0.0
+**Last updated**: 2026-05-22 | **Version**: 4.1.0
 
 ### 2026-05-22 — TASK-007: ufsecp_musig2_partial_sign v1 ABI deprecation restored
 

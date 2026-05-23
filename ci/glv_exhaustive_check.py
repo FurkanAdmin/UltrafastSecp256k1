@@ -244,8 +244,12 @@ def run(lib_path: Optional[str], extra_random: int, json_out: bool, out_file: Op
     try:
         import coincurve  # noqa: F401
     except ImportError:
-        print("ERROR: 'coincurve' is required. Install: pip install coincurve", file=sys.stderr)
-        sys.exit(1)
+        # Missing coincurve = advisory skip (rc=77, CTest SKIP_RETURN_CODE).
+        # coincurve is a Python reference for cross-checking; absence is an
+        # infrastructure gap, not a security regression in this library.
+        print("SKIP: 'coincurve' not installed (install for full GLV cross-check)",
+              file=sys.stderr)
+        sys.exit(77)
 
     try:
         lpath = _find_lib(lib_path)

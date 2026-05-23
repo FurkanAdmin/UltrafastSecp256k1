@@ -403,11 +403,14 @@ static void test_sec002_adaptor_extract_ct() {
 
     // Verify ecdsa_adaptor_extract uses is_zero_ct on the recovered secret t.
     // Positive assertion: the function body must contain the exact CT check
-    //   `if (t.is_zero_ct())`
+    //   `if (t.is_zero_ct()) return {Scalar::zero(), false};`
     // A substring search for `t.is_zero()` is unsafe — `hat.is_zero()` from
-    // `pre_sig.s_hat.is_zero()` matches it as a suffix.
+    // `pre_sig.s_hat.is_zero()` matches it as a suffix. Either `{t, false}`
+    // or `{Scalar::zero(), false}` is acceptable (both are semantically
+    // equivalent when t is zero; the latter is more explicit).
     bool ecdsa_t_is_zero_ct =
-        (src.find("if (t.is_zero_ct()) return {t, false};") != std::string::npos);
+        (src.find("if (t.is_zero_ct()) return {t, false};") != std::string::npos) ||
+        (src.find("if (t.is_zero_ct()) return {Scalar::zero(), false};") != std::string::npos);
     CHECK(ecdsa_t_is_zero_ct,
           "SEC-002-EXTRACT: ecdsa_adaptor_extract uses is_zero_ct on recovered t");
 }

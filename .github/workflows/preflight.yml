@@ -164,6 +164,15 @@ jobs:
           print('::notice::exploit_poc section: all modules PASS')
           "
 
+      - name: CAAS Stage 0d — Rule 16 enforcement (advisory skip-return)
+        # P1-CI-01 fix (2026-05-23): post-build Rule 16 enforcement via the
+        # shared ci/rule16_enforce.sh wrapper (introduced 2026-05-24 to
+        # deduplicate the previously-inline three-workflow wrapper that
+        # SonarCloud Quality Gate flagged at 9.1% duplication).
+        env:
+          UFSECP_BUILD_DIR: ${{ github.workspace }}/build-runner
+        run: bash ci/rule16_enforce.sh
+
       - name: CAAS Stage 1 — Static Analysis (hard-fail on HIGH findings)
         run: |
           python3 ci/audit_test_quality_scanner.py --json -o caas_scanner.json

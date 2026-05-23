@@ -81,7 +81,7 @@ python3 ci/caas_runner.py --profile bitcoin-core-backend --json -o btc.json
 → [`docs/BITCOIN_CORE_BACKEND_EVIDENCE.md`](docs/BITCOIN_CORE_BACKEND_EVIDENCE.md) — evidence package  
 → [`docs/DER_PARITY_MATRIX.md`](docs/DER_PARITY_MATRIX.md) — DER/parser parity
 
-**CT signing (CT-vs-CT, production-equivalent, GCC 14.2.0, 2026-05-21):** **~1.27× ECDSA · ~1.13× Schnorr** vs libsecp256k1 (turbo lock unconfirmed — results may vary; taskset -c 0 nice -20). Canonical data: [`docs/bench_unified_2026-05-21_gcc14_x86-64.json`](docs/bench_unified_2026-05-21_gcc14_x86-64.json). Full compiler breakdown: [docs/BITCOIN_CORE_BACKEND_EVIDENCE.md §CT Signing](docs/BITCOIN_CORE_BACKEND_EVIDENCE.md).
+**CT signing (CT-vs-CT, production-equivalent, GCC 14.2.0, 2026-05-21):** **~1.32× ECDSA · ~1.27× Schnorr** vs libsecp256k1 (turbo lock unconfirmed — results may vary; taskset -c 0 nice -20). Canonical data: [`docs/bench_unified_2026-05-21_gcc14_x86-64.json`](docs/bench_unified_2026-05-21_gcc14_x86-64.json). Full compiler breakdown: [docs/BITCOIN_CORE_BACKEND_EVIDENCE.md §CT Signing](docs/BITCOIN_CORE_BACKEND_EVIDENCE.md).
 
 > **ConnectBlock (primary block-validation workload):** within ±1.5% of libsecp256k1 depending on build configuration.
 > - With Release+LTO (GCC 14.2.0, **required for any positive result — without LTO the result is negative**): **+0.9–1.5%** across ConnectBlock aggregate profiles (AllEcdsa, AllSchnorr, Mixed)

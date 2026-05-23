@@ -146,27 +146,36 @@ static void test_adaptor_functional_roundtrip() {
 
     Point T = secp256k1::ct::generator_mul(t);
     Point pk = secp256k1::ct::generator_mul(sk);
+    auto pk_x = pk.x().to_bytes();
 
     // schnorr_adaptor_sign internally uses generator_mul_blinded(k) after the fix.
-    auto pre_sig = secp256k1::schnorr_adaptor_sign(sk, msg, T);
+    // 4th arg is aux_rand (BIP-340 auxiliary randomness); deterministic zeros for repro.
+    std::array<std::uint8_t, 32> aux_rand{};
+    auto pre_sig = secp256k1::schnorr_adaptor_sign(sk, msg, T, aux_rand);
 
     CHECK(!pre_sig.R_hat.is_infinity(), "adaptor: pre_sig R_hat != infinity");
 
-    bool verify_ok = secp256k1::schnorr_adaptor_verify(pre_sig, pk, msg, T);
+    bool verify_ok = secp256k1::schnorr_adaptor_verify(pre_sig, pk_x, msg, T);
     CHECK(verify_ok, "adaptor: schnorr_adaptor_verify round-trip (SEC-NEW-001)");
 
     // Adapt: recover the full Schnorr signature using the adaptor secret t.
     auto full_sig = secp256k1::schnorr_adaptor_adapt(pre_sig, t);
-    auto pk_x = pk.x().to_bytes();
     bool schnorr_ok = secp256k1::schnorr_verify(pk_x, msg, full_sig);
     CHECK(schnorr_ok, "adaptor: adapted full Schnorr sig verifies (SEC-NEW-001)");
 
     // Different messages must produce different pre-signatures.
     std::array<uint8_t, 32> msg2{};
     msg2[0] = 0xBE; msg2[31] = 0xEF;
-    auto pre_sig2 = secp256k1::schnorr_adaptor_sign(sk, msg2, T);
+    auto pre_sig2 = secp256k1::schnorr_adaptor_sign(sk, msg2, T, aux_rand);
     // R_hat values differ — nonce is message-dependent via RFC6979.
-    CHECK(pre_sig.R_hat != pre_sig2.R_hat || pre_sig.s_hat != pre_sig2.s_hat,
+    // Compare x-coordinates as byte arrays (Point has no operator!=).
+    auto r_hat_x1 = pre_sig.R_hat.x().to_bytes();
+    auto r_hat_x2 = pre_sig2.R_hat.x().to_bytes();
+    auto s_hat_1 = pre_sig.s_hat.to_bytes();
+    auto s_hat_2 = pre_sig2.s_hat.to_bytes();
+    bool R_diff = (r_hat_x1 != r_hat_x2);
+    bool S_diff = (s_hat_1 != s_hat_2);
+    CHECK(R_diff || S_diff,
           "adaptor: distinct messages produce distinct pre-sigs (nonce determinism)");
 #else
     printf("  [SKIP] adaptor module not compiled — functional test skipped\n");

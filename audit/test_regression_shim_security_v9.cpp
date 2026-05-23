@@ -21,6 +21,13 @@
 #define STANDALONE_TEST
 #endif
 
+// SHIM-GUARD (2026-05-23): when the libsecp256k1 shim include path is not on the
+// compiler's search path (e.g. unified_audit_runner built without shim target
+// linked), compile this file to an advisory-skip stub. The real shim_run_stubs_
+// unified.cpp provides the regression_shim_security_v9_run() entry point as a
+// fallback when shim is absent.
+#if !defined(__has_include) || __has_include("secp256k1.h")
+
 #include "secp256k1.h"
 #include "secp256k1_extrakeys.h"
 
@@ -202,3 +209,29 @@ int test_regression_shim_security_v9_run() {
 #ifdef STANDALONE_TEST
 int main() { return test_regression_shim_security_v9_run(); }
 #endif
+
+#else  // __has_include("secp256k1.h") failed
+
+// Shim include path not present in this build.
+//
+// Two consumer scenarios:
+//   (a) unified_audit_runner — shim_run_stubs_unified.cpp is in the same link
+//       set and provides `test_regression_shim_security_v9_run()`. We must NOT
+//       define it here or MSVC's strong-only symbols produce a duplicate link
+//       error (`__attribute__((weak))` is silently ignored by MSVC).
+//   (b) STANDALONE_TEST executable — only this .cpp is in the link set, so a
+//       missing `_run()` AND missing `main()` produces "Undefined symbols ...
+//       _main" at link time. The standalone provides the stub locally.
+#ifdef STANDALONE_TEST
+#include <cstdio>
+#ifndef ADVISORY_SKIP_CODE
+#define ADVISORY_SKIP_CODE 77
+#endif
+int test_regression_shim_security_v9_run() {
+    std::printf("[regression_shim_security_v9] SKIP — shim header not in include path\n");
+    return ADVISORY_SKIP_CODE;
+}
+int main() { return test_regression_shim_security_v9_run(); }
+#endif
+
+#endif  // __has_include("secp256k1.h")
