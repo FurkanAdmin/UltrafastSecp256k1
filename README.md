@@ -545,61 +545,7 @@ For production cryptographic systems, perform your own risk review, review the c
 
 For the full audit infrastructure breakdown (1M+ assertions, block-based CAAS gates, formal CT verification pipelines, self-audit document index), see the [Engineering Quality & Self-Audit Culture](#engineering-quality--self-audit-culture) section above and [WHY_ULTRAFASTSECP256K1.md](docs/WHY_ULTRAFASTSECP256K1.md).
 
----
-
-## Seeking Sponsors -- Bug Bounty & Development
-
-> **We are actively seeking sponsors and funding partners** to expand continuous verification, bug bounty coverage, and long-term maintenance.
-
-[![Sponsor](https://img.shields.io/badge/Sponsor_This_Project-GitHub_Sponsors-ea4aaa.svg?style=for-the-badge&logo=github)](https://github.com/sponsors/shrec)
-[![Donate with Bitcoin Lightning](https://img.shields.io/badge/Lightning_Sats-shrec@stacker.news-F7931A?style=for-the-badge&logo=bitcoin)](https://stacker.news/shrec)
-
-UltrafastSecp256k1 is a **high-performance, zero-dependency secp256k1 library** with GPU acceleration, constant-time side-channel protection, and 12+ platform targets. The funding priorities are:
-
-### 1. Bug Bounty Program
-
-We want to establish a **funded bug bounty program** to incentivize security researchers:
-
-- Critical vulnerabilities (signature forgery, key recovery, CT bypass) -- high bounty tier
-- Correctness bugs (arithmetic errors, edge cases) -- medium bounty tier
-- Memory safety / undefined behavior -- standard bounty tier
-- All GPU backends (CUDA, OpenCL, Metal, ROCm) covered
-
-### 2. Open Audit Infrastructure
-
-We want to make outside review easier without turning assurance into a bureaucratic checkbox:
-
-- One-command replay packs for self-audit, differential tests, and platform validation
-- Public artifact bundles for benchmark and audit reruns
-- More native-device automation for ARM64 and RISC-V
-- More adversarial and concurrency stress harnesses that outside reviewers can reuse
-
-Currently we accept vulnerability reports via [GitHub Security Advisories](https://github.com/shrec/UltrafastSecp256k1/security/advisories/new) but **cannot offer financial rewards without sponsor funding**.
-
-### 3. Ongoing Development
-
-Sponsorship helps sustain development of:
-
-- **Zero-knowledge proofs** -- Pedersen commitments, Bulletproofs, Schnorr sigma protocols, DLEQ proofs
-- **GPU compute** -- CUDA, OpenCL, Metal, ROCm batch signature verification, key scanning, and address generation
-- **Platform ports** -- embedded (ESP32, STM32), mobile (iOS, Android), WASM
-- **Protocol features** -- MuSig2, FROST threshold signatures, Taproot, BIP-352 Silent Payments
-- **Multi-coin support** -- 27+ blockchain address formats and signing
-- **Formal verification** -- Fiat-Crypto integration, Cryptol models (ct-verif and valgrind-ct already active in CI)
-- **CI/CD infrastructure** -- cross-platform testing, performance regression gates, fuzzing
-
-### How to Sponsor
-
-| Method | Link |
-|--------|------|
-| **GitHub Sponsors** (preferred) | [github.com/sponsors/shrec](https://github.com/sponsors/shrec) |
-| **Bitcoin Lightning** | `shrec@stacker.news` (any Lightning wallet) |
-| **PayPal** | [paypal.me/IChkheidze](https://paypal.me/IChkheidze) |
-| **Corporate / Foundation** | [payysoon@gmail.com](mailto:payysoon@gmail.com) |
-| **Discord** | [Join our server](https://discord.gg/E4BK8SeMYU) |
-
-All sponsors will be acknowledged in the README, release notes, and project documentation.
-For corporate partnerships, audit co-funding, or grant applications -- please reach out via email.
+> **Sponsors / funding partners:** see the "Support the Project" section at the bottom of this README.
 
 ---
 
