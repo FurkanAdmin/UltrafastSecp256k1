@@ -437,6 +437,33 @@ RETROACTIVELY_COVERED: dict[str, tuple[list[str], str]] = {
         "unified_audit_runner as regression_shim_security_v9, advisory=true) covers both "
         "serialize_compact and serialize_der NULL arg callback tests (v9-012/015).",
     ),
+    "efd113c125": (
+        ["audit/test_regression_dedup_refactors_2026-05-24.cpp"],
+        "DEDUP-2026-05-24 part 1: SonarCloud-driven deduplication of bip39.cpp's "
+        "decode_bip39_words helper (was inlined twice across bip39_validate / "
+        "bip39_mnemonic_to_entropy) + sp_scanner.cpp ↔ ltc/ltc_sp.cpp scan_batch "
+        "(extracted to sp_scan_batch_impl.hpp templated helper). Pure code-shape "
+        "refactor — both call sites still secure_erase entropy / random scratch on "
+        "every exit path, both scanners still tag-separate via SHA256 domain string. "
+        "The retroactive regression test (wired to unified_audit_runner as "
+        "regression_dedup_refactors_2026_05_24, advisory=false, behavioral_freeze) "
+        "pins agreement of bip39_validate vs bip39_mnemonic_to_entropy on the "
+        "12/24-word zero-entropy vector + bad-checksum negative case (#1), and the "
+        "shared SP/LTC scan_batch_impl early-exit semantics (#2). Landed in the "
+        "immediately-following commit b7f64228 alongside the ellswift refactor "
+        "extension of the same dedup work.",
+    ),
+    "9d31ea0bc8": (
+        ["audit/test_regression_dedup_refactors_2026-05-24.cpp"],
+        "DEDUP-2026-05-24 part 2: collapsed four {fe,sc}_to_data static_cast bodies "
+        "(in both public include/secp256k1/types.hpp and the internal "
+        "src/cpu/include/secp256k1/types.hpp mirror) into one detail::to_data_cast<T>() "
+        "template. types.hpp defines struct layouts + zero-cost cast helpers only — "
+        "no secret material is touched, and -O3 inlines the wrapper to the original "
+        "cast. The regression test (#3 in regression_dedup_refactors_2026_05_24) "
+        "checks fe_to_data / sc_to_data return the original address across all four "
+        "void* / const void* overloads, pinning the no-op nature of the refactor.",
+    ),
 }
 
 # Bot commits that auto-update evidence — skip.
