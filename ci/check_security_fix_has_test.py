@@ -453,6 +453,17 @@ RETROACTIVELY_COVERED: dict[str, tuple[list[str], str]] = {
         "immediately-following commit b7f64228 alongside the ellswift refactor "
         "extension of the same dedup work.",
     ),
+    "1fd72fcdeb": (
+        ["audit/test_regression_dedup_refactors_2026-05-24.cpp"],
+        "DEDUP-2026-05-24 part 3 (ellswift cleanup): remove leftover FE_ZERO/"
+        "FE_THREE/FE_FOUR local shadow declarations in ellswift_try_u + "
+        "xswiftec_inv_var (src/cpu/src/ellswift.cpp). Pure dead-code removal — "
+        "the named-constant shadows were unused after the retry-loop helper "
+        "refactor in b7f64228; this commit completes that cleanup. No semantic "
+        "change. ellswift CT correctness covered by regression_dedup_refactors_"
+        "2026_05_24 (same wave's regression test) and existing ellswift "
+        "differential tests (ellswift round-trip).",
+    ),
     "9d31ea0bc8": (
         ["audit/test_regression_dedup_refactors_2026-05-24.cpp"],
         "DEDUP-2026-05-24 part 2: collapsed four {fe,sc}_to_data static_cast bodies "

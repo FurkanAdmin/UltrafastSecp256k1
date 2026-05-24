@@ -1,6 +1,8 @@
 [package]
 name = "ultrafast-secp256k1-sys"
-version = "4.0.0"
+# Placeholder — release pipeline rewrites to git-tag version (see .github/workflows/release.yml).
+# Legacy crate name; new releases ship as `ufsecp-sys` (bindings/rust/ufsecp-sys/Cargo.toml).
+version = "0.0.0-dev"
 edition = "2021"
 license = "MIT"
 description = "Raw FFI bindings to ultrafast_secp256k1 C API"

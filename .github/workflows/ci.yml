@@ -20,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        compiler: [gcc-13, clang-17]
+        compiler: [gcc-14, clang-17]
         build_type: [Release, Debug]
 
     steps:
@@ -35,7 +35,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           if [[ "${{ matrix.compiler }}" == gcc-* ]]; then
-            sudo apt-get install -y g++-13 ccache ninja-build
+            sudo apt-get install -y g++-14 ccache ninja-build
           else
             sudo apt-get install -y clang-17 lld-17 ccache ninja-build
           fi
@@ -58,7 +58,7 @@ jobs:
       - name: Configure
         run: |
           if [[ "${{ matrix.compiler }}" == gcc-* ]]; then
-            export CC=gcc-13 CXX=g++-13
+            export CC=gcc-14 CXX=g++-14
           else
             export CC=clang-17 CXX=clang++-17
           fi
@@ -98,6 +98,9 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Install cross toolchain
+        # Native x86 jobs use gcc-14 (canonical, per KB CAAS-GCC14). Cross
+        # variants (aarch64-linux-gnu-g++-14, riscv64-linux-gnu-g++-14) are
+        # not in Ubuntu 24.04 apt; stay on gcc-13 for cross until upstream ships.
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y \
@@ -797,13 +800,13 @@ jobs:
       - name: Install toolchain
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends g++-13 ninja-build
+          sudo apt-get install -y --no-install-recommends g++-14 ninja-build
 
       - name: Configure
         run: |
           cmake -S . -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_CXX_COMPILER=g++-13 \
+            -DCMAKE_CXX_COMPILER=g++-14 \
             -DSECP256K1_BUILD_TESTS=ON \
             -DSECP256K1_BUILD_CROSS_TESTS=ON
 
@@ -831,13 +834,13 @@ jobs:
       - name: Install toolchain
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends g++-13 ninja-build
+          sudo apt-get install -y --no-install-recommends g++-14 ninja-build
 
       - name: Configure
         run: |
           cmake -S . -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_CXX_COMPILER=g++-13 \
+            -DCMAKE_CXX_COMPILER=g++-14 \
             -DSECP256K1_BUILD_TESTS=ON \
             -DSECP256K1_BUILD_PROTOCOL_TESTS=ON
 

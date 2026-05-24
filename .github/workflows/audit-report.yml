@@ -45,13 +45,13 @@ jobs:
       - name: Install build tools
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq ninja-build g++-13
+          sudo apt-get install -y -qq ninja-build g++-14
 
       - name: Configure
         run: |
           cmake -S . -B build-audit -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_CXX_COMPILER=g++-13 \
+            -DCMAKE_CXX_COMPILER=g++-14 \
             -DBUILD_TESTING=ON \
             -DSECP256K1_BUILD_PROTOCOL_TESTS=ON \
             -DSECP256K1_BUILD_FUZZ_TESTS=ON
@@ -113,7 +113,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
-          name: audit-report-linux-gcc13-${{ github.run_id }}
+          name: audit-report-linux-gcc14-${{ github.run_id }}
           path: |
             out/audit-output/audit_report.json
             out/audit-output/audit_report.txt
@@ -456,7 +456,7 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           artifact-ids: ${{ needs.verdict.outputs.linux_gcc_artifact_id }}
-          path: audit-artifacts/audit-report-linux-gcc13
+          path: audit-artifacts/audit-report-linux-gcc14
 
       - name: Download Linux Clang artifact
         if: needs.verdict.outputs.linux_clang_artifact_id != ''
@@ -541,7 +541,7 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           artifact-ids: ${{ needs.linux-gcc.outputs.audit_artifact_id }}
-          path: audit-artifacts/audit-report-linux-gcc13
+          path: audit-artifacts/audit-report-linux-gcc14
 
       - name: Download Linux Clang report
         if: needs.linux-clang.outputs.audit_artifact_id != ''
@@ -567,8 +567,8 @@ jobs:
           python3 ci/audit_verdict.py \
             --artifact-root audit-artifacts \
             --summary-file "$GITHUB_STEP_SUMMARY" \
-            --required-platform linux-gcc13 \
-            --platform "audit-report-linux-gcc13=$LINUX_GCC_RESULT" \
+            --required-platform linux-gcc14 \
+            --platform "audit-report-linux-gcc14=$LINUX_GCC_RESULT" \
             --platform "audit-report-linux-clang17=$LINUX_CLANG_RESULT" \
             --platform "audit-report-windows-msvc=$WINDOWS_MSVC_RESULT"
 

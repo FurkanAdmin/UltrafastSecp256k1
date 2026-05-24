@@ -22,22 +22,18 @@ Every exploit attempt becomes a permanent regression test. Security hardens on e
 
 ---
 
-## GPU Profile — diagnostic, not verified against current build
+## GPU Profile — out of scope for canonical claims
 
-> **Status:** diagnostic only. These numbers are NOT backed by a canonical JSON
-> artifact (`docs/canonical_numbers.json` marks `gpu_throughput.status` as
-> "diagnostic — no canonical JSON artifact; unverified against current GPU build").
-> Do not cite them in performance comparisons or release notes until a controlled
-> bench_unified GPU run produces a canonical `docs/bench_unified_*_gpu.json`.
+GPU throughput is **not yet measured** under the canonical protocol.
+`docs/canonical_numbers.json.gpu_throughput` is `null`; there is no canonical
+`docs/bench_unified_*_gpu.json` artifact. The GPU backends (CUDA / Metal /
+OpenCL) compile and pass functional tests on local hardware, but performance
+claims are deferred until a turbo-locked, host-pinned canonical run is
+produced and committed.
 
-| GPU operation | Throughput (unverified) |
-|---------------|-------------------------|
-| BIP-352 scans/s | 11.00 M/s (CUDA, RTX 3090, 2026-Q1 — diagnostic) |
-| ECDSA signs/s | 4.88 M/s (CUDA, RTX 3090, 2026-Q1 — diagnostic) |
-
-These figures come from early development benchmarks that predate the current
-GPU build configuration. The CPU CT signing numbers in the TL;DR table above
-are authoritative and verified via controlled `bench_unified` runs.
+The CPU CT signing numbers in the TL;DR table above are authoritative and
+verified via controlled `bench_unified` runs. Treat GPU as out-of-scope for
+the Bitcoin Core PR.
 
 ---
 
@@ -198,17 +194,7 @@ Every benchmark number in this project is:
 - Gated by an automated performance regression check in CI (`bench-regression.yml`)
 - Published to a [live dashboard](https://shrec.github.io/UltrafastSecp256k1/dev/bench/) on pushes to dev/main
 
-**Diagnostic GPU throughput (RTX 5060 Ti, CUDA 12) [unverified against current build — see GPU Profile section]:**
-
-| Operation | Throughput |
-|-----------|-----------|
-| ECDSA sign | 4.88 M/s |
-| ECDSA verify | 4.05 M/s |
-| Schnorr sign (BIP-340) | 3.66 M/s |
-| Schnorr verify (BIP-340) | 5.38 M/s |
-| FROST partial verify | 1.34 M/s |
-
-*These are point-in-time diagnostic measurements. `canonical_numbers.json` status: "diagnostic — no canonical JSON artifact; unverified against current GPU build." Out of scope for Bitcoin Core evaluation.*
+**GPU throughput:** not yet measured under canonical protocol — see "GPU Profile" section above. Out of scope for Bitcoin Core evaluation.
 
 **Canonical x86-64 numbers (i5-14400F, GCC 14.2.0, 2026-05-23):**
 
@@ -222,7 +208,6 @@ Source: [`docs/bench_unified_2026-05-23_gcc14_x86-64.json`](bench_unified_2026-0
 | Schnorr verify (raw) | ~45.8 µs | Variable-time, no GLV cache warmup |
 | Schnorr verify (cached) | ~39.1 µs | Variable-time, warm GLV cache (64-key pool) |
 
-*[archived — Clang 19, 2026-03-24 numbers no longer current; GCC 14 canonical above]*
 
 ---
 

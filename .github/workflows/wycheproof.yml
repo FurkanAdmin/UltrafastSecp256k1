@@ -46,7 +46,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
-            g++-13 ninja-build ccache python3
+            g++-14 ninja-build ccache python3
 
       - name: Cache ccache
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
@@ -108,7 +108,7 @@ jobs:
         run: |
           # Tests 38 (wycheproof_ecdsa), 39 (wycheproof_ecdh), 229 (wycheproof_ecdsa_bitcoin)
           # link against ufsecp_static in addition to fastsecp256k1. These tests pass
-          # locally (gcc-13 and gcc-14) but intermittently SIGILL on CI runners.
+          # locally (gcc-14 and gcc-14) but intermittently SIGILL on CI runners.
           # Running as advisory (continue-on-error) until root cause is identified.
           # The same coverage is provided by the standalone equivalents (tests 230+) above.
           ctest --test-dir build-wyche --output-on-failure -j1 \

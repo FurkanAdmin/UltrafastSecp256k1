@@ -47,7 +47,7 @@ jobs:
       - name: Install base tooling
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends cmake ninja-build g++-13
+          sudo apt-get install -y --no-install-recommends cmake ninja-build g++-14
 
       - name: Prepare external audit artifacts
         run: |

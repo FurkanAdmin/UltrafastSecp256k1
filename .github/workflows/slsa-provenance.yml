@@ -34,11 +34,12 @@ jobs:
       - name: Install build deps
         run: |
           sudo apt-get update -qq
-          # L-3 fix: use g++-13 (consistent with all other workflows).
-          # g++-14 requires ubuntu-toolchain-r PPA on ubuntu-24.04 and was
-          # causing SLSA provenance generation to fail on release tags.
+          # Canonical compiler per KB CAAS-GCC14 — keep in sync with
+          # caas-evidence-refresh.yml / audit-report.yml / ci.yml native
+          # x86 jobs. Cross-compile (aarch64/riscv64) jobs remain on
+          # gcc-13 because gcc-14 cross variants are not in Ubuntu 24.04 apt.
           sudo apt-get install -y --no-install-recommends \
-              cmake ninja-build g++-13 libssl-dev
+              cmake ninja-build g++-14 libssl-dev
 
       - name: Configure
         run: |
@@ -46,8 +47,8 @@ jobs:
                 -B build-slsa \
                 -G Ninja \
                 -DCMAKE_BUILD_TYPE=Release \
-                -DCMAKE_C_COMPILER=gcc-13 \
-                -DCMAKE_CXX_COMPILER=g++-13
+                -DCMAKE_C_COMPILER=gcc-14 \
+                -DCMAKE_CXX_COMPILER=g++-14
 
       - name: Build
         run: cmake --build build-slsa --parallel

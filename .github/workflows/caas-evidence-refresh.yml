@@ -75,13 +75,13 @@ jobs:
           python-version: '3.12'
 
       - name: Install build dependencies
-        run: sudo apt-get install -y --no-install-recommends ninja-build g++-13
+        run: sudo apt-get install -y --no-install-recommends ninja-build g++-14
 
       - name: Build shared library (required by gates inside the bundle)
         run: |
           cmake -S . -B build-audit -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_CXX_COMPILER=g++-13 \
+            -DCMAKE_CXX_COMPILER=g++-14 \
             -DBUILD_TESTING=OFF \
             -DSECP256K1_BUILD_PROTOCOL_TESTS=OFF \
             -DSECP256K1_BUILD_FUZZ_TESTS=OFF
