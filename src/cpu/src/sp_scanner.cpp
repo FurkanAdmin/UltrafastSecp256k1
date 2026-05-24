@@ -4,6 +4,7 @@
 #include "secp256k1/ct/point.hpp"
 #include "secp256k1/detail/secure_erase.hpp"
 #include "secp256k1/precompute.hpp"  // KPlan, batch_scalar_mul_generator
+#include "sp_scan_batch_impl.hpp"    // shared scan_batch core with LTC-SP
 #include <cstring>
 
 namespace secp256k1 {
@@ -69,104 +70,22 @@ SilentPaymentScanner::scan_tx(const std::vector<fast::Point>& input_pubkeys,
 
 
 // ── SilentPaymentScanner::scan_batch ─────────────────────────────────────────
-// Same pipeline as LtcSpScanner::scan_batch with BIP0352/SharedSecret tag.
+// Pipeline shared with LtcSpScanner::scan_batch — see sp_scan_batch_impl.hpp.
+// Only the SHA256 domain-separation tag differs: BIP-352 uses
+// "BIP0352/SharedSecret"; LTC-SP uses "LTCSP/SharedSecret".
 
 std::vector<SilentPaymentScanner::BatchMatch>
 SilentPaymentScanner::scan_batch(
     const std::vector<std::vector<fast::Point>>& input_pubkeys_per_tx,
     const std::vector<std::vector<std::array<std::uint8_t, 32>>>& outputs_per_tx) const
 {
-    using fast::Point;
-    using fast::Scalar;
+    // Precompute SHA256 midstate over BIP0352/SharedSecret tag once per process.
+    static const auto tag_midstate =
+        detail::sp_tag_midstate("BIP0352/SharedSecret");
 
-    std::vector<BatchMatch> results;
-    const std::size_t N = input_pubkeys_per_tx.size();
-    if (N == 0) return results;
-
-    // Thread-local scratch (no heap after first call per thread)
-    static thread_local std::vector<Point>                    tl_a_sums;
-    static thread_local std::vector<Point>                    tl_shared;
-    static thread_local std::vector<std::array<uint8_t,33>>   tl_S_comps;
-    static thread_local std::vector<uint64_t>                 tl_out_map;
-    static thread_local std::vector<Scalar>                   tl_t_scalars;
-    static thread_local std::vector<Point>                    tl_candidates;
-    static thread_local std::vector<std::array<uint8_t,32>>   tl_x_bytes;
-
-    tl_a_sums.assign(N, Point::infinity());
-    for (std::size_t i = 0; i < N; ++i)
-        for (const auto& P : input_pubkeys_per_tx[i])
-            tl_a_sums[i] = tl_a_sums[i].add(P);
-
-    fast::KPlan plan = fast::KPlan::from_scalar(scan_privkey_);
-    tl_shared.resize(N);
-    Point::batch_scalar_mul_fixed_k(plan, tl_a_sums.data(), N, tl_shared.data());
-
-    tl_S_comps.resize(N);
-    Point::batch_to_compressed(tl_shared.data(), N, tl_S_comps.data());
-
-    static const std::array<std::uint32_t, 8> s_base = []() noexcept {
-        const auto tag = SHA256::hash(
-            reinterpret_cast<const std::uint8_t*>("BIP0352/SharedSecret"), 20);
-        std::uint8_t blk[64];
-        std::memcpy(blk,      tag.data(), 32);
-        std::memcpy(blk + 32, tag.data(), 32);
-        std::array<std::uint32_t, 8> st = {
-            0x6a09e667u, 0xbb67ae85u, 0x3c6ef372u, 0xa54ff53au,
-            0x510e527fu, 0x9b05688cu, 0x1f83d9abu, 0x5be0cd19u
-        };
-        detail::sha256_compress_dispatch(blk, st.data());
-        return st;
-    }();
-
-    tl_out_map.clear();
-    tl_t_scalars.clear();
-
-    for (std::uint32_t tx = 0; tx < static_cast<std::uint32_t>(N); ++tx) {
-        if (tl_shared[tx].is_infinity()) continue;
-        const auto& S_comp = tl_S_comps[tx];
-        std::uint8_t blk[64];
-        std::memcpy(blk, S_comp.data(), 33);
-        blk[37] = 0x80;
-        std::memset(blk + 38, 0, 24);
-        blk[62] = 0x03; blk[63] = 0x28;
-
-        const auto& outs = outputs_per_tx[tx];
-        for (std::uint32_t k = 0; k < static_cast<std::uint32_t>(outs.size()); ++k) {
-            blk[33] = uint8_t(k>>24); blk[34] = uint8_t(k>>16);
-            blk[35] = uint8_t(k>>8);  blk[36] = uint8_t(k);
-            std::array<std::uint32_t,8> h;
-            std::memcpy(h.data(), s_base.data(), 32);
-            detail::sha256_compress_dispatch(blk, h.data());
-            std::array<uint8_t,32> t_bytes;
-            for (int b = 0; b < 8; ++b) {
-                t_bytes[b*4+0]=uint8_t(h[b]>>24); t_bytes[b*4+1]=uint8_t(h[b]>>16);
-                t_bytes[b*4+2]=uint8_t(h[b]>>8);  t_bytes[b*4+3]=uint8_t(h[b]);
-            }
-            tl_out_map.push_back((uint64_t(tx)<<32)|k);
-            tl_t_scalars.push_back(Scalar::from_bytes(t_bytes));
-        }
-    }
-
-    if (tl_t_scalars.empty()) return results;
-    const std::size_t M = tl_t_scalars.size();
-
-    std::vector<Point> out_jac(M);
-    fast::batch_scalar_mul_generator(tl_t_scalars.data(), out_jac.data(), M);
-
-    tl_candidates.resize(M);
-    for (std::size_t i = 0; i < M; ++i)
-        tl_candidates[i] = spend_pubkey_.add(out_jac[i]);
-
-    tl_x_bytes.resize(M);
-    Point::batch_x_only_bytes(tl_candidates.data(), M, tl_x_bytes.data());
-
-    for (std::size_t i = 0; i < M; ++i) {
-        std::uint32_t tx = uint32_t(tl_out_map[i]>>32);
-        std::uint32_t k  = uint32_t(tl_out_map[i]&0xffffffff);
-        if (tl_x_bytes[i] == outputs_per_tx[tx][k])
-            results.push_back({tx, k, spend_privkey_ + tl_t_scalars[i]});
-    }
-    return results;
+    return detail::sp_scan_batch_impl<BatchMatch>(
+        scan_privkey_, spend_pubkey_, spend_privkey_, tag_midstate,
+        input_pubkeys_per_tx, outputs_per_tx);
 }
 
 } // namespace secp256k1

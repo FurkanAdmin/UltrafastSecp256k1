@@ -174,6 +174,55 @@ bip39_generate(size_t entropy_bytes, const uint8_t* entropy_in) {
 }
 
 // ---------------------------------------------------------------------------
+// decode_bip39_words — shared core of bip39_validate + bip39_mnemonic_to_entropy
+//
+// Decodes word indices into entropy bits and verifies the BIP-39 checksum.
+// Returns true iff checksum matches; caller is responsible for secure-erasing
+// `entropy` after use. `entropy_bytes_out` receives the actual entropy length
+// (16–32 bytes, derived from indices.size() ∈ {12,15,18,21,24}).
+//
+// Bit-packing identical to BIP-39:
+//   - Each word index is 11 bits, MSB first.
+//   - First (words×11 − words/3) bits → entropy.
+//   - Remaining (words/3) bits → checksum.
+//   - Expected checksum = SHA256(entropy)[0] >> (8 − checksum_bits).
+// ---------------------------------------------------------------------------
+static bool decode_bip39_words(const std::vector<int>& indices,
+                               uint8_t* entropy,
+                               size_t& entropy_bytes_out) {
+    const size_t total_bits    = indices.size() * 11;
+    const size_t checksum_bits = indices.size() / 3;
+    const size_t entropy_bits  = total_bits - checksum_bits;
+    entropy_bytes_out          = entropy_bits / 8;
+
+    std::memset(entropy, 0, entropy_bytes_out);
+    uint8_t checksum_byte = 0;
+
+    for (size_t i = 0; i < indices.size(); ++i) {
+        const auto idx = static_cast<uint32_t>(indices[i]);
+        for (size_t b = 0; b < 11; ++b) {
+            const size_t bit_pos = i * 11 + b;
+            const bool bit_set = (idx >> (10 - b)) & 1;
+            if (bit_pos < entropy_bits) {
+                if (bit_set) {
+                    entropy[bit_pos / 8] |= (1u << (7 - (bit_pos % 8)));
+                }
+            } else {
+                const size_t cs_bit = bit_pos - entropy_bits;
+                if (bit_set) {
+                    checksum_byte |= (1u << (7 - cs_bit));
+                }
+            }
+        }
+    }
+
+    auto hash = SHA256::hash(entropy, entropy_bytes_out);
+    const uint8_t expected_cs = hash[0] >> (8 - checksum_bits);
+    const uint8_t actual_cs   = checksum_byte >> (8 - checksum_bits);
+    return expected_cs == actual_cs;
+}
+
+// ---------------------------------------------------------------------------
 // bip39_validate
 // ---------------------------------------------------------------------------
 bool bip39_validate(const std::string& mnemonic) {
@@ -194,41 +243,13 @@ bool bip39_validate(const std::string& mnemonic) {
         }
     }
 
-    // Reconstruct entropy + checksum bits
-    const size_t total_bits = words.size() * 11;
-    const size_t checksum_bits = words.size() / 3;
-    const size_t entropy_bits = total_bits - checksum_bits;
-    const size_t entropy_bytes = entropy_bits / 8;
-
     uint8_t entropy[32] = {};
-    uint8_t checksum_byte = 0;
-
-    for (size_t i = 0; i < words.size(); ++i) {
-        const auto idx = static_cast<uint32_t>(indices[i]);
-        for (size_t b = 0; b < 11; ++b) {
-            const size_t bit_pos = i * 11 + b;
-            const bool bit_set = (idx >> (10 - b)) & 1;
-            if (bit_pos < entropy_bits) {
-                if (bit_set) {
-                    entropy[bit_pos / 8] |= (1u << (7 - (bit_pos % 8)));
-                }
-            } else {
-                const size_t cs_bit = bit_pos - entropy_bits;
-                if (bit_set) {
-                    checksum_byte |= (1u << (7 - cs_bit));
-                }
-            }
-        }
-    }
-
-    // Verify checksum
-    auto hash = SHA256::hash(entropy, entropy_bytes);
-    const uint8_t expected_cs = hash[0] >> (8 - checksum_bits);
-    const uint8_t actual_cs = checksum_byte >> (8 - checksum_bits);
+    size_t  entropy_bytes = 0;
+    const bool checksum_ok = decode_bip39_words(indices, entropy, entropy_bytes);
 
     detail::secure_erase(entropy, sizeof(entropy));
     detail::secure_erase(indices.data(), indices.size() * sizeof(int));
-    return expected_cs == actual_cs;
+    return checksum_ok;
 }
 
 // ---------------------------------------------------------------------------
@@ -281,38 +302,9 @@ bip39_mnemonic_to_entropy(const std::string& mnemonic) {
         }
     }
 
-    const size_t total_bits = words.size() * 11;
-    const size_t checksum_bits = words.size() / 3;
-    const size_t entropy_bits = total_bits - checksum_bits;
-    const size_t entropy_bytes = entropy_bits / 8;
-
     uint8_t entropy[32] = {};
-    uint8_t checksum_byte = 0;
-
-    for (size_t i = 0; i < words.size(); ++i) {
-        const auto idx = static_cast<uint32_t>(indices[i]);
-        for (size_t b = 0; b < 11; ++b) {
-            const size_t bit_pos = i * 11 + b;
-            const bool bit_set = (idx >> (10 - b)) & 1;
-            if (bit_pos < entropy_bits) {
-                if (bit_set) {
-                    entropy[bit_pos / 8] |= (1u << (7 - (bit_pos % 8)));
-                }
-            } else {
-                const size_t cs_bit = bit_pos - entropy_bits;
-                if (bit_set) {
-                    checksum_byte |= (1u << (7 - cs_bit));
-                }
-            }
-        }
-    }
-
-    // Verify checksum
-    auto hash = SHA256::hash(entropy, entropy_bytes);
-    const uint8_t expected_cs = hash[0] >> (8 - checksum_bits);
-    const uint8_t actual_cs = checksum_byte >> (8 - checksum_bits);
-
-    if (expected_cs != actual_cs) {
+    size_t  entropy_bytes = 0;
+    if (!decode_bip39_words(indices, entropy, entropy_bytes)) {
         detail::secure_erase(entropy, sizeof(entropy));
         detail::secure_erase(indices.data(), indices.size() * sizeof(int));
         return {ent, false};
