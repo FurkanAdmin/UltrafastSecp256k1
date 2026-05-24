@@ -1333,7 +1333,7 @@ static const AuditModule ALL_MODULES[] = {
     { "regression_adaptor_blinded_nonce", "SEC-NEW-001: adaptor.cpp generator_mul_blinded(k) DPA defence; SEC-NEW-002: BCH shim is_zero_ct on nonce k; P3-SHIM-STACK: kStackMsgMax 256->1024; P3-BATCH-MEM: batch vector shrink_to_fit -- source-scan + adaptor sign+adapt+verify round-trip", "ct_analysis", test_regression_adaptor_blinded_nonce_run, false },
     // === 2026-05-24 DEDUP refactors (SonarCloud-driven, no security/ABI change) ===
     // advisory=false: deterministic roundtrips + tag-separation + cast-invariance.
-    { "regression_dedup_refactors_2026_05_24", "DEDUP-2026-05-24: bip39 decode_bip39_words helper, sp_scanner+ltc_sp shared sp_scan_batch_impl, types.hpp to_data_cast<T> template, ellswift retry-loop helper -- invariant roundtrips proving no behavioural drift", "behavioral_freeze", test_regression_dedup_refactors_2026_05_24_run, false },
+    { "regression_dedup_refactors_2026_05_24", "DEDUP-2026-05-24: bip39 decode_bip39_words helper, sp_scanner+ltc_sp shared sp_scan_batch_impl, types.hpp to_data_cast<T> template, ellswift retry-loop helper -- invariant roundtrips proving no behavioural drift", "differential", test_regression_dedup_refactors_2026_05_24_run, false },
     // === 2026-05-21 SEC-006 ===
     { "regression_bip324_privkey_lifetime", "SEC-006: Bip324Session privkey_ raw-byte window documented; complete_handshake erases after use (full store-Scalar fix tracked SEC-006)", "memory_safety", test_regression_bip324_privkey_lifetime_run, false },
     // === 2026-05-21 SHIM-010: ndata R-grind bounded termination ===
