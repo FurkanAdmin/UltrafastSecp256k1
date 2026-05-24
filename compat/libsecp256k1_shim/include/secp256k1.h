@@ -112,6 +112,20 @@ SECP256K1_API void secp256k1_context_destroy(secp256k1_context *ctx);
 SECP256K1_API int  secp256k1_context_randomize(secp256k1_context *ctx, const unsigned char *seed32);
 SECP256K1_API void secp256k1_selftest(void);
 
+/* -- Preallocated context API (TASK-008) ---------------------------------- */
+/* These functions allow callers to provide their own memory for the context.
+ * secp256k1_context_preallocated_destroy does NOT free the buffer — the
+ * caller owns it. secp256k1_context_destroy DOES free (normal malloc path).
+ * Note: this shim's internal state is fully self-contained in the returned
+ * pointer; the prealloc buffer must be at least secp256k1_context_preallocated_size()
+ * bytes aligned to alignof(secp256k1_context). */
+SECP256K1_API size_t secp256k1_context_preallocated_size(unsigned int flags);
+SECP256K1_API secp256k1_context *secp256k1_context_preallocated_create(
+    void *prealloc, unsigned int flags);
+SECP256K1_API secp256k1_context *secp256k1_context_preallocated_clone(
+    const secp256k1_context *ctx, void *prealloc);
+SECP256K1_API void secp256k1_context_preallocated_destroy(secp256k1_context *ctx);
+
 /* Install a callback invoked on illegal API usage (NULL ctx, bad arg, etc.).
  * The default callback calls abort(). Pass a no-op to suppress abort. */
 SECP256K1_API void secp256k1_context_set_illegal_callback(

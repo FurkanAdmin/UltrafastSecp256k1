@@ -4,9 +4,11 @@
 #include "secp256k1.h"
 #include "shim_internal.hpp"
 #include <array>
+#include <cstddef>
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
+#include <new>
 
 #include "secp256k1/precompute.hpp"
 #include "secp256k1/scalar.hpp"
@@ -294,6 +296,64 @@ void secp256k1_context_set_error_callback(
     // Same as illegal_callback: static context allowed (libsecp v0.6+ compat).
     ctx->error_cb      = fun ? fun : default_illegal_callback;
     ctx->error_cb_data = data;
+}
+
+// -- Preallocated context API (TASK-008) ------------------------------------
+// Callers supply their own memory. secp256k1_context_preallocated_destroy
+// does NOT call free() — the caller owns the buffer.
+
+size_t secp256k1_context_preallocated_size(unsigned int flags) {
+    // Same size regardless of flags (our context struct is flag-size-independent).
+    // If flags are invalid we still return a non-zero size; create() will reject them.
+    (void)flags;
+    return sizeof(secp256k1_context);
+}
+
+secp256k1_context *secp256k1_context_preallocated_create(void *prealloc, unsigned int flags) {
+    if (!prealloc) {
+        g_static_ctx.illegal_cb("secp256k1_context_preallocated_create: NULL prealloc",
+                                const_cast<void*>(g_static_ctx.illegal_cb_data));
+        return nullptr;
+    }
+    if ((flags & SECP256K1_FLAGS_TYPE_MASK) != SECP256K1_FLAGS_TYPE_CONTEXT) {
+        g_static_ctx.illegal_cb("secp256k1_context_preallocated_create: invalid flags",
+                                const_cast<void*>(g_static_ctx.illegal_cb_data));
+        return nullptr;
+    }
+    shim_ensure_fixed_base();
+    auto *ctx = new(prealloc) secp256k1_context{};
+    ctx->flags = flags;
+    return ctx;
+}
+
+secp256k1_context *secp256k1_context_preallocated_clone(
+    const secp256k1_context *ctx, void *prealloc)
+{
+    if (!ctx) {
+        secp256k1_shim_call_illegal_cb(nullptr,
+            "secp256k1_context_preallocated_clone: NULL context");
+        return nullptr;
+    }
+    if (!prealloc) {
+        secp256k1_shim_call_illegal_cb(ctx,
+            "secp256k1_context_preallocated_clone: NULL prealloc");
+        return nullptr;
+    }
+    auto *clone = new(prealloc) secp256k1_context{};
+    std::memcpy(clone, ctx, sizeof(secp256k1_context));
+    return clone;
+}
+
+void secp256k1_context_preallocated_destroy(secp256k1_context *ctx) {
+    if (ctx && ctx != &g_static_ctx) {
+        // Erase sensitive fields — same as context_destroy but do NOT free().
+        std::memset(ctx->blind, 0, 32);
+        secp256k1::detail::secure_erase(&ctx->cached_r_G, sizeof(ctx->cached_r_G));
+        secp256k1::detail::secure_erase(&ctx->cached_r, sizeof(ctx->cached_r));
+        ctx->cached_r_G_valid = false;
+        ctx->~secp256k1_context_struct();
+        // Caller owns the buffer — do not free().
+    }
 }
 
 } // extern "C"

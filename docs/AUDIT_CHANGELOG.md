@@ -1,5 +1,12 @@
 # Audit Changelog
 
+## 2026-05-24 — Fix: TASK-008 secp256k1_context_preallocated_* API
+
+- **`compat/libsecp256k1_shim/include/secp256k1.h`** — added declarations for `secp256k1_context_preallocated_size`, `secp256k1_context_preallocated_create`, `secp256k1_context_preallocated_clone`, `secp256k1_context_preallocated_destroy`.
+- **`compat/libsecp256k1_shim/src/shim_context.cpp`** — implemented all four functions using placement-new; `preallocated_destroy` does not `free()`.
+- **`docs/SHIM_KNOWN_DIVERGENCES.md`** — documented size/flags divergence.
+- **`audit/test_regression_shim_preallocated_ctx.cpp` (NEW)** — PAC-1..6 test suite. `advisory=true`.
+
 ## 2026-05-23 — Fix: SHIM-002 + TEST-001 + PR description disclosure
 
 - **`compat/libsecp256k1_shim/src/shim_batch_verify.cpp`** — `secp256k1_schnorrsig_verify_batch` and `secp256k1_ecdsa_verify_batch`: added explicit NULL-ctx guards firing function-specific illegal-callback messages (`"secp256k1_schnorrsig_verify_batch: NULL context"` / `"secp256k1_ecdsa_verify_batch: NULL context"`) before the generic `ctx_can_verify()` check. Previously the generic `"secp256k1_shim: NULL context argument"` message was emitted, which obscured which entry point received the NULL ctx (SHIM-002).
@@ -302,7 +309,7 @@
 - **audit/test_exploit_frost_absent_signer_id.cpp (NEW — P1-SEC-001):** 3 sub-tests (FSI-1..3): absent signer → zero z_i; present signer → non-zero z_i; below-threshold → zero z_i. Wired to `unified_audit_runner` as `exploit_poc`, `advisory=false`.
 - **audit/test_regression_schnorr_sign_e_hash_erased.cpp (NEW — P1-SEC-002):** 4 sub-tests (SHE-1..4): sign+verify round-trip; 50 round-trips with varied messages; deterministic output; different messages → different sigs. Wired as `ct_analysis`, `advisory=false`.
 - **audit/test_exploit_musig2_infinity_pubnonce.cpp (NEW — P1-SEC-003):** 6 sub-tests (MIP-1..6): valid pubnonce accepted; zero input (prefix 0x00) rejected; uncompressed prefix (0x04) rejected; off-curve x handled; NULL args rejected; invalid second-point prefix rejected. Wired as `exploit_poc`, `advisory=true` (requires shim).
-- **ci/sync_module_count.py:** Module count propagated — 382 total (271 exploit-PoC, 115 non-exploit).
+- **ci/sync_module_count.py:** Module count propagated — 382 total (272 exploit-PoC, 115 non-exploit).
 
 ## 2026-05-21 — Fix: doc sync, stale paths, canonical benchmark JSON machine-generation (REL-001..011, BENCH-003/006, CI-001)
 
@@ -779,7 +786,7 @@ evidence upgrades, and changes to what the repository can honestly claim.
   FAST variable-time row now labeled `[diag FAST]` — clearly marked as not production-equivalent.
   This eliminates the invalid VT-Ultra vs CT-libsecp comparison from the ratio table.
 
-### Module count: 357 total (101 non-exploit + 271 exploit PoC)
+### Module count: 357 total (101 non-exploit + 272 exploit PoC)
 
 ---
 
@@ -925,7 +932,7 @@ evidence upgrades, and changes to what the repository can honestly claim.
 - `docs/SHIM_KNOWN_DIVERGENCES.md` created: complete list of intentional shim vs libsecp256k1 behavioral differences.
 - `CLAUDE.md` updated: Canonical Data Synchronization rules added (module counts via `sync_module_count.py`, benchmark data via canonical JSON, ConnectBlock claim wording rules).
 - `docs/BITCOIN_CORE_BACKEND_EVIDENCE.md`: GCC CT signing regression (0.82–0.85×) disclosed; commit SHA mismatch corrected.
-- Module counts synced via `sync_module_count.py`: 98 non-exploit + 271 exploit PoC = 350 total.
+- Module counts synced via `sync_module_count.py`: 98 non-exploit + 272 exploit PoC = 350 total.
 
 ---
 
@@ -1800,7 +1807,7 @@ All 4 wired into `unified_audit_runner.cpp` + `audit/CMakeLists.txt`.
 
 ### Documentation Sync
 
-- `sync_module_count.py` run: WHY/README updated to 271 exploit PoCs, 80 non-exploit, 312 total.
+- `sync_module_count.py` run: WHY/README updated to 272 exploit PoCs, 80 non-exploit, 312 total.
 - `sync_version_refs.py` run: 26 doc files updated from v3.60/v3.66 → v3.68.0.
 - CT pipeline count: "3" → "5" (LLVM ct-verif, Valgrind taint, ct-prover, dudect, ARM64 native) across README + WHY.
 - `docs/EXPLOIT_TEST_CATALOG.md`: `test_exploit_der_parsing_differential` updated to 13 tests.
@@ -4200,7 +4207,7 @@ tests PASS.**
   double-hash confusion (H(msg) ≠ H(H(msg))); domain prefix isolation (domain-A sig ≠ domain-B
   sig).  Committed `c843979c`.
 
-**Running total after this wave: 271 exploit PoC files, 59 new checks.**
+**Running total after this wave: 272 exploit PoC files, 59 new checks.**
 
 ---
 

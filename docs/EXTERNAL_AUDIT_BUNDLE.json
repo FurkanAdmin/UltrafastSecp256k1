@@ -33,13 +33,13 @@
     {
       "exists": true,
       "path": "docs/TEST_MATRIX.md",
-      "sha256": "8ad9d6dc2cc4212c4f948741ced352eeb7698c08866727f0b4fc38e85b963b1d",
+      "sha256": "fb000887990eae79b32b1e2918c6507254ac527655589bf6f3147db712ea4a25",
       "size": 58795
     },
     {
       "exists": true,
       "path": "docs/CT_VERIFICATION.md",
-      "sha256": "4820e82eb8ce1c5dbb44b141e57e5074a0dbe0f308db5104c3712295e23fd222",
+      "sha256": "2749251a88e3a85e2d8d54fa5db4049868f946f5417ec255c09ecc7e1e863b2a",
       "size": 45428
     },
     {
@@ -156,7 +156,7 @@
           {
             "findings": [
               {
-                "message": "Audit test-quality findings: files=405, critical=0, high=0, medium=0, low=0",
+                "message": "Audit test-quality findings: files=406, critical=0, high=0, medium=0, low=0",
                 "severity": "INFO"
               },
               {
@@ -200,11 +200,27 @@
           {
             "findings": [
               {
-                "message": "1 files modified/deleted since graph build (2026-05-24T18:37:47)",
+                "message": "35 files modified/deleted since graph build (2026-05-24T18:37:47)",
                 "severity": "WARN"
               },
               {
-                "message": "MODIFIED: docs/SECURITY_AUTONOMY_KPI.json",
+                "message": "MODIFIED: README.md",
+                "severity": "INFO"
+              },
+              {
+                "message": "MODIFIED: docs/ARM64_AUDIT_BENCHMARK.md",
+                "severity": "INFO"
+              },
+              {
+                "message": "MODIFIED: docs/ATTACK_GUIDE.md",
+                "severity": "INFO"
+              },
+              {
+                "message": "MODIFIED: docs/AUDIT_CHANGELOG.md",
+                "severity": "INFO"
+              },
+              {
+                "message": "MODIFIED: docs/AUDIT_COVERAGE.md",
                 "severity": "INFO"
               }
             ],
@@ -244,7 +260,7 @@
           {
             "findings": [
               {
-                "message": "43 CTest targets not in TEST_MATRIX.md: ${_name}_shim, bip324_kat_cuda, exploit_bip352_address_collision, exploit_bip39_nfkd, exploit_bug001_addr_overflow",
+                "message": "44 CTest targets not in TEST_MATRIX.md: ${_name}_shim, bip324_kat_cuda, exploit_bip352_address_collision, exploit_bip39_nfkd, exploit_bug001_addr_overflow",
                 "severity": "WARN"
               }
             ],
@@ -376,8 +392,8 @@
           {
             "findings": [
               {
-                "message": "1 changed files have matching docs",
-                "severity": "PASS"
+                "message": "CMakeLists.txt changed but docs/BUILDING.md not updated",
+                "severity": "WARN"
               }
             ],
             "name": "P10: Doc-Code Pairing",
@@ -614,11 +630,11 @@
           "value": {
             "dirty": true,
             "ref": "dev",
-            "sha": "031ecbcfd76af452501840e9219b07a7824084f0",
-            "short": "031ecbcfd7"
+            "sha": "48a35b3d228fc5a4dc3c1118b8163f7a63ae9321",
+            "short": "48a35b3d22"
           }
         },
-        "generated_at": "2026-05-24T19:12:05.303338+00:00",
+        "generated_at": "2026-05-24T19:19:44.478953+00:00",
         "platform": "Linux",
         "provenance": {
           "build_flags": {
@@ -635,12 +651,12 @@
             },
             "flags_hash": "c03bf05b8a5e9aee"
           },
-          "collected_at": "2026-05-24T19:12:05.303299+00:00",
+          "collected_at": "2026-05-24T19:19:44.478918+00:00",
           "git": {
             "dirty": true,
             "ref": "dev",
-            "sha": "031ecbcfd76af452501840e9219b07a7824084f0",
-            "short": "031ecbcfd7"
+            "sha": "48a35b3d228fc5a4dc3c1118b8163f7a63ae9321",
+            "short": "48a35b3d22"
           },
           "platform": {
             "machine": "x86_64",
@@ -661,7 +677,7 @@
           },
           "version": "4.1.0"
         },
-        "run_id": "audit_gate-031ecbcfd7-20260524T191205",
+        "run_id": "audit_gate-48a35b3d22-20260524T191944",
         "runner": "audit_gate",
         "schema_version": "1.0.0",
         "sections": [
@@ -767,7 +783,7 @@
               {
                 "check_id": "p2__audit_test_quality",
                 "severity": "info",
-                "title": "Audit test-quality findings: files=405, critical=0, high=0, medium=0, low=0"
+                "title": "Audit test-quality findings: files=406, critical=0, high=0, medium=0, low=0"
               },
               {
                 "check_id": "p2__audit_test_quality",
@@ -816,12 +832,32 @@
               {
                 "check_id": "p6__graph_freshness",
                 "severity": "advisory:medium",
-                "title": "1 files modified/deleted since graph build (2026-05-24T18:37:47)"
+                "title": "35 files modified/deleted since graph build (2026-05-24T18:37:47)"
               },
               {
                 "check_id": "p6__graph_freshness",
                 "severity": "info",
-                "title": "MODIFIED: docs/SECURITY_AUTONOMY_KPI.json"
+                "title": "MODIFIED: README.md"
+              },
+              {
+                "check_id": "p6__graph_freshness",
+                "severity": "info",
+                "title": "MODIFIED: docs/ARM64_AUDIT_BENCHMARK.md"
+              },
+              {
+                "check_id": "p6__graph_freshness",
+                "severity": "info",
+                "title": "MODIFIED: docs/ATTACK_GUIDE.md"
+              },
+              {
+                "check_id": "p6__graph_freshness",
+                "severity": "info",
+                "title": "MODIFIED: docs/AUDIT_CHANGELOG.md"
+              },
+              {
+                "check_id": "p6__graph_freshness",
+                "severity": "info",
+                "title": "MODIFIED: docs/AUDIT_COVERAGE.md"
               }
             ],
             "name": "P6: Graph Freshness",
@@ -868,7 +904,7 @@
               {
                 "check_id": "p8__test_documentation",
                 "severity": "advisory:medium",
-                "title": "43 CTest targets not in TEST_MATRIX.md: ${_name}_shim, bip324_kat_cuda, exploit_bip352_address_collision, exploit_bip39_nfkd, exploit_bug001_addr_overflow"
+                "title": "44 CTest targets not in TEST_MATRIX.md: ${_name}_shim, bip324_kat_cuda, exploit_bip352_address_collision, exploit_bip39_nfkd, exploit_bug001_addr_overflow"
               }
             ],
             "name": "P8: Test Documentation",
@@ -1029,12 +1065,12 @@
             "findings": [
               {
                 "check_id": "p10__doc-code_pairing",
-                "severity": "pass",
-                "title": "1 changed files have matching docs"
+                "severity": "advisory:medium",
+                "title": "CMakeLists.txt changed but docs/BUILDING.md not updated"
               }
             ],
             "name": "P10: Doc-Code Pairing",
-            "verdict": "PASS"
+            "verdict": "PASS with advisory"
           },
           {
             "findings": [
@@ -1303,21 +1339,21 @@
           }
         ],
         "summary": {
-          "advisory": 49,
+          "advisory": 54,
           "blocking": 0,
-          "info": 43,
+          "info": 47,
           "sections": 26,
           "skipped_sections": 0,
-          "total_findings": 96,
-          "warnings": 6
+          "total_findings": 100,
+          "warnings": 7
         },
         "verdict": "PASS with advisory"
       },
       "passing": true,
       "required": true,
       "returncode": 0,
-      "stderr_sha256": "34ea0f670731c7434c469cd49ea4e97afae3b3289d58248c5e894650d71f6253",
-      "stdout_sha256": "caaf9c0b25594a10805bd10f19eca995ae89148eb16e133b3e846df95fc7520a"
+      "stderr_sha256": "808377fa9fc1978df3ef094daee86f10eae981b0b63b2a8af22d58ed6d82dec7",
+      "stdout_sha256": "4f9b4f13e10b3c68325341b5431bb8b15eb2c29b81ac0cad2f188f7306e94fba"
     },
     {
       "name": "audit_gap_report_strict",
@@ -1619,13 +1655,13 @@
         "gates_skipped": 0,
         "gates_total": 8,
         "overall_pass": true,
-        "timestamp": "2026-05-24T19:12:07.482600+00:00"
+        "timestamp": "2026-05-24T19:19:46.651642+00:00"
       },
       "passing": true,
       "required": true,
       "returncode": 0,
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stdout_sha256": "9c4edb83cecc6b2821981ea6c476e3e1c23083beed68501f76ea81dd5696a679"
+      "stdout_sha256": "50f631e60941d2c8ef73669bb09963105a04580f91a8ba86155fe23ffab4343f"
     },
     {
       "name": "supply_chain_gate",
@@ -1671,19 +1707,19 @@
         "checks_total": 5,
         "failing_checks": [],
         "overall_pass": true,
-        "timestamp": "2026-05-24T19:12:07.518637+00:00"
+        "timestamp": "2026-05-24T19:19:46.691560+00:00"
       },
       "passing": true,
       "required": true,
       "returncode": 0,
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stdout_sha256": "f4a2a98b7f90f0be468f874664d8fb21e17fe791ccc9351340f59979752e92f5"
+      "stdout_sha256": "3364f4ffe4b3461681550255f932aadcc9db209452b3daeb421eb38c60aeae10"
     }
   ],
-  "generated_at": "2026-05-24T19:12:07.534039+00:00",
+  "generated_at": "2026-05-24T19:19:46.710083+00:00",
   "git": {
     "branch": "dev",
-    "commit": "031ecbcfd76af452501840e9219b07a7824084f0",
+    "commit": "48a35b3d228fc5a4dc3c1118b8163f7a63ae9321",
     "dirty": true
   },
   "repo_root": "/home/shrek/Secp256k1/Secp256K1fast/libs/UltrafastSecp256k1",

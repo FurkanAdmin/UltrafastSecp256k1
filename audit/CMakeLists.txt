@@ -3999,6 +3999,8 @@ if(TARGET secp256k1_shim)
         test_regression_shim_security_v9.cpp
         # 2026-05-23 SHIM-NONCEGEN-001: musig_nonce_gen extra_input32 behavioral freeze
         test_regression_musig_noncegen_extra_input.cpp
+        # 2026-05-24 TASK-008: preallocated context API
+        test_regression_shim_preallocated_ctx.cpp
 )
     target_compile_definitions(unified_audit_runner PRIVATE SECP256K1_BUILD_COMPAT_SHIM)
     target_link_libraries(unified_audit_runner PRIVATE secp256k1_shim)
@@ -5278,6 +5280,22 @@ set_tests_properties(regression_musig_noncegen_extra_input PROPERTIES TIMEOUT 30
     SKIP_RETURN_CODE 77
     LABELS "audit;regression;shim;musig;nonce;shim-noncegen-001")
 target_sources(unified_audit_runner PRIVATE test_regression_musig_noncegen_extra_input.cpp)
+
+# TASK-008: preallocated context API (2026-05-24)
+add_executable(test_regression_shim_preallocated_ctx_standalone
+    test_regression_shim_preallocated_ctx.cpp)
+audit_target_defaults(test_regression_shim_preallocated_ctx_standalone)
+target_compile_definitions(test_regression_shim_preallocated_ctx_standalone PRIVATE STANDALONE_TEST)
+if(TARGET secp256k1_shim)
+    target_link_libraries(test_regression_shim_preallocated_ctx_standalone PRIVATE secp256k1_shim)
+    target_include_directories(test_regression_shim_preallocated_ctx_standalone PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../compat/libsecp256k1_shim/include)
+endif()
+add_test(NAME regression_shim_preallocated_ctx
+    COMMAND test_regression_shim_preallocated_ctx_standalone)
+set_tests_properties(regression_shim_preallocated_ctx PROPERTIES TIMEOUT 30
+    SKIP_RETURN_CODE 77
+    LABELS "audit;regression;shim;context;preallocated;task-008")
 
 # SEC-001/CT-001: adaptor extract CT scalar mul + s_inv erase (2026-05-23)
 # advisory=false: ufsecp ABI + C++ adaptor API always available.

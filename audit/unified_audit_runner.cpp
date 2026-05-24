@@ -626,6 +626,8 @@ int test_regression_shim_security_v7_run();               // 2026-05-13 v7: T-01
 int test_regression_adaptor_degenerate_v7_run();          // 2026-05-13 v7: T-09 adaptor degenerate output guard
 // 2026-05-13 v8 security fixes (P1-SEC-NEW-001, RED-TEAM-008, P2-SEC-NEW-002)
 int test_regression_shim_security_v8_run();               // advisory=true: shim must be linked
+// 2026-05-24 TASK-008: preallocated context API
+int test_regression_shim_preallocated_ctx_run();          // advisory=true: shim must be linked
 
 // ============================================================================
 // Forward declarations -- 2026-05-21 P1 security fixes (SEC-001, SEC-002, SEC-003)
@@ -1323,6 +1325,8 @@ static const AuditModule ALL_MODULES[] = {
     // === 2026-05-13 v8 security regression guards ===
     // advisory=true: depend on the libsecp256k1 shim being linked.
     { "regression_shim_security_v8", "v8: P1-SEC-NEW-001 ecdh strict privkey (Rule 11) + RED-TEAM-008 ecdsa_verify on-curve + P2-SEC-NEW-002 ecdh pubkey on-curve", "exploit_poc", test_regression_shim_security_v8_run, true },
+    // === 2026-05-24 TASK-008: preallocated context API ===
+    { "regression_shim_preallocated_ctx", "TASK-008: secp256k1_context_preallocated_* create/clone/destroy/size correctness", "exploit_poc", test_regression_shim_preallocated_ctx_run, true },
     // === 2026-05-16 CA-001: curve membership check restored in large-batch ECDSA verify ===
     // advisory=true: shim must be linked (secp256k1_ecdsa_verify_batch is shim-only).
     { "regression_ecdsa_batch_curve_check", "CA-001: secp256k1_ecdsa_verify_batch rejects invalid-curve pubkeys (y^2 != x^3+7) consistently in small-batch (n<8) and large-batch (n>=8) paths (BCK-1..6)", "exploit_poc", test_regression_ecdsa_batch_curve_check_run, true },

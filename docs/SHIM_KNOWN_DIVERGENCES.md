@@ -11,6 +11,30 @@ For the complete compatibility test matrix see `compat/libsecp256k1_shim/tests/`
 
 ---
 
+## secp256k1_context_preallocated_* — placement-new semantics
+
+- **Upstream behavior:** `secp256k1_context_preallocated_size(flags)` returns a
+  flags-dependent byte count. The preallocated buffer holds ALL context state
+  inline; the context is entirely self-contained in that buffer.
+- **Shim behavior:** `secp256k1_context_preallocated_size` always returns
+  `sizeof(secp256k1_context)` regardless of flags (our context struct size is
+  flags-independent). `secp256k1_context_preallocated_create` places a
+  `secp256k1_context` object into the caller's buffer via placement-new.
+  The struct contains non-trivially-destructible members (Point, Scalar),
+  so `secp256k1_context_preallocated_destroy` calls the destructor explicitly
+  but does NOT free the buffer — caller owns it. This matches upstream semantics.
+- **Reason:** Our internal context state fits in a fixed-size struct. Placement-new
+  is used so member initializers (Point default ctor, Scalar default ctor) run
+  correctly in the caller's buffer without requiring heap allocation.
+- **Impact:** None for correct callers. The size returned by `preallocated_size` may
+  differ from upstream (upstream may include precomputed table space in certain
+  configurations; ours does not — precomputed tables are globally shared). Callers
+  must use the shim's own `preallocated_size` return value, not a size hard-coded
+  from upstream libsecp256k1.
+- **Test:** `audit/test_regression_shim_preallocated_ctx.cpp` PAC-1..6.
+
+---
+
 ## secp256k1_schnorrsig_verify with msglen != 32 — ShimSchnorrCache bypassed (SHIM-007)
 
 - **Upstream behavior:** libsecp256k1 `secp256k1_schnorrsig_verify` supports variable-length
