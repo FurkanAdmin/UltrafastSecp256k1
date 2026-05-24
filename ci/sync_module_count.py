@@ -113,6 +113,14 @@ SUMMARY_NONEXPLOIT_RE = re.compile(r'(\| Audit Modules\s+\| )\d+( \(non-exploit 
 # Matches "N-module `unified_audit_runner`" (backtick-wrapped variant used in README)
 # Handled by RUNNER_MODULE_COUNT_BT_RE defined above; applied in make_replacements.
 
+# Matches "N exploit PoCs modules + N non-exploit modules = N total"
+# Used in docs/ATTACK_GUIDE.md:7 (Current assurance state line). Added 2026-05-24
+# after the multi-pass review found this format was the only ATTACK_GUIDE count
+# expression and no existing pattern covered it (caused 371-vs-400 drift).
+EXPLOIT_PLUS_TOTAL_RE = re.compile(
+    r'\b\d+ exploit PoCs? modules? \+ \d+ non-exploit modules? = \d+ total\b'
+)
+
 
 # ── Count sources ─────────────────────────────────────────────────────────────
 
@@ -160,6 +168,16 @@ def make_replacements(content: str,
         return replacement
 
     new = POC_FILES_AND_MODULES_RE.sub(_replace_poc_and_mods, new)
+
+    # "N exploit PoCs modules + N non-exploit modules = N total" (ATTACK_GUIDE format)
+    def _replace_exploit_plus_total(m: re.Match) -> str:
+        nonlocal changes
+        replacement = f'{exploit_mods} exploit PoCs modules + {non_exploit} non-exploit modules = {total} total'
+        if m.group(0) != replacement:
+            changes += 1
+        return replacement
+
+    new = EXPLOIT_PLUS_TOTAL_RE.sub(_replace_exploit_plus_total, new)
 
     # "N PoC files" standalone
     def _replace_poc_files(m: re.Match) -> str:
