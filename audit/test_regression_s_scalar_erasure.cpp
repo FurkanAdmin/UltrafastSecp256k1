@@ -112,7 +112,12 @@ static void test_ssr2_ct_ecdsa_sign_roundtrip() {
 static void test_ssr3_musig2_agg_correctness() {
     SECP256K1_INIT();
 
-#if defined(__SANITIZE_MEMORY__)
+// Standard MSan detection: Clang uses __has_feature (a builtin, not a macro).
+// Provide a fallback so __has_feature(x) evaluates to 0 on non-Clang compilers.
+#ifndef __has_feature
+#  define __has_feature(x) 0
+#endif
+#if __has_feature(memory_sanitizer) || defined(__SANITIZE_MEMORY__)
     // MSan with track-origins=2 slows scalar multiplications 100-500x.
     // A full 2-party MuSig2 roundtrip (12+ scalar mults) exceeds 600s.
     // Verify the s-erasure fix via source scan instead.
