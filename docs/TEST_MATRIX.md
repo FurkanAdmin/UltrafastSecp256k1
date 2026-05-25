@@ -382,6 +382,8 @@ fix pass (SEC-001/CT-001/SEC-002/SEC-003/SHIM-001/CI-006):
 - `regression_musig_xonly_zero_tweak` — SHIM-001: secp256k1_musig_pubkey_xonly_tweak_add accepts zero tweak (advisory=true, shim)
 - `regression_shim_security_v9` — SHIM-NEW-012/015: serialize+seckey NULL arg illegal_callback (advisory=true, shim)
 - `regression_musig_noncegen_extra_input` — SHIM-NONCEGEN-001: musig_nonce_gen extra_input32 behavioral freeze (advisory=true, shim)
+- `regression_shim_keypair_null_cb` — T-09/10: per-arg illegal_callback for keypair_create/sec/pub/xonly_pub + sig parse (advisory=true, shim)
+- `regression_shim_context_erase` — T-11/12: secure_erase ctx->blind + is_zero_ct in ContextBlindingScope (advisory=true, shim)
 
 ### Generated Inventory Sync (2026-05-12)
 
@@ -876,6 +878,8 @@ ctest --test-dir build-audit -R "exploit" --output-on-failure
 | `shim_recovery_and_noncefp` | `compat/libsecp256k1_shim/tests/test_shim_recovery_and_noncefp.cpp` | PASS3-001/002: recoverable sig parse accepts r=0/s=0 (REC-1..4); ecdsa_sign/recoverable/schnorr_sign_custom fire illegal_callback for custom noncefp (NFP-1..3) |
 | `regression_ecdsa_verify_cache_consistency` | `audit/test_regression_ecdsa_verify_cache_consistency.cpp` | SHIM-013: `secp256k1_ecdsa_verify` 1st-encounter direct-Point path now runs `parse_bytes_strict` + curve-equation check matching the 2nd-encounter cache path; CVC-1..3: x>=p, y>=p, off-curve all reject deterministically across 3 repeat calls (no cache-state divergence) |
 | `regression_musig_noncegen_extra_input` | `audit/test_regression_musig_noncegen_extra_input.cpp` | SHIM-NONCEGEN-001: secp256k1_musig_nonce_gen ignores extra_input32 — behavioral freeze NCI-1..3: source-scan marker, NULL vs non-NULL pubnonce identity, two distinct non-NULL extra_input32 pubnonce identity |
+| `regression_shim_keypair_null_cb` | `audit/test_regression_shim_keypair_null_cb.cpp` | T-09/10: secp256k1 shim fires illegal_callback on per-argument NULL in keypair_create/sec/pub/xonly_pub + ecdsa sig parse (NCA-1..9) — advisory=true, shim |
+| `regression_shim_context_erase` | `audit/test_regression_shim_context_erase.cpp` | T-11/12: shim_context.cpp memset→secure_erase on ctx->blind (3×), ContextBlindingScope is_zero→is_zero_ct (SCE-1..5) — advisory=true, shim |
 
 ## Upstream Libsecp256k1 Parity Tests (batch 3 — v3.69+)
 

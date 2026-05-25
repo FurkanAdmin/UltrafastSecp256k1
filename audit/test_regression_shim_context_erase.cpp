@@ -129,8 +129,7 @@ static void test_sce4_ctx_randomize_destroy_roundtrip() {
 
     secp256k1_context_destroy(vctx);
     secp256k1_context_destroy(ctx);
-    // No crash = secure_erase of blind did not corrupt memory.
-    CHECK(true, "[SCE-4] context_destroy with randomized context must not crash");
+    ++g_pass; // reaching here without crash = secure_erase of blind did not corrupt memory
 }
 
 // ─── SCE-5: functional — context_randomize(NULL seed) disables blinding ──────
@@ -161,7 +160,7 @@ static void test_sce5_randomize_null_disables_blinding() {
     CHECK(rc == 1, "[SCE-5] sign must succeed after disabling blinding");
 
     secp256k1_context_destroy(ctx);
-    CHECK(true, "[SCE-5] context_destroy after NULL randomize must not crash");
+    ++g_pass; // reaching here without crash = context_destroy after NULL randomize succeeded
 }
 
 #else
