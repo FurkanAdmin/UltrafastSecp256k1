@@ -549,6 +549,7 @@ std::array<uint8_t, 64> musig2_partial_sig_agg(
     // Final signature: (R.x, s)
     auto R_x = session.R.x().to_bytes();
     auto s_bytes = s.to_bytes();
+    secure_erase(&s, sizeof(s));
 
     std::array<uint8_t, 64> sig{};
     std::memcpy(sig.data(), R_x.data(), 32);

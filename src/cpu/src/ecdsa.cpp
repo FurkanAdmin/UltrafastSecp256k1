@@ -561,7 +561,9 @@ ECDSASignature ecdsa_sign(const std::array<uint8_t, 32>& msg_hash,
                     result = ECDSASignature{r, s}.normalize();
                 }
                 secure_erase(&k_inv, sizeof(k_inv));
+                secure_erase(&s, sizeof(s));
             }
+            secure_erase(&r, sizeof(r));
         }
     }
 

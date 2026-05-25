@@ -3960,6 +3960,8 @@ target_sources(unified_audit_runner PRIVATE
     test_regression_p2_ct_shim_fixes.cpp
     # P1-SEC-001: FROST frost_sign absent signer ID (real impl when FROST built)
     $<$<BOOL:${SECP256K1_BUILD_FROST}>:test_exploit_frost_absent_signer_id.cpp>
+    # 2026-05-25 T-08: r/s erase in ecdsa_sign + s erase in musig2_partial_sig_agg
+    test_regression_s_scalar_erasure.cpp
     # Feature module stubs: when a module is OFF, these provide advisory-skip
     # _run() implementations so unified_audit_runner links without the real files.
     feature_run_stubs_unified.cpp)
@@ -4220,6 +4222,16 @@ if(NOT CMAKE_CROSSCOMPILING)
 else()
     message(STATUS "INTEROP: cross-compiling (target=${CMAKE_SYSTEM_PROCESSOR}); skipping OpenSSL detection, differential_openssl will skip with advisory")
 endif()
+
+# -- 2026-05-25 T-08: r/s scalar erasure regression (SSR-1..3) ---------------
+add_executable(test_regression_s_scalar_erasure_standalone
+    test_regression_s_scalar_erasure.cpp)
+audit_target_defaults(test_regression_s_scalar_erasure_standalone)
+target_compile_definitions(test_regression_s_scalar_erasure_standalone PRIVATE STANDALONE_TEST)
+add_test(NAME regression_s_scalar_erasure
+    COMMAND test_regression_s_scalar_erasure_standalone)
+set_tests_properties(regression_s_scalar_erasure PROPERTIES
+    TIMEOUT 60 LABELS "audit;regression;memory_safety;ecdsa;musig2;secure_erase")
 
 # Full Audit Orchestrator (custom target)
 # ===========================================================================

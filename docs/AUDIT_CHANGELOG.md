@@ -1,5 +1,13 @@
 # Audit Changelog
 
+## 2026-05-25 — Fix: T-08 r/s scalar erasure in ecdsa_sign + musig2_partial_sig_agg
+
+- **`src/cpu/src/ecdsa.cpp`** — `ecdsa_sign()` fast-path: added `secure_erase(&s, sizeof(s))` and `secure_erase(&r, sizeof(r))` immediately after the existing `secure_erase(&k_inv)`. The intermediate scalars `r` and `s` are secrets during computation; they are now erased after being copied into the returned `ECDSASignature{r,s}`, eliminating stack residue.
+- **`src/cpu/src/musig2.cpp`** — `musig2_partial_sig_agg()`: added `secure_erase(&s, sizeof(s))` after `s.to_bytes()` serializes the aggregated partial-signature scalar. The erase happens after `s_bytes` captures the value, so the output is unchanged.
+- **`audit/test_regression_s_scalar_erasure.cpp` (NEW)** — SSR-1..3 sign+verify roundtrips: (1) `ecdsa_sign` fast-path 10×, (2) `ct::ecdsa_sign` 10×, (3) full 2-party MuSig2 roundtrip through `musig2_partial_sig_agg` + `schnorr_verify`. Proves output correctness is preserved after both erasures. `advisory=false`.
+- **`audit/unified_audit_runner.cpp`** — forward declaration + `ALL_MODULES` entry in `memory_safety` section.
+- **`audit/CMakeLists.txt`** — standalone CTest target `regression_s_scalar_erasure` + `target_sources` entry for unified runner.
+
 ## 2026-05-24 — Fix: TASK-008 secp256k1_context_preallocated_* API
 
 - **`compat/libsecp256k1_shim/include/secp256k1.h`** — added declarations for `secp256k1_context_preallocated_size`, `secp256k1_context_preallocated_create`, `secp256k1_context_preallocated_clone`, `secp256k1_context_preallocated_destroy`.

@@ -686,6 +686,11 @@ int test_regression_gpu_ecdh_extended_ct_run(); // GEC-1..7: correctness guard a
 int test_regression_ecdsa_verify_cache_consistency_run(); // CVC-1..3: 1st-encounter strict parse + curve check
 
 // ============================================================================
+// Forward declarations -- 2026-05-25 T-08: s/r scalar erasure in ecdsa_sign + musig2_partial_sig_agg
+// ============================================================================
+int test_regression_s_scalar_erasure_run(); // SSR-1..3: r/s erase in ecdsa_sign; s erase in musig2_partial_sig_agg
+
+// ============================================================================
 // Report section IDs -- 10 audit categories
 // ============================================================================
 //   1. math_invariants   -- Mathematical Invariants (Fp, Zn, Group Laws)
@@ -848,6 +853,7 @@ static const AuditModule ALL_MODULES[] = {
     { "c_abi_negative",    "C ABI null/bad-key/bad-sig contract tests",   "memory_safety",  test_c_abi_negative_run, false },
     { "c_abi_thread_stress", "C ABI thread stress (one ctx per thread)",  "memory_safety",  test_c_abi_thread_stress_run, false },
     { "secure_erase",      "Secure memory erasure (volatile readback)",   "memory_safety",  audit_secure_erase_run, false },
+    { "s_scalar_erasure",  "s/r scalar erase in ecdsa_sign + musig2_partial_sig_agg (SSR-1..3)", "memory_safety", test_regression_s_scalar_erasure_run, false },
     // advisory=true: returns ADVISORY_SKIP_CODE (77) when source tree is absent (e.g. out-of-tree build).
     { "ct_namespace",      "CT namespace discipline (source-level scan)", "memory_safety",  audit_ct_namespace_run, true },
     { "kat_all_ops",       "KAT: ECDH/WIF/P2PKH/P2WPKH/P2TR/hash/arith","standard_vectors", test_kat_all_operations_run, false },
