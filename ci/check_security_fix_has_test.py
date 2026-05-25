@@ -58,6 +58,7 @@ DOCS_ONLY_PATTERNS = (
 TEST_PATTERNS = (
     r"^audit/test_",
     r"^tests/",
+    r"^src/cpu/tests/",
     r"^compat/libsecp256k1_shim/tests/",
     r"^compat/libsecp256k1_bchn_shim/tests/",
 )
