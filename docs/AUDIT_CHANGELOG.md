@@ -13,6 +13,26 @@
   Tests specifically the large-batch MSM path (N > kSchnorrBatchIndividualCutoff=96)
   where g_coeff accumulation and the generator term apply.
 
+## 2026-05-26 — Phase 4: CT boundary audit — frost.cpp, adaptor.cpp, musig2.cpp, bip324.cpp, recovery.cpp
+
+Read-only CT audit of all secret-bearing signing paths in the five previously unaudited files.
+No code issues found. Findings recorded in knowledge_base (CT-AUDIT-FROST/ADAPTOR/MUSIG2/BIP324/RECOVERY).
+
+- **frost.cpp** — `frost_sign`: `ct::bool_to_mask` + `ct::scalar_cneg` for nonces (d/ei) and
+  signing share (s_i); `ct::scalar_mul/add` for z_i; `secure_erase` on all paths.
+  `frost_lagrange_coefficient_from_commitments`: uses `ct::scalar_mul/sub/inverse` (SEC-002/CT-002).
+- **adaptor.cpp** — `schnorr_adaptor_sign`: `ct::generator_mul_blinded` for private key and
+  nonce; fixed 2-iter CT nonce (P2-CT-RT-004); `ct::scalar_cneg/add` for s. `ecdsa_adaptor_sign`:
+  `ct::scalar_inverse/mul/add`. All secret temporaries erased.
+- **musig2.cpp** — `musig2_partial_sign`: signer validation uses SafeGCD + 33-byte XOR-accumulate
+  (no early exit). k combined via `ct::scalar_add(k1, ct::scalar_mul(b, k2))`. Negate via
+  `ct::bool_to_mask` + `ct::scalar_select`. s_i via `ct::scalar_mul/add` chain.
+- **bip324.cpp** — `xdh`: `ct::ecmult_const_xonly(xn, xd, sk)`. `complete_handshake`: CT
+  accumulator for zero-check (P1-009 fix); `secure_erase` on shared_secret, prk, keys, sk, privkey_.
+- **recovery.cpp** — `ecdsa_sign_recoverable`: `signing_generator_mul` = `ct::generator_mul_blinded`.
+  Branchless recid (R.y parity + MSB-cascade overflow). `ct::scalar_inverse/mul/add`, `ct::scalar_is_high`,
+  `ct::ct_normalize_low_s`. `secure_erase` on k, k_inv, r_times_d, z_plus_rd, s on both paths.
+
 ## 2026-05-26 — Fix: SHIM-006: schnorrsig_verify_batch msglen!=32 changed from illegal callback to silent return 0
 
 - **`compat/libsecp256k1_shim/src/shim_batch_verify.cpp`** — Removed
