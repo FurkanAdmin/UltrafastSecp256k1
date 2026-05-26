@@ -13,6 +13,21 @@
   Tests specifically the large-batch MSM path (N > kSchnorrBatchIndividualCutoff=96)
   where g_coeff accumulation and the generator term apply.
 
+## 2026-05-26 — Fix: SHIM-006: schnorrsig_verify_batch msglen!=32 changed from illegal callback to silent return 0
+
+- **`compat/libsecp256k1_shim/src/shim_batch_verify.cpp`** — Removed
+  `secp256k1_shim_call_illegal_cb` call for `msglen != 32` in `secp256k1_schnorrsig_verify_batch`.
+  Replaced with a plain `return 0`. Upstream libsecp256k1 supports varlen batch verify and does
+  NOT fire the illegal callback for `msglen != 32`. Firing `abort()` for a capability limitation
+  was a behavioral divergence that could abort callers legitimately using varlen batch verify
+  against upstream.
+- **`compat/libsecp256k1_shim/tests/test_shim_security_edge_cases.cpp`** — Updated
+  `test_shim006_verify_batch_nonstandard_msglen_returns_zero()` (renamed from
+  `test_shim006_verify_batch_nonstandard_msglen_fires_callback`): now verifies callback does
+  NOT fire (delta == 0) and return is 0.
+- **`docs/SHIM_KNOWN_DIVERGENCES.md`** — Added SHIM-006 entry documenting the batch varlen
+  limitation, the reason for `return 0` (not illegal callback), and the corrected test.
+
 ## 2026-05-26 — Fix: TEST-001: regression_musig2_signer_index marked advisory=true
 
 - **`audit/unified_audit_runner.cpp`** — Changed `regression_musig2_signer_index` from

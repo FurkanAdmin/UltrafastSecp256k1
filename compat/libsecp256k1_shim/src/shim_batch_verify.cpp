@@ -60,11 +60,10 @@ int secp256k1_schnorrsig_verify_batch(
     if (!sigs64 || !msgs || !pubkeys) return 0;
 
     // Only 32-byte messages supported by internal batch_verify.
-    // SHIM-006 fix: fire illegal callback on unsupported msglen (not silent 0).
-    if (msglen != 32) {
-        secp256k1_shim_call_illegal_cb(ctx, "secp256k1_schnorrsig_verify_batch: msglen != 32 not supported");
-        return 0;
-    }
+    // Upstream libsecp256k1 supports varlen batch messages; shim does not, but this is
+    // a shim limitation, not an illegal call. Return 0 (fail-closed) without firing
+    // the illegal callback — callers using varlen should fall back to singular verify.
+    if (msglen != 32) return 0;
 
     // Small batches: fall back to individual verify (lower overhead).
     if (n < kBatchMinSchnorr) {

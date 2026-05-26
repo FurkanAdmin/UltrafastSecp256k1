@@ -883,3 +883,28 @@ For the complete compatibility test matrix see `compat/libsecp256k1_shim/tests/`
   calls `secp256k1_ecdsa_sign` and `secp256k1_schnorrsig_sign` with it, and asserts both
   return 1 without firing the illegal callback. Also calls `secp256k1_ecdsa_verify` and
   `secp256k1_schnorrsig_verify` with CONTEXT_NONE and asserts both return correct results.
+
+---
+
+## secp256k1_schnorrsig_verify_batch — msglen != 32 returns 0 silently (SHIM-006)
+
+- **Upstream behavior:** `secp256k1_schnorrsig_verify_batch` in libsecp256k1 supports
+  variable-length messages (`msglen` need not be 32). The BIP-340 challenge hash accepts
+  any message length; batch verify is defined for arbitrary `msglen`.
+- **Shim behavior:** The shim's batch verify does not implement the varlen code path — it
+  only supports `msglen == 32`. When `msglen != 32`, the function returns `0` (fail-closed)
+  without firing the illegal callback. Callers needing varlen must use the singular
+  `secp256k1_schnorrsig_verify` which handles any `msglen` correctly.
+- **Reason:** Varlen batch verify requires a generalized tagged-hash path through the MSM
+  accumulator. The shim's current batch MSM uses 32-byte message slots. This is a shim
+  capability limitation, not an illegal API call — firing `abort()` via the illegal callback
+  for an unsupported-but-valid input was a divergence from upstream (SHIM-006 correction,
+  2026-05-26). Previously the shim fired the illegal callback on msglen != 32, which would
+  abort callers that legitimately use varlen batch verify against upstream libsecp256k1.
+- **Impact:** Callers using `msglen == 32` (standard BIP-340 use) are unaffected. Callers
+  using varlen batch verify receive `0` (verification failed) instead of aborting. They
+  should fall back to singular verify for varlen messages.
+- **Test:** `test_shim006_verify_batch_nonstandard_msglen_returns_zero()` in
+  `compat/libsecp256k1_shim/tests/test_shim_security_edge_cases.cpp` — verifies that
+  `secp256k1_schnorrsig_verify_batch` with `msglen=64` returns 0 without firing the
+  illegal callback.

@@ -20,8 +20,9 @@
 //          NULL ctx to reach serialize logic. Now NULL ctx is checked first.
 //          Test: call ec_pubkey_cmp(NULL, ...) with a no-op callback, verify fires.
 //
-// SHIM-006 schnorrsig_verify_batch with msglen!=32 must fire illegal callback.
-//          Test: register callback, call with msglen=64, verify callback fires.
+// SHIM-006 schnorrsig_verify_batch with msglen!=32 returns 0 silently (corrected:
+//          upstream libsecp supports varlen batch; firing abort() was a divergence).
+//          Test: register callback, call with msglen=64, verify NO callback fires + rc==0.
 //
 // SHIM-008 ellswift_xdh with NULL hashfp must fire illegal callback (not silent 0).
 //          Test: register callback, call with NULL hashfp, verify callback fires.
@@ -238,10 +239,14 @@ static void test_shim004_context_clone_null_fires_callback() {
 }
 
 // ---------------------------------------------------------------------------
-// SHIM-006: schnorrsig_verify_batch with msglen!=32 fires illegal callback
+// SHIM-006: schnorrsig_verify_batch with msglen!=32 returns 0 silently
 // ---------------------------------------------------------------------------
-static void test_shim006_verify_batch_nonstandard_msglen_fires_callback() {
-    printf("  [SHIM-006] schnorrsig_verify_batch msglen!=32 fires illegal callback\n");
+// Upstream libsecp256k1 supports variable-length batch messages and does NOT
+// fire the illegal callback for msglen != 32. Firing abort() for an
+// "unsupported but not illegal" call was a divergence. Corrected to return 0
+// silently — callers needing varlen should use singular secp256k1_schnorrsig_verify.
+static void test_shim006_verify_batch_nonstandard_msglen_returns_zero() {
+    printf("  [SHIM-006] schnorrsig_verify_batch msglen!=32 returns 0 without firing callback\n");
 
     secp256k1_context* ctx = make_ctx_with_counting_cb();
     secp256k1_xonly_pubkey pubkey;
@@ -256,12 +261,12 @@ static void test_shim006_verify_batch_nonstandard_msglen_fires_callback() {
     const secp256k1_xonly_pubkey* pubkeys[1] = { &pubkey };
 
     int before = g_illegal_called;
-    // msglen=64 is not 32 — should fire illegal callback (SHIM-006 fix)
+    // msglen=64 is not 32 — shim limitation: fail-closed without illegal callback
     int rc = secp256k1_schnorrsig_verify_batch(ctx, sigs, msgs, 64, pubkeys, 1);
     int after = g_illegal_called;
 
-    CHECK_EQ(after - before, 1, "SHIM-006: msglen!=32 must fire illegal callback");
-    CHECK_EQ(rc, 0, "SHIM-006: msglen!=32 must return 0");
+    CHECK_EQ(after - before, 0, "SHIM-006: msglen!=32 must NOT fire illegal callback (not an illegal call)");
+    CHECK_EQ(rc, 0, "SHIM-006: msglen!=32 must return 0 (unsupported, fail-closed)");
 
     secp256k1_context_destroy(ctx);
 }
@@ -472,7 +477,7 @@ int test_shim_security_edge_cases_run() {
     test_shim004_context_clone_null_fires_callback();
     test_shim004_precomp_null_ctx_fires_callback();
     test_shim005_pubkey_cmp_null_ctx_fires_callback();
-    test_shim006_verify_batch_nonstandard_msglen_fires_callback();
+    test_shim006_verify_batch_nonstandard_msglen_returns_zero();
     test_shim008_ellswift_xdh_null_hashfp_fires_callback();
     test_perf003_small_batch_schnorr_verify_correctness();
 
