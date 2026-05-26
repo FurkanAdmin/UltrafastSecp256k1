@@ -104,13 +104,13 @@ lags behind the generated validation surfaces, prefer the generated counts.
 |------|---------|-------|
 | `opencl/tests/test_opencl.cpp` | OpenCL | Kernel correctness |
 | `opencl/tests/opencl_extended_test.cpp` | OpenCL | Extended operations |
-| `opencl/src/opencl_audit_runner.cpp` | OpenCL | Unified GPU audit ( 408 modules, 8 sections) |
+| `opencl/src/opencl_audit_runner.cpp` | OpenCL | Unified GPU audit ( 409 modules, 8 sections) |
 | `metal/tests/test_metal_host.cpp` | Metal | Metal shader correctness |
-| `metal/src/metal_audit_runner.mm` | Metal | `secp256k1_metal_audit`: unified GPU audit ( 408 modules, 8 sections) |
+| `metal/src/metal_audit_runner.mm` | Metal | `secp256k1_metal_audit`: unified GPU audit ( 409 modules, 8 sections) |
 | `src/cuda/src/test_ct_smoke.cu` | CUDA | CT smoke tests incl. ZK knowledge + DLEQ prove/verify (9 tests) |
 | `src/cuda/src/gpu_ct_leakage_probe.cu` | CUDA | Fixed-vs-random device-cycle Welch t-test for CT generator/signing kernels with JSON evidence output |
 | `src/cuda/src/test_suite.cu` | CUDA | `cuda_selftest`: kernel correctness, field + scalar + point ops |
-| `src/cuda/src/gpu_audit_runner.cu` | CUDA | `gpu_audit`: unified GPU audit ( 408 modules, 8 sections) |
+| `src/cuda/src/gpu_audit_runner.cu` | CUDA | `gpu_audit`: unified GPU audit ( 409 modules, 8 sections) |
 | `metal/app/metal_test.mm` | Metal | `secp256k1_metal_test`: shader correctness, compute pipeline |
 | `metal/app/bench_metal.mm` | Metal | `secp256k1_metal_bench_full`: comprehensive Metal benchmark |
 | `compat/libsecp256k1_shim/tests/shim_test.cpp` | CPU | `secp256k1_shim_test`: libsecp256k1 API compatibility shim |
@@ -867,6 +867,7 @@ ctest --test-dir build-audit -R "exploit" --output-on-failure
 | `regression_ct_secret_is_zero` | `audit/test_regression_ct_secret_is_zero.cpp` | SIZ-1..4: adaptor CT nonce (VT is_zero removed before ct::scalar_inverse) + taproot is_zero→is_zero_ct fixes; adaptor round-trip + taproot edge cases |
 | `regression_rfc6979_ct_loop` | `audit/test_regression_rfc6979_ct_loop.cpp` | RFC6979-CT: rfc6979_nonce fixed 2-iteration CT loop + ct::scalar_select; 200 sign+verify round-trips, determinism, nonce uniqueness |
 | `regression_batch_csprng_seed` | `audit/test_regression_batch_csprng_seed.cpp` | P2-SEC-002: schnorr_batch_verify CSPRNG-seeded weights; BWC-1..4: 128-sig large-batch correct, fail-closed, soundness agreement, ECDSA path unchanged |
+| `regression_batch_gterm_vt` | `audit/test_regression_batch_gterm_vt.cpp` | PERF-008: schnorr_batch_verify g_coeff*G uses VT path (not CT); GTM-1..3: 128-sig large-batch correct, corrupted-s false, mismatched-pubkey false |
 | `regression_adaptor_ct_nonce` | `audit/test_regression_adaptor_ct_nonce.cpp` | P2-CT-RT-004: adaptor_nonce/ecdsa_adaptor_binding fixed 2-iter CT select; ACN-1..5: Schnorr/ECDSA adaptor round-trips, adapt+extract, determinism, nonce uniqueness |
 | `regression_adaptor_blinded_nonce` | `audit/test_regression_adaptor_blinded_nonce.cpp` | SEC-NEW-001/002 + P3-SHIM-STACK + P3-BATCH-MEM: schnorr_adaptor_sign ct::generator_mul_blinded(k) DPA defence, shim_schnorr_bch is_zero_ct on nonce, stack msg buffer 256→1024, batch vector shrink_to_fit |
 | `regression_nonce_candidate_erase` | `audit/test_regression_nonce_candidate_erase.cpp` | P2-CT-001/002/003/007: cand1+cand2 secure_erase after ct::scalar_select in rfc6979_nonce, rfc6979_nonce_hedged, musig2_nonce_gen (k1+k2), derive_scalar_from_hash; NCER-1..5: 200 ECDSA roundtrips, determinism, uniqueness, 50 hedged roundtrips, source scan |

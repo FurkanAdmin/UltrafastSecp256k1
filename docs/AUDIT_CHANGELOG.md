@@ -1,5 +1,18 @@
 # Audit Changelog
 
+## 2026-05-26 — Fix: PERF-008: batch_verify g_coeff*G generator term changed from CT to VT
+
+- **`src/cpu/src/batch_verify.cpp`** — Replaced `ct::generator_mul(g_coeff)` with
+  `Point::generator().scalar_mul(g_coeff)`. `g_coeff` accumulates `weight_i * sig_i.s`
+  where all weights and signature scalars are public data in the verify path. Using
+  constant-time arithmetic here adds overhead with zero security benefit. The VT path
+  produces the same algebraic result. Also removed the now-unused
+  `#include "secp256k1/ct/point.hpp"` from this file.
+- **`audit/test_regression_batch_gterm_vt.cpp`** — New regression test (GTM-1..3):
+  128-entry valid batch → true, corrupted sig.s → false, mismatched pubkey → false.
+  Tests specifically the large-batch MSM path (N > kSchnorrBatchIndividualCutoff=96)
+  where g_coeff accumulation and the generator term apply.
+
 ## 2026-05-26 — Fix: CI build/audit portability fixes — advisory flag + GCC __has_feature
 
 - **`audit/unified_audit_runner.cpp`** — Changed `test_exploit_context_flag_bypass` from

@@ -659,6 +659,7 @@ int test_shim_security_edge_cases_run(); // SHIM-003/004/006/008, SEC-003, PERF-
 // Forward declarations -- 2026-05-21 P2-SEC-002: batch verify CSPRNG seeding
 // ============================================================================
 int test_regression_batch_csprng_seed_run();   // P2-SEC-002: CSPRNG-seeded batch verify weights
+int test_regression_batch_gterm_vt_run();      // PERF-008: g_coeff*G generator term uses VT path
 
 // ============================================================================
 // Forward declarations -- 2026-05-21 P2-CT-RT-004: adaptor nonce CT fix
@@ -1415,6 +1416,9 @@ static const AuditModule ALL_MODULES[] = {
 #if SECP256K1_HAS_ADAPTOR
     { "regression_batch_csprng_seed", "P2-SEC-002: schnorr_batch_verify CSPRNG-seeded weights — adversary cannot pre-compute batch weights; correctness (BWC-1..4): large-batch valid→true, fail-closed, two-call soundness, ECDSA unchanged", "protocol_security", test_regression_batch_csprng_seed_run, false },
 #endif // SECP256K1_HAS_ADAPTOR (used as proxy for adaptor module presence; batch verify always built)
+    // === PERF-008: batch verify generator term uses VT path (not CT) ===
+    // advisory=false: pure C++ API, no shim/GPU dependency; tests large-batch MSM path.
+    { "regression_batch_gterm_vt", "PERF-008: schnorr_batch_verify g_coeff*G uses Point::generator().scalar_mul (VT) not ct::generator_mul; correctness (GTM-1..3): valid batch→true, corrupted-s→false, mismatched-pubkey→false", "protocol_security", test_regression_batch_gterm_vt_run, false },
     // === 2026-05-21 P2-CT-RT-004: adaptor_nonce fixed 2-iteration CT loop ===
     // advisory=false: C++ API only, no shim/GPU dependency.
 #if SECP256K1_HAS_ADAPTOR

@@ -185,6 +185,13 @@ target_compile_definitions(test_regression_batch_csprng_seed_standalone PRIVATE 
 add_test(NAME regression_batch_csprng_seed COMMAND test_regression_batch_csprng_seed_standalone)
 set_tests_properties(regression_batch_csprng_seed PROPERTIES TIMEOUT 120)
 
+# -- PERF-008: batch verify generator term uses VT path (not CT) ---------------
+add_executable(test_regression_batch_gterm_vt_standalone test_regression_batch_gterm_vt.cpp)
+audit_target_defaults(test_regression_batch_gterm_vt_standalone)
+target_compile_definitions(test_regression_batch_gterm_vt_standalone PRIVATE STANDALONE_TEST)
+add_test(NAME regression_batch_gterm_vt COMMAND test_regression_batch_gterm_vt_standalone)
+set_tests_properties(regression_batch_gterm_vt PROPERTIES TIMEOUT 120)
+
 # -- P2-CT-RT-004: adaptor nonce fixed 2-iteration CT regression guard --------
 add_executable(test_regression_adaptor_ct_nonce_standalone test_regression_adaptor_ct_nonce.cpp)
 audit_target_defaults(test_regression_adaptor_ct_nonce_standalone)
@@ -5241,6 +5248,8 @@ target_sources(unified_audit_runner PRIVATE test_regression_rfc6979_ct_loop.cpp)
 if(SECP256K1_BUILD_ADAPTOR)
     target_sources(unified_audit_runner PRIVATE test_regression_batch_csprng_seed.cpp)
 endif()
+# PERF-008: no feature dependency; always included in unified runner.
+target_sources(unified_audit_runner PRIVATE test_regression_batch_gterm_vt.cpp)
 
 # P2-CT-RT-004: adaptor_nonce fixed 2-iteration CT loop regression guard.
 # C++ API only — no shim/GPU dependency. advisory=false.

@@ -10,7 +10,6 @@
 #include "secp256k1/pippenger.hpp"
 #include "secp256k1/sha256.hpp"
 #include "secp256k1/tagged_hash.hpp"
-#include "secp256k1/ct/point.hpp"
 #include "secp256k1/detail/csprng.hpp"
 #include "secp256k1/detail/secure_erase.hpp"
 #if defined(__SIZEOF_INT128__) && !defined(SECP256K1_PLATFORM_ESP32) && !defined(SECP256K1_PLATFORM_STM32) && !defined(__EMSCRIPTEN__)
@@ -214,7 +213,8 @@ bool schnorr_batch_verify_impl(const Entry* entries, std::size_t n,
         points[n + i] = R_pt;
     }
 
-    auto G_term = ct::generator_mul(g_coeff);
+    // g_coeff = sum(weight_i * sig_i.s) — all public data; VT correct here.
+    auto G_term = Point::generator().scalar_mul(g_coeff);
     auto rest = msm(scalars, points, msm_n);
     auto result = G_term.add(rest);
     return result.is_infinity();
