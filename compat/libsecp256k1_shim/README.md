@@ -93,6 +93,8 @@ Custom `noncefp` callbacks are **not forwarded**. The shim always uses RFC 6979 
 - `NULL`, `secp256k1_nonce_function_rfc6979`, `secp256k1_nonce_function_default` → accepted (RFC 6979 used)
 - Any other non-NULL pointer → returns 0 (fail-closed, not silently ignored)
 - `ndata` IS respected — passed as auxiliary entropy to hedged signing (used by Bitcoin Core's R-grinding loop)
+- **nonce bytes differ from upstream libsecp256k1 when `ndata != NULL`** — upstream appends a 16-byte `"ECDSA"` algo-tag to the HMAC keydata; the shim omits it (hedged nonce variant). Signatures are cryptographically valid and verify correctly. Bitcoin Core's R-grinding terminates normally; only the specific `(r, s)` bytes differ. See [SHIM_KNOWN_DIVERGENCES.md §SHIM-P3-006](../../docs/SHIM_KNOWN_DIVERGENCES.md).
+  - To get byte-identical nonces: build with `-DSECP256K1_SHIM_RFC6979_COMPAT=ON` (see Build Flags below).
 
 This is compatible with all known Bitcoin Core usage. See `BITCOIN_CORE_PR_BLOCKERS.md §B`.
 
@@ -129,6 +131,31 @@ cmake --build build
 - C++20 compiler (GCC 13+, Clang 16+, MSVC 2022+)
 - UltrafastSecp256k1 CPU library (`fastsecp256k1` target)
 - No external dependencies beyond the standard library
+
+---
+
+## Build Flags
+
+| Flag | Default | Description |
+|---|---|---|
+| `SECP256K1_BUILD_SHIM` | `OFF` | Compile shim sources into `fastsecp256k1` (engine-integrated mode for Bitcoin Core backend). When ON, `secp256k1_shim` is a stub that re-exports headers and links the engine. |
+| `SECP256K1_SHIM_RFC6979_COMPAT` | `OFF` | Make `secp256k1_ecdsa_sign` and `secp256k1_ecdsa_sign_recoverable` produce **byte-identical** nonces to upstream libsecp256k1 by appending the `"ECDSA"` algo16 tag to the RFC 6979 HMAC keydata. See below. |
+| `SECP256K1_SHIM_BUILD_TESTS` | `OFF` | Build the shim compatibility test suite (`shim_test`). |
+
+### SECP256K1_SHIM_RFC6979_COMPAT
+
+```bash
+cmake -S . -B build -DSECP256K1_SHIM_RFC6979_COMPAT=ON
+cmake --build build
+```
+
+**When to use:** you need `secp256k1_ecdsa_sign` to produce the same `(r, s)` bytes as upstream libsecp256k1 for the same `(seckey, msg, ndata)` inputs — for example, differential testing against libsecp256k1 reference vectors, or a protocol that pins specific nonce bytes.
+
+**Default OFF reason:** the default hedged-nonce path mixes OS-CSPRNG randomness into the HMAC-DRBG, providing fault-attack resistance (a CPU glitch cannot force nonce reuse). The compat path omits OS randomness, making nonce generation fully deterministic — which is the libsecp256k1 behaviour, but slightly more vulnerable to fault injection on embedded targets.
+
+**Security:** both paths produce cryptographically secure signatures. The nonce bytes differ; the signing key is not exposed by either path.
+
+**Scope:** affects only `secp256k1_ecdsa_sign` and `secp256k1_ecdsa_sign_recoverable`. Schnorr signing, ECDH, and MuSig2 are unaffected.
 
 ---
 
