@@ -11,78 +11,14 @@ For the complete compatibility test matrix see `compat/libsecp256k1_shim/tests/`
 
 ---
 
-## secp256k1_context_preallocated_* — placement-new semantics
+## Security improvements (shim is stricter than upstream)
 
-- **Upstream behavior:** `secp256k1_context_preallocated_size(flags)` returns a
-  flags-dependent byte count. The preallocated buffer holds ALL context state
-  inline; the context is entirely self-contained in that buffer.
-- **Shim behavior:** `secp256k1_context_preallocated_size` always returns
-  `sizeof(secp256k1_context)` regardless of flags (our context struct size is
-  flags-independent). `secp256k1_context_preallocated_create` places a
-  `secp256k1_context` object into the caller's buffer via placement-new.
-  The struct contains non-trivially-destructible members (Point, Scalar),
-  so `secp256k1_context_preallocated_destroy` calls the destructor explicitly
-  but does NOT free the buffer — caller owns it. This matches upstream semantics.
-- **Reason:** Our internal context state fits in a fixed-size struct. Placement-new
-  is used so member initializers (Point default ctor, Scalar default ctor) run
-  correctly in the caller's buffer without requiring heap allocation.
-- **Impact:** None for correct callers. The size returned by `preallocated_size` may
-  differ from upstream (upstream may include precomputed table space in certain
-  configurations; ours does not — precomputed tables are globally shared). Callers
-  must use the shim's own `preallocated_size` return value, not a size hard-coded
-  from upstream libsecp256k1.
-- **Test:** `audit/test_regression_shim_preallocated_ctx.cpp` PAC-1..6.
+These divergences are intentional hardening beyond upstream libsecp256k1. They
+are stricter but never less safe. Callers using well-formed inputs are unaffected.
 
 ---
 
-## secp256k1_schnorrsig_verify with msglen != 32 — ShimSchnorrCache bypassed (SHIM-007)
-
-- **Upstream behavior:** libsecp256k1 `secp256k1_schnorrsig_verify` supports variable-length
-  messages with full lift_x computation on every call (no lift_x caching in the reference impl).
-- **Shim behavior:** For `msglen == 32`, the shim uses `ShimSchnorrCache` to amortize the
-  lift_x and GLV table build across repeated verifications of the same pubkey. For
-  `msglen != 32`, the cache is bypassed and lift_x runs on every call — matching upstream
-  latency but not achieving the steady-state speedup that 32-byte message paths can achieve.
-- **Reason:** The ShimSchnorrCache keys on the full 32-byte pubkey x-coordinate to identify
-  cache entries. The `msglen != 32` code path uses the existing direct-verify overload which
-  does not consult the cache. This is a performance inconsistency, not a correctness or
-  security issue.
-- **Impact:** Callers using variable-length Schnorr messages (e.g., non-BIP-340 protocols)
-  will not benefit from lift_x amortization. Production Bitcoin validation only uses 32-byte
-  messages, so this does not affect the ConnectBlock benchmark.
-- **Test:** No dedicated differential test — behavior is equivalent to upstream on this path.
-
----
-
-## secp256k1_musig_pubnonce_serialize / pubnonce_parse / nonce_agg / nonce_process — `ctx` ignored
-
-- **Upstream behavior:** These four MuSig2 functions accept a `secp256k1_context*`
-  argument but do not require it to be non-NULL in upstream libsecp256k1-zkp at
-  the version targeted by this shim. The argument is reserved for forward
-  compatibility but is currently unused.
-- **Shim behavior:** The `ctx` parameter is declared `/*ctx*/` (unused) in all four.
-  A NULL `ctx` will NOT fire the illegal-callback path on these functions; only
-  the explicit argument checks apply.
-- **Reason:** Matches upstream. These calls are pure data-transformation operations
-  (serialize/parse/aggregate nonces, compute session state) that do not consume
-  context flags, signing permission, or blinding.
-- **Impact:** Callers relying on a NULL-ctx illegal-callback firing for these
-  specific functions will not see it. The illegal-callback contract holds for
-  every other shim function that uses the context.
-- **Previously listed functions now FIXED (2026-05-25):** `secp256k1_musig_pubkey_get`,
-  `secp256k1_musig_partial_sig_verify`, `secp256k1_musig_partial_sig_serialize`,
-  and `secp256k1_musig_partial_sig_parse` previously shared this behavior — all four
-  now use `SHIM_REQUIRE_CTX(ctx)` and fire the illegal callback on NULL ctx.
-  `secp256k1_musig_pubkey_ec_tweak_add` and `secp256k1_musig_pubkey_xonly_tweak_add`
-  are also fixed — see SHIM-MUSIG-CTX-001 below.
-- **Test:** Covered indirectly by `audit/test_regression_shim_security_v7.cpp`
-  (musig2 partial sign + verify round-trip) and `audit/test_exploit_shim_musig_*`
-  family. A targeted differential test against upstream libsecp256k1-zkp can be
-  added if a divergence ever appears.
-
----
-
-## secp256k1_ecdh — private key >= curve order rejected
+### secp256k1_ecdh — private key >= curve order rejected
 
 - **Upstream behavior:** `secp256k1_ecdh` with a private key value `>= n` (curve order)
   reduces the key silently mod n and proceeds. A key equal to `n` reduces to 0 and is
@@ -100,7 +36,7 @@ For the complete compatibility test matrix see `compat/libsecp256k1_shim/tests/`
 
 ---
 
-## secp256k1_ecdh — off-curve pubkey rejected
+### secp256k1_ecdh — off-curve pubkey rejected
 
 - **Upstream behavior:** libsecp256k1 trusts the `secp256k1_pubkey` opaque struct to
   contain a valid on-curve point (invariant: always populated via `ec_pubkey_parse`).
@@ -116,7 +52,161 @@ For the complete compatibility test matrix see `compat/libsecp256k1_shim/tests/`
 
 ---
 
-## secp256k1_ecdsa_sign — ndata/extra_entropy nonce divergence (SHIM-P3-006)
+### secp256k1_context_randomize — seed >= n
+
+- **Upstream behavior:** Seeds are treated as opaque bytes for blinding; no range check.
+  Upstream libsecp256k1 applies the seed directly as a blinding scalar (with mod-n reduction
+  internally), so seeds >= n are accepted and result in a reduced blinding value.
+- **Shim behavior:** Uses `Scalar::parse_bytes_strict_nonzero` on the seed. Seeds >= n or == 0
+  disable blinding (the blinding scalar is left at its current value) rather than silently
+  reducing mod-n. No conditional subtraction of n is applied to the seed.
+- **Reason:** Rule 11 (CLAUDE.md) requires `parse_bytes_strict_nonzero` for any private-key
+  or secret-scalar input. Seeds >= n are astronomically rare with fresh OS randomness;
+  disabling blinding on such seeds is safe (the call is advisory in libsecp256k1 too — a
+  failed randomization leaves the context operational, just without blinding).
+- **Impact:** A caller passing a seed value in [n, 2^256) will not get a blinding scalar
+  derived from that seed — blinding is left disabled. Callers using the recommended 32 bytes
+  of fresh randomness from the OS are effectively never affected (probability ~2^-128).
+- **Test:** `audit/test_regression_p2_ct_shim_fixes.cpp` covers the `parse_bytes_strict_nonzero`
+  path in `secp256k1_context_randomize` (CT-003).
+
+---
+
+### secp256k1_musig_partial_sig_agg — all-zero check uses CT accumulator (SHIM-MUSIG-CT)
+
+- **Upstream behavior:** No all-zero check — returns the aggregated value unconditionally.
+- **Shim behavior:** Checks whether the 64-byte aggregated signature is all-zero (degenerate
+  aggregation result) and returns 0 if so. The check uses a branchless OR-accumulator
+  (`uint32_t nonzero = 0; for(i) nonzero |= sig[i]`) running all 64 bytes unconditionally.
+- **Reason:** The early-exit pattern would leak information about the signature bytes via
+  branch-predictor and cache timing — the loop would terminate faster when a non-zero byte
+  appeared early, revealing the index of the first non-zero byte. The OR-accumulator
+  eliminates this side-channel. The all-zero check itself is an additional fail-closed guard
+  not present in upstream.
+- **Impact:** No behavioral change for callers — the return value is the same. Timing
+  behavior is now data-independent for the all-zero check.
+- **Test:** `test_regression_shim_security_v7_run` (musig2 aggregate round-trips).
+
+---
+
+### secp256k1_ecdsa_sign / secp256k1_ecdsa_sign_recoverable / secp256k1_schnorrsig_sign_custom — custom nonce function rejected
+
+- **Upstream behavior:** Any `noncefp` / `extraparams->noncefp` is dispatched (called with the
+  message, key, and counter to produce a nonce).
+- **Shim behavior:** Only the standard nonce functions are accepted (NULL, `rfc6979`, `default`
+  for ECDSA; NULL, `bip340` for Schnorr). Any other non-NULL `noncefp` fires the illegal callback
+  with a descriptive message before returning 0. Previously returned 0 silently (fixed 2026-05-21,
+  PASS3-001).
+- **Reason:** The shim uses RFC 6979 / BIP-340 nonce generation internally and cannot forward
+  an arbitrary nonce function. Fail-closed so callers relying on a specific nonce function see
+  an error rather than silently receiving RFC 6979 output.
+- **Impact:** Callers with custom nonce functions. Bitcoin Core uses NULL (RFC 6979 default) —
+  unaffected. Callers with callbacks installed now receive the callback notification.
+- **Test:** `compat/libsecp256k1_shim/tests/test_shim_recovery_and_noncefp.cpp` NFP-1..3.
+
+---
+
+### secp256k1_nonce_function_rfc6979 / secp256k1_nonce_function_default
+
+- **Upstream behavior:** These function pointers generate RFC 6979 nonce bytes when
+  called directly.
+- **Shim behavior:** Both pointers are stubs that return 0 (failure) and write nothing.
+  They are exported for ABI symbol compatibility only. The shim never calls them.
+- **Reason:** The shim's signing path uses its own RFC 6979 implementation. Returning 0
+  from a stub that writes nothing is correct: a caller that invokes these pointers
+  directly gets explicit failure rather than empty output with a success code (SC-08).
+- **Impact:** Any caller using these pointers as standalone hash primitives (rare).
+
+---
+
+### secp256k1_nonce_function_bip340
+
+- **Upstream behavior:** Generates BIP-340 aux-entropy-mixed nonce bytes when called.
+- **Shim behavior:** Returns 0 (failure) and writes nothing. Exported for ABI compatibility.
+- **Reason:** Same as rfc6979 stubs above. The shim handles BIP-340 nonce internally
+  via the `aux_rand32` parameter of `secp256k1_schnorrsig_sign32`.
+- **Impact:** Any caller using this pointer as a standalone hash primitive.
+
+---
+
+## Performance improvements (shim is faster; correctness identical to upstream)
+
+These divergences are intentional optimizations. The observable results (pubkeys,
+signatures, verification outcomes) are identical to upstream; only latency differs.
+
+---
+
+### secp256k1_context_preallocated_* — placement-new semantics
+
+- **Upstream behavior:** `secp256k1_context_preallocated_size(flags)` returns a
+  flags-dependent byte count. The preallocated buffer holds ALL context state
+  inline; the context is entirely self-contained in that buffer.
+- **Shim behavior:** `secp256k1_context_preallocated_size` always returns
+  `sizeof(secp256k1_context)` regardless of flags (our context struct size is
+  flags-independent). `secp256k1_context_preallocated_create` places a
+  `secp256k1_context` object into the caller's buffer via placement-new.
+  The struct contains non-trivially-destructible members (Point, Scalar),
+  so `secp256k1_context_preallocated_destroy` calls the destructor explicitly
+  but does NOT free the buffer — caller owns it. This matches upstream semantics.
+- **Reason:** Our internal context state fits in a fixed-size struct. Placement-new
+  is used so member initializers (Point default ctor, Scalar default ctor) run
+  correctly in the caller's buffer without requiring heap allocation. Precomputed
+  tables are globally shared (not per-context), so the size is flags-independent.
+- **Impact:** None for correct callers. The size returned by `preallocated_size` may
+  differ from upstream (upstream may include precomputed table space in certain
+  configurations). Callers must use the shim's own `preallocated_size` return value,
+  not a size hard-coded from upstream libsecp256k1.
+- **Test:** `audit/test_regression_shim_preallocated_ctx.cpp` PAC-1..6.
+
+---
+
+### secp256k1_schnorrsig_verify — thread-local xonly-pubkey cache (NEW-SHIM-004)
+
+- **Upstream behavior:** No caching. Every `secp256k1_schnorrsig_verify` call
+  re-runs `lift_x` (sqrt) and rebuilds GLV precomputation tables for the supplied
+  x-only pubkey.
+- **Shim behavior:** A 256-slot, thread-local, FNV-1a-fingerprinted cache stores
+  the lifted point + precomputed tables. Warm cache hits skip `lift_x` and the
+  GLV rebuild (~1,954 ns saved per hit on the ConnectBlock workload).
+- **Reason:** ConnectBlock-style hot paths (Bitcoin Core block validation) re-verify
+  the same set of x-only pubkeys many times within a small window. Caching the
+  lifted point is a strict perf optimisation; correctness is identical to upstream.
+- **Impact / divergence shape:**
+  1. **Memory:** ~256 × ~1.5 KB ≈ 384 KB of additional thread-local memory per
+     thread that ever calls `secp256k1_schnorrsig_verify` in the shim.
+  2. **Hash collisions are silent:** the cache uses a 32-bit FNV-1a fingerprint
+     to index into 256 slots; on collision (~2^-32 per slot ≈ 0.1% per million
+     unique pubkeys) the previously cached entry is overwritten without warning.
+     The next verify of the evicted key re-runs `lift_x` + table build (~2 µs penalty).
+     This is a perf footprint, not a correctness issue — verification is still sound.
+  3. **Thread isolation:** cache is `thread_local`, so multi-threaded callers
+     each pay the cold-cache cost on the first verify per thread.
+  4. **msglen != 32:** for variable-length messages, the function bypasses the cache
+     and calls the varlen verify overload directly — identical latency to upstream.
+     The cache speedup applies to msglen == 32 only (standard BIP-340 / ConnectBlock
+     use case).
+- **Note on the `verify_precomp` API:** callers that need deterministic warm-cache
+  behaviour (no eviction) should use `secp256k1_xonly_pubkey_parse_precomp` +
+  `secp256k1_schnorrsig_verify_precomp` from `secp256k1_schnorrsig.h`, which
+  exposes the prebuilt object explicitly and bypasses the global cache.
+- **Test:** Planned — `audit/test_regression_shim_schnorr_cache_collision.cpp`
+  will exercise the eviction-and-rebuild path: verify key A, fill the cache by
+  verifying ≥256 distinct keys (forcing at least one slot collision), re-verify
+  key A and assert it still returns 1. Current coverage is indirect via the
+  unique-pubkey ConnectBlock workload exercised in `bench_unified` and the
+  high-diversity verify path in `audit/test_exploit_schnorr_verify_*`.
+
+---
+
+## Capability gaps and structural divergences
+
+These divergences reflect architectural constraints or unimplemented features.
+They are not security issues; callers are affected only if they use the specific
+unsupported API.
+
+---
+
+### secp256k1_ecdsa_sign — ndata/extra_entropy nonce divergence (SHIM-P3-006)
 
 - **Upstream behavior:** When `ndata` is non-NULL, `secp256k1_ecdsa_sign` passes it
   to `secp256k1_nonce_function_rfc6979` as the `extra_entropy` argument. Upstream
@@ -140,7 +230,6 @@ For the complete compatibility test matrix see `compat/libsecp256k1_shim/tests/`
   `rfc6979_nonce_libsecp_compat`, which appends the 16-byte `ECDSA` algo16 tag and passes
   `ndata` directly — producing byte-identical nonces to upstream libsecp256k1. Trade-off:
   the hedged nonce's OS-CSPRNG fault-attack resistance is not available in compat mode.
-  Compat mode also works correctly when `ndata == nullptr` (no extra entropy case).
 - **Tracking:** SHIM-P3-006. Functional test:
   `audit/test_regression_shim_rgrind_functional.cpp` RGF-1..4 (valid sig across 32 iterations).
   `audit/test_regression_shim_rfc6979_compat.cpp` — rfc6979_nonce_libsecp_compat determinism
@@ -148,129 +237,11 @@ For the complete compatibility test matrix see `compat/libsecp256k1_shim/tests/`
 
 ---
 
-## secp256k1_nonce_function_rfc6979 / secp256k1_nonce_function_default
-
-- **Upstream behavior:** These function pointers generate RFC 6979 nonce bytes when
-  called directly.
-- **Shim behavior:** Both pointers are stubs that return 0 (failure) and write nothing.
-  They are exported for ABI symbol compatibility only. The shim never calls them.
-- **Reason:** The shim's signing path uses its own RFC 6979 implementation. Returning 0
-  from a stub that writes nothing is correct: a caller that invokes these pointers
-  directly gets explicit failure rather than empty output with a success code (SC-08).
-- **Impact:** Any caller using these pointers as standalone hash primitives (rare).
-
----
-
-## secp256k1_nonce_function_bip340
-
-- **Upstream behavior:** Generates BIP-340 aux-entropy-mixed nonce bytes when called.
-- **Shim behavior:** Returns 0 (failure) and writes nothing. Exported for ABI compatibility.
-- **Reason:** Same as rfc6979 stubs above. The shim handles BIP-340 nonce internally
-  via the `aux_rand32` parameter of `secp256k1_schnorrsig_sign32`.
-- **Impact:** Any caller using this pointer as a standalone hash primitive.
-
----
-
-## secp256k1_schnorrsig_verify — variable-length message [FIXED 2026-05-21 — NOT A DIVERGENCE]
-
-- **Upstream behavior (v0.4+):** Accepts any `msglen`. Computes BIP-340 challenge as
-  `H_BIP0340/challenge(R.x || P.x || msg[:msglen])`. Empty message (`msglen == 0`)
-  and NULL msg with `msglen == 0` are accepted.
-- **Shim behavior (current):** Accepts any `msglen` — matches upstream. For `msglen == 32`
-  uses the optimized fixed-length path; other lengths use the generic tagged-hash path.
-  `msg == NULL` with `msglen > 0` fires illegal callback and returns 0.
-- **Reason:** Fixed (was: rejected msglen != 32). The core library now exposes
-  `schnorr_verify(pubkey_x32, msg, msglen, sig)` using `schnorr_challenge_scalar_varlen`.
-- **Impact:** No divergence. Callers using variable-length Schnorr (FROST, Lightning,
-  sign_custom with msglen != 32) work correctly through the shim.
-
----
-
-## secp256k1_xonly_pubkey_tweak_add / tweak_add_check / keypair_xonly_tweak_add [FIXED 2026-05-11]
-
-- **Upstream behavior:** NULL ctx triggers illegal callback (default: abort).
-- **Shim behavior:** NULL ctx triggers illegal callback via `SHIM_REQUIRE_CTX` (abort).
-  **Fixed 2026-05-11.** Previously `(void)ctx;` — NULL ctx would silently succeed.
-- **Impact:** None for correct callers. Defense against accidental NULL ctx in Taproot paths.
-
----
-
-## secp256k1_keypair_create — context flag check [FIXED 2026-05-11]
-
-- **Upstream behavior (≤v0.5):** Requires SIGN context; VERIFY-only returns 0.
-  **Upstream behavior (v0.6+):** CONTEXT_NONE accepted for all operations.
-- **Shim behavior:** Uses `ctx_can_sign()` which accepts SIGN and CONTEXT_NONE
-  (libsecp v0.6+ compat), rejects VERIFY-only, and aborts on NULL. **Fixed 2026-05-11.**
-- **Impact:** Callers using VERIFY-only context to call keypair_create. Correct behavior
-  per libsecp v0.6+ (Bitcoin Core v26+ uses CONTEXT_NONE or SIGN).
-
----
-
-## secp256k1_context_randomize — seed >= n
-
-- **Upstream behavior:** Seeds are treated as opaque bytes for blinding; no range check.
-  Upstream libsecp256k1 applies the seed directly as a blinding scalar (with mod-n reduction
-  internally), so seeds >= n are accepted and result in a reduced blinding value.
-- **Shim behavior:** Uses `Scalar::parse_bytes_strict_nonzero` on the seed. Seeds >= n or == 0
-  disable blinding (the blinding scalar is left at its current value) rather than silently
-  reducing mod-n. No conditional subtraction of n is applied to the seed.
-- **Reason:** Rule 11 (CLAUDE.md) requires `parse_bytes_strict_nonzero` for any private-key
-  or secret-scalar input. Seeds >= n are astronomically rare with fresh OS randomness;
-  disabling blinding on such seeds is safe (the call is advisory in libsecp256k1 too — a
-  failed randomization leaves the context operational, just without blinding).
-- **Impact:** A caller passing a seed value in [n, 2^256) will not get a blinding scalar
-  derived from that seed — blinding is left disabled. Callers using the recommended 32 bytes
-  of fresh randomness from the OS are effectively never affected (probability ~2^-128).
-- **Test:** `audit/test_regression_p2_ct_shim_fixes.cpp` covers the `parse_bytes_strict_nonzero`
-  path in `secp256k1_context_randomize` (CT-003).
-
----
-
-## secp256k1_schnorrsig_sign_custom — NULL context [FIXED 2026-05-11]
-
-- **Upstream behavior:** Fires illegal callback (default: abort) when ctx is NULL.
-- **Shim behavior:** Fires illegal callback via explicit NULL check before `schnorr_ctx_can_sign`.
-  **Fixed 2026-05-11** (PASS3-008). Previously `schnorr_ctx_can_sign(NULL)` returned false
-  without firing the callback — a silent return 0 instead of abort.
-- **Impact:** None for correct callers (NULL ctx is always a bug).
-- **Test:** Differential test: `secp256k1_schnorrsig_sign_custom(NULL, ...)` — verify callback fires.
-
----
-
-## secp256k1_ec_pubkey_serialize — invalid flags [FIXED 2026-05-11]
-
-- **Upstream behavior:** Fires illegal callback for any flags value other than
-  `SECP256K1_EC_COMPRESSED` or `SECP256K1_EC_UNCOMPRESSED`.
-- **Shim behavior:** Fires illegal callback and returns 0 for invalid flags.
-  **Fixed 2026-05-11** (PASS3-011). Previously garbage flags (e.g. `0xDEAD`) were
-  treated as `SECP256K1_EC_UNCOMPRESSED` — silent wrong output.
-- **Impact:** None for correct callers (invalid flags are always a bug).
-- **Test:** Differential test: `secp256k1_ec_pubkey_serialize(ctx, ..., 0xDEAD)` — verify return 0 + callback fires.
-
----
-
-## secp256k1_ecdsa_recoverable_signature_parse_compact — r/s zero check [FIXED 2026-05-21]
-
-- **Upstream behavior:** Accepts r=0 or s=0 at parse time; rejects at recover time.
-- **Shim behavior:** **Fixed 2026-05-21 (PASS3-002).** Now uses `parse_bytes_strict` —
-  accepts r=0 or s=0 at parse time, matching upstream libsecp256k1. Rejection of degenerate
-  r/s values happens at `secp256k1_ecdsa_recover` time.
-- **Previous shim behavior:** Used `parse_bytes_strict_nonzero` — rejected r=0 or s=0 at
-  parse time (stricter than upstream, divergence).
-- **Reason for fix:** Behavioral parity with upstream libsecp256k1; the previous divergence
-  had no security benefit (zero r/s signatures are always invalid; rejecting earlier vs later
-  makes no difference in practice).
-- **Impact:** No impact for callers using valid signatures. Callers that parse r=0 or s=0
-  compact bytes now get parse return 1 (like libsecp) instead of 0.
-- **Test:** `compat/libsecp256k1_shim/tests/test_shim_recovery_and_noncefp.cpp` REC-1..4.
-
----
-
-## secp256k1_musig_pubkey_agg — session map cap
+### secp256k1_musig_pubkey_agg — session map cap
 
 - **Upstream behavior:** Unlimited concurrent MuSig2 sessions; all state stored inline in opaque structs.
 - **Shim behavior:** Hard cap at 1024 concurrent sessions (`kMaxKaEntries`). The 1025th
-  call returns 0. **Fixed 2026-05-11:** previously returned 1 even when cap was hit.
+  call returns 0. (Fixed 2026-05-11: previously returned 1 even when cap was hit.)
 - **Reason:** The shim uses a global `unordered_map` to associate opaque `secp256k1_musig_keyagg_cache`
   pointers with internal session state (because the opaque struct is too small for variable-length
   data). Unbounded growth is a DoS risk.
@@ -284,24 +255,7 @@ For the complete compatibility test matrix see `compat/libsecp256k1_shim/tests/`
 
 ---
 
-## secp256k1_ecdsa_sign / secp256k1_ecdsa_sign_recoverable / secp256k1_schnorrsig_sign_custom — custom nonce function
-
-- **Upstream behavior:** Any `noncefp` / `extraparams->noncefp` is dispatched (called with the
-  message, key, and counter to produce a nonce).
-- **Shim behavior:** Only the standard nonce functions are accepted (NULL, `rfc6979`, `default`
-  for ECDSA; NULL, `bip340` for Schnorr). **Updated 2026-05-21 (PASS3-001):** any other non-NULL
-  `noncefp` now fires the illegal callback with a descriptive message before returning 0.
-  Previously returned 0 silently (divergence from upstream callback behavior).
-- **Reason:** The shim uses RFC 6979 / BIP-340 nonce generation internally and cannot forward
-  an arbitrary nonce function. Fail-closed so callers relying on a specific nonce function see
-  an error rather than silently receiving RFC 6979 output.
-- **Impact:** Callers with custom nonce functions. Bitcoin Core uses NULL (RFC 6979 default) —
-  unaffected. Callers with callbacks installed now receive the callback notification.
-- **Test:** `compat/libsecp256k1_shim/tests/test_shim_recovery_and_noncefp.cpp` NFP-1..3.
-
----
-
-## secp256k1_musig_session — internal raw pointer (process-local-only)
+### secp256k1_musig_session — internal raw pointer (process-local-only)
 
 - **Upstream behavior:** `secp256k1_musig_session` is a 133-byte self-contained opaque
   struct. All data needed to reconstruct the session is encoded in those bytes. The struct
@@ -325,275 +279,7 @@ For the complete compatibility test matrix see `compat/libsecp256k1_shim/tests/`
 
 ---
 
-## secp256k1_ecdsa_signature_parse_der — rejects r=0 or s=0 (DER-STRICT) [FIXED 2026-05-26]
-
-> **FIXED 2026-05-26.** This entry is retained for historical reference.
-
-- **Upstream behavior:** Accepts r=0 or s=0 in DER signatures at parse time; rejects
-  them at verify time (r=0 makes the group element undefined; s=0 makes the equation
-  degenerate).
-- **Previous shim behavior:** Used `parse_bytes_strict_nonzero` in the DER parser —
-  rejected r=0 or s=0 at parse time, diverging from upstream.
-- **Current shim behavior (FIXED):** Uses `in_range_scalar` (accepting [0, n-1]) in
-  `shim_ecdsa.cpp`. r=0 and s=0 are accepted at parse time; verify rejects them. Now
-  matches upstream libsecp256k1.
-- **Fix date:** 2026-05-26. Tracking: DER-STRICT.
-- **Test:** `audit/test_regression_shim_divergence_fixes.cpp` SDF-3 — DER blob with r=0,
-  s=1 must return 1 from `secp256k1_ecdsa_signature_parse_der`.
-
----
-
-## secp256k1_ec_pubkey_parse — NULL pubkey/input didn't fire illegal callback (SHIM-ILLCB-002) [FIXED 2026-05-26]
-
-> **FIXED 2026-05-26.** Entry retained for historical reference.
-
-- **Upstream behavior:** NULL `pubkey` or NULL `input` triggers the illegal callback
-  (default: abort) via `ARG_CHECK`.
-- **Previous shim behavior:** Combined `if (!pubkey || !input) return 0;` — the callback
-  was not fired; the function silently returned 0.
-- **Current shim behavior (FIXED):** Per-argument NULL checks each call
-  `secp256k1_shim_call_illegal_cb` before returning 0. Matches upstream.
-- **Fix date:** 2026-05-26. Tracking: SHIM-ILLCB-002.
-- **Test:** `audit/test_regression_shim_divergence_fixes.cpp` SDF-1 (NULL pubkey), SDF-2 (NULL input).
-
----
-
-## secp256k1_context_set_illegal_callback / set_error_callback — NULL ctx silent return (SHIM-ILLCB-001) [FIXED 2026-05-26]
-
-> **FIXED 2026-05-26.** Entry retained for historical reference.
-
-- **Upstream behavior:** NULL `ctx` triggers `ARG_CHECK(ctx != NULL)`, which calls the
-  default illegal callback (abort).
-- **Previous shim behavior:** `if (!ctx) return;` — silently returned without firing any
-  callback.
-- **Current shim behavior (FIXED):** `if (!ctx) { default_illegal_callback("ctx != NULL", nullptr); return; }`
-  — fires abort() on NULL ctx, matching upstream. Both `set_illegal_callback` and
-  `set_error_callback` are fixed.
-- **Fix date:** 2026-05-26. Tracking: SHIM-ILLCB-001.
-- **Test:** SDF-4 in `audit/test_regression_shim_divergence_fixes.cpp` — code-review verified
-  (in-process test not feasible as the fix calls abort()).
-
----
-
-## secp256k1_keypair_create — stored seckey not BIP-340 normalized [FIXED 2026-05-26]
-
-> **FIXED 2026-05-26.** Entry retained for historical reference.
-
-- **Upstream behavior:** `secp256k1_keypair_create` stores the BIP-340-normalized seckey
-  `d` such that `d*G` has even Y. If the input `seckey` produces an odd-Y pubkey, `n - seckey`
-  is stored instead (BIP-340 requires the signer to use the negated key for even-Y).
-- **Previous shim behavior:** Stored the raw input `seckey` bytes verbatim. If the input
-  produced an odd-Y pubkey, `secp256k1_keypair_sec` would return the unnormalized key, causing
-  a signing divergence: Schnorr signatures produced via `schnorrsig_sign32` used the normalized
-  key internally (via Y-parity check in `shim_schnorr.cpp`) but `keypair_sec` returned the raw
-  input — a caller that retrieved the seckey from the keypair and re-derived the pubkey would
-  get the wrong (negated) pubkey.
-- **Current shim behavior (FIXED):** `secp256k1_keypair_create` now negates `k` (CT, via
-  `ct::scalar_cneg + ct::bool_to_mask`) when `P.y` is odd. The normalized key bytes are stored
-  in `keypair->data[0..31]` using `secure_erase` on the stack copy. `keypair_sec` returns the
-  BIP-340-normalized key.
-- **Fix date:** 2026-05-26. Tracking: keypair_sec BIP-340 normalization.
-- **Test:** `audit/test_regression_shim_divergence_fixes.cpp` SDF-5 (stored sk produces even-Y
-  pubkey for sk=1..4), SDF-6 (Schnorr sign+verify roundtrip via keypair_create).
-
----
-
-## secp256k1_ecdsa_recover — NULL pubkey/sig/msghash fires illegal callback (SHIM-NEW-001) [FIXED 2026-05-12]
-
-- **Upstream behavior:** NULL required arguments (`pubkey`, `sig`, `msghash32`) trigger
-  the illegal callback (default: abort).
-- **Previous shim behavior:** Returned 0 silently without firing the callback.
-- **Current shim behavior:** Fires `secp256k1_shim_call_illegal_cb` before returning 0.
-  **Fixed 2026-05-12** (SHIM-NEW-001).
-- **Reason:** Matches libsecp256k1 contract. Silent return 0 on NULL args is a divergence
-  that could mask caller bugs.
-- **Impact:** None for correct callers. A caller that passes NULL args now gets the same
-  abort behavior as with libsecp256k1.
-- **Test:** `test_shim_recover_null_pubkey_fires_callback` — pass NULL pubkey, verify
-  callback flag is set.
-
----
-
-## secp256k1_schnorrsig_sign_custom — NULL sig64/keypair fires illegal callback (SHIM-NEW-003) [FIXED 2026-05-12]
-
-- **Upstream behavior:** NULL `sig64` or `keypair` triggers the illegal callback (default: abort).
-- **Previous shim behavior:** Returned 0 silently without firing the callback.
-- **Current shim behavior:** Fires `secp256k1_shim_call_illegal_cb` before returning 0.
-  **Fixed 2026-05-12** (SHIM-NEW-003).
-- **Reason:** Matches libsecp256k1 contract.
-- **Impact:** None for correct callers.
-- **Test:** `test_shim_schnorrsig_null_sig_fires_callback` — pass NULL sig64, verify callback fires.
-
----
-
-## secp256k1_ecdh — uses Scalar::from_bytes (silent mod-n reduction) (SHIM-NEW-002) [HISTORICAL/RESOLVED]
-
-> **This entry is HISTORICAL and describes behavior that no longer exists.**
-> The shim was corrected to use `Scalar::parse_bytes_strict_nonzero()` (rejects zero and >= n),
-> matching upstream `secp256k1_scalar_set_b32_seckey` semantics. See SHIM-A06 below for the
-> current accurate description. Entry retained for historical reference only. Corrected 2026-05-20.
-
----
-
-## secp256k1_ecdsa_verify -- high-S signature acceptance (SEC-007 — NOT A DIVERGENCE)
-
-- **Upstream behavior:** libsecp256k1 `secp256k1_ecdsa_verify` does NOT internally normalize
-  before verifying. Both low-S and high-S signatures pass `secp256k1_ecdsa_verify` (the
-  mathematical ECDSA equation is valid for either s value). BIP-62 low-S enforcement in
-  Bitcoin Core is done separately at the script validation layer, not inside libsecp.
-- **Shim behavior:** Identical — the shim passes signatures directly to
-  `secp256k1::ecdsa_verify` without normalizing. Both low-S and high-S signatures verify.
-- **Verdict:** No behavioral divergence. A prior version of this entry incorrectly claimed
-  that upstream "internally normalizes" before verify. That claim was factually wrong.
-  SEC-007 is closed: the behavior is identical between shim and upstream.
-- **Impact:** None — behavior matches upstream exactly.
-- **Test:** `audit/test_regression_shim_high_s_verify.cpp` confirms shim behavior matches
-  upstream: high-S signatures verify successfully in both implementations.
-
----
-
-## All sign functions -- wrong-flag context (VERIFY-only passed to sign) (SHIM-001) [FIXED 2026-05-21]
-
-- **Upstream behavior:** libsecp256k1 fires the illegal callback (default: abort) when a
-  VERIFY-only context is passed to a sign function, then returns 0.
-- **Shim behavior:** **Fixed 2026-05-21 (SHIM-001).** `ctx_can_sign()` now fires
-  `secp256k1_shim_call_illegal_cb(ctx, "sign: context not initialized for signing")` before
-  returning false when a VERIFY-only context is detected. The calling sign function then returns 0.
-  This matches libsecp256k1 behaviour exactly: callback fires, then returns error.
-- **Previous shim behavior:** Returned 0 silently without firing the illegal callback.
-- **Reason:** Matches upstream libsecp256k1 contract. Fuzzing harnesses and callers relying
-  on callback invocation for error detection now receive the callback signal correctly.
-- **Impact:** None for correct callers. Callers using a VERIFY-only context with sign functions
-  now trigger the callback (default: abort), matching upstream behaviour.
-- **Test:** Differential test -- pass VERIFY-only ctx to secp256k1_ecdsa_sign, verify callback fires.
-
----
-
-## secp256k1_ecdsa_verify_batch — large-batch curve membership check (CA-001) [RESOLVED 2026-05-13]
-
-- **Previous shim behavior (PERF-004, now removed):** The large-batch ECDSA path (n >= 8)
-  omitted the `y²=x³+7` curve membership check that the small-batch path (n < 8) performed.
-  Comment stated: "from_affine + Point arithmetic rejects infinity points" and "incorrect verify
-  result, caught below." This was a P1 security inconsistency — an invalid-curve point could
-  pass through `from_affine` (which does not validate the curve equation) and enter the batch MSM.
-- **Current behavior:** Both small-batch and large-batch paths now perform the `y²=x³+7` check
-  before calling `Point::from_affine`. Invalid-curve points are rejected at input time, not
-  downstream. **Fixed 2026-05-13 (CA-001).**
-- **Upstream behavior:** libsecp256k1 does not expose a batch ECDSA verify API; this is an
-  additive shim-only function with no upstream divergence to track.
-- **Impact:** None for callers with valid public keys (all keys from `secp256k1_ec_pubkey_parse`
-  are on-curve). Only affects callers who bypass `ec_pubkey_parse` and write the opaque struct
-  directly with an off-curve point.
-- **Test:** Covered by `audit/test_regression_shim_security_v8.cpp` `test_ecdh_pubkey_off_curve`
-  pattern; a targeted batch-ECDSA off-curve test should be added in a follow-up.
-
----
-
-## secp256k1_schnorrsig_verify -- thread-local xonly-pubkey cache (NEW-SHIM-004)
-
-- **Upstream behavior:** No caching.  Every `secp256k1_schnorrsig_verify` call
-  re-runs `lift_x` (sqrt) and rebuilds GLV precomputation tables for the supplied
-  x-only pubkey.
-- **Shim behavior:** A 256-slot, thread-local, FNV-1a-fingerprinted cache stores
-  the lifted point + precomputed tables.  Warm cache hits skip `lift_x` and the
-  GLV rebuild (~1,954 ns saved per hit on the ConnectBlock workload).
-- **Reason:** ConnectBlock-style hot paths (Bitcoin Core block validation) re-verify
-  the same set of x-only pubkeys many times within a small window.  Caching the
-  lifted point is a strict perf optimisation; correctness is identical to upstream.
-- **Impact / divergence shape:**
-  1. **Memory:** ~256 × ~1.5 KB ≈ 384 KB of additional thread-local memory per
-     thread that ever calls `secp256k1_schnorrsig_verify` in the shim.
-  2. **Hash collisions are silent:** the cache uses a 32-bit FNV-1a fingerprint
-     to index into 256 slots; on collision (~2^-32 per slot ≈ 0.1% per million
-     unique pubkeys) the previously cached entry is overwritten without warning.
-     The next verify of the evicted key re-runs `lift_x` + table build (~2 µs penalty).
-     This is a perf footprint, not a correctness issue — verification is still sound.
-  3. **Thread isolation:** cache is `thread_local`, so multi-threaded callers
-     each pay the cold-cache cost on the first verify per thread.
-- **Note on the `verify_precomp` API:** callers that need deterministic warm-cache
-  behaviour (no eviction) should use `secp256k1_xonly_pubkey_parse_precomp` +
-  `secp256k1_schnorrsig_verify_precomp` from `secp256k1_schnorrsig.h`, which
-  exposes the prebuilt object explicitly and bypasses the global cache.
-- **Test:** Planned — `audit/test_regression_shim_schnorr_cache_collision.cpp`
-  will exercise the eviction-and-rebuild path: verify key A, fill the cache by
-  verifying ≥256 distinct keys (forcing at least one slot collision), re-verify
-  key A and assert it still returns 1.  Correctness must hold after eviction;
-  only the per-call latency changes.  Current coverage is indirect via the
-  unique-pubkey ConnectBlock workload exercised in `bench_unified` and the
-  high-diversity verify path in `audit/test_exploit_schnorr_verify_*`.
-
----
-
-## secp256k1_schnorrsig_verify -- null msg without firing illegal callback (SHIM-003) [FIXED 2026-05-21]
-
-- **Status:** FIXED 2026-05-21. The shim now matches upstream behavior for `msg=NULL` with `msglen==0`
-  (upstream allows NULL msg when msglen==0; the shim previously fired the illegal callback in all
-  NULL-msg cases). NULL msg with msglen>0 still fires the illegal callback (correct).
-- **Upstream behavior:** `secp256k1_schnorrsig_verify` allows `msg=NULL` when `msglen==0`
-  (zero-length message is a valid BIP-340 construct). For `msg=NULL` with `msglen>0`, fires
-  the illegal callback (default: abort) then returns 0.
-- **Shim behavior (post-fix):** Matches upstream. NULL msg is permitted when msglen==0. NULL msg
-  with msglen>0 fires the illegal callback and returns 0.
-- **Residual divergence:** None for the msglen==0 case. For msglen==32 with msg=NULL, both upstream
-  and shim fire the illegal callback.
-- **Test:** `tests/test_shim_security_edge_cases.cpp` SHIM-003 test: NULL msg + msglen=0 must NOT
-  fire callback and must return 0 (valid vacuous-verify result).
-
----
-
-## pubkey_data_to_point (internal helper) — no curve membership check (SEC-004) [RESOLVED 2026-05-21]
-
-- **Status:** RESOLVED (2026-05-21). The curve membership check `y²=x³+7 mod p` has been
-  added to `pubkey_data_to_point` via `shim_pubkey_helpers.hpp`. All callers that use
-  `pubkey_data_to_point` now get the check. Off-curve input causes the function to return
-  `Point::infinity()`, which all callers treat as failure via `is_infinity()` checks.
-- **Previous risk:** If this helper were called without a prior curve check, an off-curve
-  point would be accepted silently, potentially enabling invalid-point attacks where
-  a small-order subgroup point leaks private key bits modulo the subgroup order.
-- **Tracking:** SEC-004
-- **Impact:** None for callers with valid on-curve public keys. Off-curve inputs are now
-  detected and rejected at the helper boundary rather than at individual call sites.
-
----
-
----
-
-## secp256k1_ec_pubkey_cmp — NULL ctx now fires illegal callback (SHIM-005-FIX) [FIXED 2026-05-21]
-
-- **Upstream behavior:** NULL ctx fires the illegal callback (default: abort) before any other
-  argument check. The pubkey comparison result is never computed if ctx is NULL.
-- **Previous shim behavior:** NULL ctx was passed directly to `secp256k1_shim_call_illegal_cb`
-  only when pubkeys were null — not when ctx itself was null. This meant a NULL ctx could
-  silently reach `secp256k1_ec_pubkey_serialize` with a NULL context, a separate bug.
-- **Current shim behavior (post-fix):** Explicit `!ctx` guard fires the illegal callback
-  and returns 0 before any pubkey or serialize logic. **Fixed 2026-05-21 (SHIM-005-FIX).**
-- **Reason:** Matches upstream libsecp256k1 contract — NULL ctx is always a programming
-  error and must fire the callback.
-- **Impact:** None for correct callers. Callers that accidentally pass NULL ctx now get the
-  same abort behavior as with upstream libsecp256k1.
-- **Test:** `test_shim_security_edge_cases_run` — calls `secp256k1_ec_pubkey_cmp` with NULL
-  ctx and asserts the illegal callback fires.
-
----
-
-## secp256k1_musig_partial_sig_agg — all-zero check uses CT accumulator (SHIM-MUSIG-CT)
-
-- **Upstream behavior:** No all-zero check — returns the aggregated value unconditionally.
-- **Shim behavior:** Checks whether the 64-byte aggregated signature is all-zero (degenerate
-  aggregation result) and returns 0 if so. **Updated 2026-05-21:** the check now uses a
-  branchless OR-accumulator (`uint32_t nonzero = 0; for(i) nonzero |= sig[i]`) instead of
-  the previous early-exit `break` loop.
-- **Reason:** The early-exit loop leaked information about the signature bytes via
-  branch-predictor and cache timing — the loop terminated faster when a non-zero byte
-  appeared early, revealing the index of the first non-zero byte. The OR-accumulator
-  runs all 64 bytes unconditionally, eliminating this side-channel.
-- **Impact:** No behavioral change for callers — the return value is the same. Timing
-  behavior is now data-independent for the all-zero check.
-- **Test:** `test_regression_shim_security_v7_run` (musig2 aggregate round-trips).
-
----
-
-## secp256k1_musig_nonce_gen — extra_input32 silently ignored (SHIM-NONCEGEN-001)
+### secp256k1_musig_nonce_gen — extra_input32 silently ignored (SHIM-NONCEGEN-001)
 
 - **Upstream behavior:** `secp256k1_musig_nonce_gen` accepts an `extra_input32` parameter
   that is mixed into the nonce derivation as additional entropy (defense-in-depth).
@@ -614,55 +300,30 @@ For the complete compatibility test matrix see `compat/libsecp256k1_shim/tests/`
 
 ---
 
-## secp256k1_tagged_sha256 — msg=NULL with msglen=0 now allowed (SHIM-A03) [FIXED 2026-05-21]
+### secp256k1_schnorrsig_verify_batch — msglen != 32 returns 0 silently (SHIM-006)
 
-- **Upstream behavior:** libsecp256k1 `secp256k1_tagged_sha256` allows `msg=NULL` when
-  `msglen=0` — a zero-length message is valid input and produces a well-defined tagged hash
-  of the empty string.
-- **Previous shim behavior (divergence, now fixed):** The shim previously rejected `msg=NULL`
-  unconditionally (`if (!hash32 || !tag || !msg) return 0`), causing false rejection of
-  zero-length messages.
-- **Current shim behavior (fixed):** `msg=NULL` with `msglen=0` is now accepted and produces
-  the correct tagged hash of the empty message. `msg=NULL` with `msglen>0` fires the illegal
-  callback and returns 0, matching libsecp256k1 behavior.
-- **Reason:** Zero-length messages are valid per the SHA256 spec and libsecp256k1 does not
-  restrict them. The previous guard was overly strict.
-- **Impact:** Callers hashing empty messages now work correctly. No behavioral change for
-  callers passing non-NULL msg or msglen=0 with non-NULL msg.
-- **Test:** Covered by shim null-arg tests. A dedicated zero-length message round-trip test
-  should be added to `compat/libsecp256k1_shim/tests/`.
-
----
-
-## secp256k1_musig_pubkey_ec_tweak_add / secp256k1_musig_pubkey_xonly_tweak_add — NULL ctx now fires illegal callback (SHIM-MUSIG-CTX-001) [FIXED 2026-05-25]
-
-- **Upstream behavior:** NULL ctx fires the illegal callback (default: abort). Non-NULL ctx is
-  validated for context flags before proceeding.
-- **Previous shim behavior:** Both functions declared ctx as `/*ctx*/` — completely discarded.
-  NULL ctx silently proceeded to `!keyagg_cache || !tweak32` check without firing the callback.
-- **Current shim behavior:** Both functions now call `SHIM_REQUIRE_CTX(ctx)` as their first
-  statement. NULL ctx fires the illegal callback (default: abort) and returns 0 — matching
-  upstream libsecp256k1 behavior. **Fixed 2026-05-25 (SHIM-MUSIG-CTX-001).**
-- **Reason:** Matches upstream libsecp256k1 contract. NULL ctx is always a programming error
-  and should fire the callback for all public API functions, not silently return 0.
-- **Impact:** None for correct callers. Callers that accidentally pass NULL ctx now get the
-  same abort behavior as with upstream libsecp256k1.
-- **Test:** Differential test: call `secp256k1_musig_pubkey_ec_tweak_add(NULL, ...)` with a
-  valid keyagg_cache and tweak32 — verify callback fires and function returns 0.
+- **Upstream behavior:** `secp256k1_schnorrsig_verify_batch` in libsecp256k1 supports
+  variable-length messages (`msglen` need not be 32). The BIP-340 challenge hash accepts
+  any message length; batch verify is defined for arbitrary `msglen`.
+- **Shim behavior:** The shim's batch verify does not implement the varlen code path — it
+  only supports `msglen == 32`. When `msglen != 32`, the function returns `0` (fail-closed)
+  without firing the illegal callback. Callers needing varlen must use the singular
+  `secp256k1_schnorrsig_verify` which handles any `msglen` correctly.
+- **Reason:** Varlen batch verify requires a generalized tagged-hash path through the MSM
+  accumulator. The shim's current batch MSM uses 32-byte message slots. This is a shim
+  capability limitation, not an illegal API call — firing `abort()` via the illegal callback
+  for an unsupported-but-valid input was itself a divergence from upstream (corrected 2026-05-26).
+- **Impact:** Callers using `msglen == 32` (standard BIP-340 use) are unaffected. Callers
+  using varlen batch verify receive `0` (verification failed) instead of aborting. They
+  should fall back to singular verify for varlen messages.
+- **Test:** `test_shim006_verify_batch_nonstandard_msglen_returns_zero()` in
+  `compat/libsecp256k1_shim/tests/test_shim_security_edge_cases.cpp` — verifies that
+  `secp256k1_schnorrsig_verify_batch` with `msglen=64` returns 0 without firing the
+  illegal callback.
 
 ---
 
-## secp256k1_ec_pubkey_tweak_mul vs secp256k1_ec_pubkey_tweak_add (zero tweak)
-
-- **Upstream behavior:** `tweak_mul` rejects zero tweak (returns 0); `tweak_add` accepts zero tweak (point unchanged, returns 1)
-- **Shim behavior:** Matches upstream — `tweak_mul` uses `parse_bytes_strict_nonzero` (rejects zero); `tweak_add` uses `parse_bytes_strict` (accepts zero)
-- **Reason:** Intentional asymmetry matching libsecp256k1 v0.5+ semantics; multiplying by zero always produces infinity (invalid pubkey), while adding zero is a no-op
-- **Impact:** Callers must not pass a zero tweak to `tweak_mul`; zero tweak to `tweak_add` is well-defined
-- **Test:** `test_differential_tweak_zero` (to be added)
-
----
-
-## secp256k1_context_randomize — blinding is per-thread, not per-context (SHIM-THREAD-BLIND)
+### secp256k1_context_randomize — blinding is per-thread, not per-context (SHIM-THREAD-BLIND)
 
 - **Upstream behavior:** `secp256k1_context_randomize` stores the blinding scalar inside the
   `secp256k1_context` struct. The blinding is strictly per-context: two contexts on the same
@@ -678,10 +339,8 @@ For the complete compatibility test matrix see `compat/libsecp256k1_shim/tests/`
   context's cached seed into `g_blinding`, uses it for the signing operation, then clears it
   via `clear_blinding()` on scope exit.
   **Consequence:** Two contexts on the same thread used in an interleaved pattern will
-  overwrite each other's active blinding. For example, if context A's `ContextBlindingScope`
-  is entered, then context B's `ContextBlindingScope` is entered before A's exits (which
-  cannot happen via the shim's current synchronous API but could happen via callbacks or
-  coroutines), context A would clear B's blinding on exit. The source contains a comment
+  overwrite each other's active blinding. This cannot happen via the shim's synchronous API
+  but could happen via callbacks or coroutines. The source contains a comment
   `// DEVIATION FROM LIBSECP CONTRACT` acknowledging this limitation.
 - **Reason:** The CT blinding API (`ct::set_blinding` / `ct::clear_blinding` /
   `ct::generator_mul_blinded`) is a global singleton by design — it operates on a thread-local
@@ -691,23 +350,15 @@ For the complete compatibility test matrix see `compat/libsecp256k1_shim/tests/`
   dominant use pattern: one context per thread, or multiple contexts used sequentially
   (not interleaved within a single call frame).
 - **Impact:**
-  1. **Single-context-per-thread callers:** No divergence. The behavior is identical to
-     upstream — `secp256k1_context_randomize(ctx, seed)` sets the blinding, and all signing
-     calls using `ctx` on that thread apply the blinding correctly.
+  1. **Single-context-per-thread callers:** No divergence — identical to upstream.
   2. **Multiple-contexts-same-thread, sequential callers:** No divergence. As long as signing
-     operations from different contexts do not interleave (i.e., one complete sign call
-     finishes before another starts), each `ContextBlindingScope` loads its own context's seed
-     and clears it correctly.
+     operations from different contexts do not interleave, each `ContextBlindingScope` loads
+     its own context's seed and clears it correctly.
   3. **Interleaved contexts (callbacks, coroutines, C++ co_await):** Potential mismatch.
-     If context A's signing path is suspended (co_await) after entering its
-     `ContextBlindingScope` and context B's signing is invoked on the same thread, B will
-     overwrite `g_blinding`; when A resumes, it will operate under B's (or no) blinding.
-     This scenario does not arise in Bitcoin Core's synchronous signing paths.
-  4. **Two randomized contexts same thread:** `secp256k1_context_randomize(ctx_a, seed_a)`
-     then `secp256k1_context_randomize(ctx_b, seed_b)` — both stores succeed. But if both
-     contexts are used to sign on the same thread within the same call stack (nested),
-     only the innermost `ContextBlindingScope` is active at any given moment. This is
-     architecturally safe for synchronous stacks.
+     If context A's signing path is suspended after entering its `ContextBlindingScope` and
+     context B's signing is invoked on the same thread, B will overwrite `g_blinding`; when
+     A resumes, it will operate under B's (or no) blinding. This scenario does not arise in
+     Bitcoin Core's synchronous signing paths.
 - **Tracking:** SHIM-THREAD-BLIND. The source acknowledgement `// DEVIATION FROM LIBSECP
   CONTRACT` is at `src/cpu/src/ct_point.cpp` near the `thread_local BlindingState` definition.
   This divergence is not a security vulnerability for the targeted Bitcoin Core use case
@@ -715,91 +366,6 @@ For the complete compatibility test matrix see `compat/libsecp256k1_shim/tests/`
   multi-context patterns.
 - **Planned fix:** Refactor CT blinding to accept an explicit `BlindingState*` parameter,
   thread-local as a fallback only. Deferred — requires changes throughout the CT layer.
-- **Differential test:** Instantiate two contexts A and B, randomize both with distinct seeds,
-  call a sign function with A and verify the result, then call with B and verify. Assert both
-  produce valid signatures. This proves sequential multi-context operation is safe. Testing
-  interleaved/nested is not feasible via the synchronous C ABI.
 - **Test:** `audit/test_regression_shim_thread_blinding.cpp` (to be added) — TBL-1: sign with
   ctx_a then sign with ctx_b on same thread, both must verify. TBL-2: randomize then sign 1000
   times with alternating contexts, all must verify.
-
----
-
-## secp256k1_ec_pubkey_parse — hybrid pubkeys (0x06/0x07 prefix) now accepted (SHIM-HYBRID-001) [FIXED 2026-05-21]
-
-- **Upstream behavior:** libsecp256k1 accepts 0x04 (uncompressed), 0x02/0x03 (compressed),
-  and 0x06/0x07 (hybrid) prefixes in `secp256k1_ec_pubkey_parse`. Hybrid-format public keys
-  (which encode both the full X and Y coordinates plus a parity byte) are a valid but rarely
-  used SEC encoding. All three formats parse to the same on-curve point.
-- **Previous shim behavior (divergence — FIXED 2026-05-21):** The shim's 65-byte parse path
-  in `shim_pubkey.cpp` only accepted 0x04 (uncompressed). 0x06 and 0x07 (hybrid prefix)
-  caused the parse to return 0 (failure) without firing the illegal callback. This caused
-  70 out of 693 Bitcoin Core integration test cases to fail (hybrid-pubkey test vectors).
-- **Current shim behavior:** `secp256k1_ec_pubkey_parse` now accepts 0x04, 0x06, and 0x07
-  prefixes for 65-byte inputs, parsing the Y coordinate directly and ignoring the parity byte
-  (Y is reconstructed from the SEC encoding, and the encoded Y is used as-is). This matches
-  libsecp256k1 behavior. 0x02/0x03 (33-byte compressed) continue to be handled separately.
-- **Reason:** BIP-340, Bitcoin Core test vectors, and SEC-encoded public keys distributed
-  on-chain can carry the 0x06/0x07 prefix. Rejection broke the Bitcoin Core integration test
-  suite. Fixed to match upstream.
-- **Impact:** None for callers sending standard compressed (0x02/0x03) or uncompressed (0x04)
-  public keys. Callers sending hybrid-encoded keys (0x06/0x07) now succeed where they
-  previously failed.
-- **Test:** Bitcoin Core integration test suite — 693/693 pass after fix (2026-04-27,
-  commit c1df659e). Dedicated shim unit test in `compat/libsecp256k1_shim/tests/` for
-  hybrid-prefix round-trip (to be added).
-
----
-
-## secp256k1_context_* — SECP256K1_CONTEXT_NONE accepted for sign and verify (SHIM-CTX-NONE)
-
-- **Upstream behavior (libsecp256k1 v0.6+):** Starting with v0.6, libsecp256k1 deprecated
-  the `SECP256K1_CONTEXT_SIGN` / `SECP256K1_CONTEXT_VERIFY` flags. All operations now accept
-  any non-NULL context regardless of the creation flags. `SECP256K1_CONTEXT_NONE` is valid for
-  both signing and verification in v0.6+. The flags are kept for source compatibility but are
-  no longer meaningful — `secp256k1_context_create(SECP256K1_CONTEXT_NONE)` is the recommended
-  idiomatic form.
-- **Shim behavior:** `ctx_can_sign()` and `ctx_can_verify()` return `true` when the context
-  flags are `SECP256K1_CONTEXT_NONE` (0x0), in addition to the explicit SIGN and VERIFY flags.
-  This matches the libsecp256k1 v0.6+ behavior and ensures callers that pass
-  `secp256k1_context_create(SECP256K1_CONTEXT_NONE)` to sign functions do not receive a
-  spurious illegal callback.
-- **Reason:** Bitcoin Core 28.x uses `SECP256K1_CONTEXT_NONE` as the recommended context type.
-  Rejecting it in the shim would cause all Bitcoin Core signing and verification calls to fail
-  or fire illegal callbacks, breaking the integration.
-- **Impact:** Callers using the older `SECP256K1_CONTEXT_SIGN` / `SECP256K1_CONTEXT_VERIFY`
-  flags continue to work. Callers using `SECP256K1_CONTEXT_NONE` (v0.6+ idiom) now work
-  correctly. This is intentional v0.6+ compat.
-- **Note:** If a strictly wrong-flag context is passed (e.g., VERIFY-only context to a sign
-  function in a build that enforces the old semantics), the shim fires the illegal callback
-  per the `ctx_can_sign()` path — see the "All sign functions -- wrong-flag context (SHIM-001)"
-  entry above. CONTEXT_NONE is explicitly exempt from that path.
-- **Test:** `audit/test_regression_shim_context_none.cpp` — creates a CONTEXT_NONE context,
-  calls `secp256k1_ecdsa_sign` and `secp256k1_schnorrsig_sign` with it, and asserts both
-  return 1 without firing the illegal callback. Also calls `secp256k1_ecdsa_verify` and
-  `secp256k1_schnorrsig_verify` with CONTEXT_NONE and asserts both return correct results.
-
----
-
-## secp256k1_schnorrsig_verify_batch — msglen != 32 returns 0 silently (SHIM-006)
-
-- **Upstream behavior:** `secp256k1_schnorrsig_verify_batch` in libsecp256k1 supports
-  variable-length messages (`msglen` need not be 32). The BIP-340 challenge hash accepts
-  any message length; batch verify is defined for arbitrary `msglen`.
-- **Shim behavior:** The shim's batch verify does not implement the varlen code path — it
-  only supports `msglen == 32`. When `msglen != 32`, the function returns `0` (fail-closed)
-  without firing the illegal callback. Callers needing varlen must use the singular
-  `secp256k1_schnorrsig_verify` which handles any `msglen` correctly.
-- **Reason:** Varlen batch verify requires a generalized tagged-hash path through the MSM
-  accumulator. The shim's current batch MSM uses 32-byte message slots. This is a shim
-  capability limitation, not an illegal API call — firing `abort()` via the illegal callback
-  for an unsupported-but-valid input was a divergence from upstream (SHIM-006 correction,
-  2026-05-26). Previously the shim fired the illegal callback on msglen != 32, which would
-  abort callers that legitimately use varlen batch verify against upstream libsecp256k1.
-- **Impact:** Callers using `msglen == 32` (standard BIP-340 use) are unaffected. Callers
-  using varlen batch verify receive `0` (verification failed) instead of aborting. They
-  should fall back to singular verify for varlen messages.
-- **Test:** `test_shim006_verify_batch_nonstandard_msglen_returns_zero()` in
-  `compat/libsecp256k1_shim/tests/test_shim_security_edge_cases.cpp` — verifies that
-  `secp256k1_schnorrsig_verify_batch` with `msglen=64` returns 0 without firing the
-  illegal callback.
