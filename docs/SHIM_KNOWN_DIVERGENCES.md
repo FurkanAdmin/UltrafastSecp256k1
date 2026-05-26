@@ -723,6 +723,50 @@ For the complete compatibility test matrix see `compat/libsecp256k1_shim/tests/`
 
 ---
 
+## secp256k1_context_set_illegal_callback — NULL ctx silently returns (SHIM-ILLCB-001)
+
+- **Upstream behavior:** When `ctx=NULL`, libsecp256k1 fires the static default illegal
+  callback (`secp256k1_default_illegal_callback_fn`) before returning. The callback fires
+  with message `"ctx != NULL"`. Default behavior: `abort()`.
+- **Shim behavior:** `if (!ctx) return;` — silently returns without invoking any callback.
+  No `abort()` occurs. A caller that passes NULL ctx to `secp256k1_context_set_illegal_callback`
+  receives no feedback that their argument is invalid.
+- **Reason:** The shim has no static default callback object equivalent to
+  `secp256k1_default_illegal_callback_fn`. Recreating the upstream behavior requires
+  storing a global fallback callback pointer, which adds complexity for a function
+  that is almost never called with NULL ctx in practice.
+- **Impact:** Callers that pass NULL ctx to this function will not trigger an abort.
+  The most likely effect is that a mis-initialized ctx pointer silently passes through,
+  leaving the callback unset. Any subsequent operation with that context will use
+  the default callback (defined at context creation time). No security impact — this
+  is a programming-error path, not a signing or verification path.
+- **Tracking:** SHIM-ILLCB-001. Low priority — NULL ctx here is a caller bug, not an
+  attacker-controlled input. Bitcoin Core never calls `set_illegal_callback(NULL)`.
+- **Test:** None planned — this is a programming-error case with no security impact.
+
+---
+
+## secp256k1_ec_pubkey_parse — NULL pubkey/input silently returns 0 (SHIM-ILLCB-002)
+
+- **Upstream behavior:** NULL `pubkey` or NULL `input` fires the illegal callback
+  (default: `abort()`) via `ARG_CHECK`. After the callback, returns 0.
+- **Shim behavior:** `if (!pubkey || !input) return 0;` — returns 0 silently without
+  invoking the illegal callback. The callback is NOT fired.
+- **Reason:** The NULL checks were written as early-exit guards, not as illegal-callback
+  dispatches. Matching upstream would require replacing these with
+  `secp256k1_shim_call_illegal_cb(ctx, "pubkey != NULL"); return 0;` style guards.
+  The T-09/10 fix applied the same treatment to keypair_create/sec/pub/xonly_pub and
+  ecdsa_signature_parse_compact/der, but did not reach ec_pubkey_parse.
+- **Impact:** Callers that accidentally pass NULL pubkey or NULL input will receive
+  return 0 (failure) without the debugging signal of the illegal callback. No security
+  impact — the call still fails. This is a programming-error path, not an attacker path.
+- **Tracking:** SHIM-ILLCB-002. Can be fixed in the same style as the T-09/10 NULL-arg
+  callback fixes. Low priority — callers that pass NULL `pubkey` or `input` to
+  `secp256k1_ec_pubkey_parse` have a programming error that return-0 already surfaces.
+- **Test:** None planned — future T-09/10 follow-up can add coverage when fixed.
+
+---
+
 ## secp256k1_context_randomize — blinding is per-thread, not per-context (SHIM-THREAD-BLIND)
 
 - **Upstream behavior:** `secp256k1_context_randomize` stores the blinding scalar inside the

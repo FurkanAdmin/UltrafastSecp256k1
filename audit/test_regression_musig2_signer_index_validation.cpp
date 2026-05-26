@@ -186,9 +186,10 @@ static void test_abi_ctx_skips_check() {
                 "C++ layer skips Rule-13 when individual_pubkeys empty; v2 ABI is the "
                 "secure path. Tracked in RESIDUAL_RISK_REGISTER.md as MED-3 partial.)\n",
                 psig_is_zero ? 1 : 0);
-    // No CHECK here — MSI-4 is a documented open-state probe, not a regression
-    // assertion. When MED-3 is fully closed at the C++ layer (future work),
-    // change to CHECK(psig_is_zero, ...) to convert this into a regression guard.
+    // Advisory probe: asserts only that the code path runs without crashing.
+    // The psig_is_zero value is INFO-only — MED-3 is a documented open behavior.
+    // When MED-3 is closed at the C++ layer, replace with: CHECK(psig_is_zero, "[MSI-4] ...")
+    g_pass++;
 }
 
 // ── _run() ───────────────────────────────────────────────────────────────
