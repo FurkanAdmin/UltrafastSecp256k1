@@ -142,6 +142,9 @@ run_check "Preflight --bug-scan"    python3 ci/preflight.py --bug-scan
 run_check "Preflight --security"    python3 ci/preflight.py --security
 run_check "Preflight --abi"         python3 ci/preflight.py --abi
 run_check "Preflight --freshness"   python3 ci/preflight.py --freshness
+# doc-sync and cuda-msvc are hard-fail in preflight.yml but were missing locally
+run_check "Preflight --doc-sync"    python3 ci/preflight.py --doc-sync
+run_check "Preflight --cuda-msvc"   python3 ci/preflight.py --cuda-msvc
 run_check "Exploit traceability join" python3 ci/exploit_traceability_join.py
 echo ""
 
@@ -189,6 +192,10 @@ run_caas_check "Security autonomy"   python3 ci/security_autonomy_check.py
 run_caas_check "Advisory skip returns (Rule 16)" bash ci/check_advisory_skip_returns.sh
 run_caas_check "Shim parity"         python3 ci/check_libsecp_shim_parity.py
 run_caas_check "Formal verification (Z3+Lean blocking)" python3 ci/run_formal_verification.py
+# These three were hard-fail in gate.yml caas-security but missing locally
+run_caas_check "Bundle integrity verify"     python3 ci/verify_external_audit_bundle.py --json --allow-commit-mismatch
+run_caas_check "Evidence chain integrity"    python3 ci/evidence_governance.py validate
+run_caas_check "Determinism gate"            python3 ci/check_determinism_gate.py
 echo ""
 
 # ── Protocol & Backend Parity Gates (~5s) ───────────────────────────────────
