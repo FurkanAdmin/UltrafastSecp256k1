@@ -33,27 +33,9 @@ static int g_pass = 0, g_fail = 0;
 static const char* g_section = "";
 
 #include "audit_check.hpp"
+#include "audit_helpers.hpp"
 
 static std::mt19937_64 rng(0xA0D17'F01DA);  // NOLINT(cert-msc32-c,cert-msc51-cpp)
-
-static Scalar random_scalar() {
-    std::array<uint8_t, 32> out{};
-    for (int i = 0; i < 4; ++i) {
-        uint64_t v = rng();
-        std::memcpy(out.data() + static_cast<std::size_t>(i) * 8, &v, 8);
-    }
-    for (;;) {
-        auto s = Scalar::from_bytes(out);
-        if (!s.is_zero()) return s;
-        out[31] ^= 0x01;
-    }
-}
-
-static bool points_equal(const Point& a, const Point& b) {
-    if (a.is_infinity() && b.is_infinity()) return true;
-    if (a.is_infinity() != b.is_infinity()) return false;
-    return a.to_compressed() == b.to_compressed();
-}
 
 // ============================================================================
 // 1. Point at infinity
@@ -107,8 +89,8 @@ static void test_jacobian_add() {
     // P + Q where P != Q, P != -Q
     { const int total = SCALED(1000, 50);
     for (int i = 0; i < total; ++i) {
-        auto k1 = random_scalar();
-        auto k2 = random_scalar();
+        auto k1 = random_scalar(rng);
+        auto k2 = random_scalar(rng);
         auto P = G.scalar_mul(k1);
         auto Q = G.scalar_mul(k2);
         auto R1 = P.add(Q);
@@ -119,9 +101,9 @@ static void test_jacobian_add() {
 
     // Associativity: (P + Q) + R == P + (Q + R)
     for (int i = 0; i < SCALED(500, 30); ++i) {
-        auto P = G.scalar_mul(random_scalar());
-        auto Q = G.scalar_mul(random_scalar());
-        auto R = G.scalar_mul(random_scalar());
+        auto P = G.scalar_mul(random_scalar(rng));
+        auto Q = G.scalar_mul(random_scalar(rng));
+        auto R = G.scalar_mul(random_scalar(rng));
         auto lhs = P.add(Q).add(R);
         auto rhs = P.add(Q.add(R));
         CHECK(points_equal(lhs, rhs), "(P+Q)+R == P+(Q+R)");
@@ -172,7 +154,7 @@ static void test_mixed_add_same_point() {
 
     // When two points are equal, add should still return dbl result
     for (int i = 0; i < 100; ++i) {
-        auto P = G.scalar_mul(random_scalar());
+        auto P = G.scalar_mul(random_scalar(rng));
         auto sum = P.add(P);
         auto dbl = P.dbl();
         CHECK(points_equal(sum, dbl), "P+P == dbl(P)");
@@ -193,7 +175,7 @@ static void test_point_negation() {
 
     { const int total = SCALED(1000, 50);
     for (int i = 0; i < total; ++i) {
-        auto P = G.scalar_mul(random_scalar());
+        auto P = G.scalar_mul(random_scalar(rng));
         auto neg_P = P.negate();
 
         CHECK(!neg_P.is_infinity(), "-P is not infinity");
@@ -230,7 +212,7 @@ static void test_affine_conversion() {
 
     { const int total = SCALED(1000, 50);
     for (int i = 0; i < total; ++i) {
-        auto P = G.scalar_mul(random_scalar());
+        auto P = G.scalar_mul(random_scalar(rng));
 
         // compressed -> uncompressed should represent same point
         auto comp = P.to_compressed();
@@ -271,8 +253,8 @@ static void test_scalar_mul_identities() {
     // (a + b) * G == a*G + b*G
     { const int total = SCALED(1000, 50);
     for (int i = 0; i < total; ++i) {
-        auto a = random_scalar();
-        auto b = random_scalar();
+        auto a = random_scalar(rng);
+        auto b = random_scalar(rng);
         auto lhs = G.scalar_mul(a + b);
         auto rhs = G.scalar_mul(a).add(G.scalar_mul(b));
         CHECK(points_equal(lhs, rhs), "(a+b)*G == a*G + b*G");
@@ -281,8 +263,8 @@ static void test_scalar_mul_identities() {
 
     // (a * b) * G == a * (b * G)
     for (int i = 0; i < SCALED(500, 30); ++i) {
-        auto a = random_scalar();
-        auto b = random_scalar();
+        auto a = random_scalar(rng);
+        auto b = random_scalar(rng);
         auto lhs = G.scalar_mul(a * b);
         auto bG = G.scalar_mul(b);
         auto rhs = bG.scalar_mul(a);
@@ -329,7 +311,7 @@ static void test_ecdsa_roundtrip() {
 
     { const int total = SCALED(1000, 50);
     for (int i = 0; i < total; ++i) {
-        auto sk = random_scalar();
+        auto sk = random_scalar(rng);
         auto pk = G.scalar_mul(sk);
         std::array<uint8_t, 32> msg{};
         uint64_t v = rng();
@@ -348,7 +330,7 @@ static void test_ecdsa_roundtrip() {
         msg[0] ^= 0x01;
 
         // Wrong key
-        auto pk2 = G.scalar_mul(random_scalar());
+        auto pk2 = G.scalar_mul(random_scalar(rng));
         CHECK(!secp256k1::ecdsa_verify(msg, pk2, sig), "wrong key fails");
         if ((i+1) % (total/5+1) == 0) printf("      %d/%d\n", i+1, total);
     } }
@@ -365,7 +347,7 @@ static void test_schnorr_roundtrip() {
 
     { const int total = SCALED(1000, 50);
     for (int i = 0; i < total; ++i) {
-        auto sk = random_scalar();
+        auto sk = random_scalar(rng);
         std::array<uint8_t, 32> msg{};
         uint64_t v = rng();
         std::memcpy(msg.data(), &v, 8);
@@ -398,7 +380,7 @@ static void test_stress_random() {
 
     { const int total = SCALED(100000, 1000);
     for (int i = 0; i < total; ++i) {
-        auto k = random_scalar();
+        auto k = random_scalar(rng);
         auto P = G.scalar_mul(k);
 
         // Check not infinity (probability negligible for random k)

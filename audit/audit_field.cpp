@@ -23,22 +23,10 @@ static int g_pass = 0, g_fail = 0;
 static const char* g_section = "";
 
 #include "audit_check.hpp"
+#include "audit_helpers.hpp"
 
 // Deterministic PRNG
 static std::mt19937_64 rng(0xA0D17'F1E1D);  // NOLINT(cert-msc32-c,cert-msc51-cpp)
-
-static std::array<uint8_t, 32> random_bytes() {
-    std::array<uint8_t, 32> out{};
-    for (int i = 0; i < 4; ++i) {
-        uint64_t v = rng();
-        std::memcpy(out.data() + static_cast<std::size_t>(i) * 8, &v, 8);
-    }
-    return out;
-}
-
-static FieldElement random_fe() {
-    return FieldElement::from_bytes(random_bytes());
-}
 
 // The prime p as bytes (big-endian)
 static const std::array<uint8_t, 32> P_BYTES = {
@@ -60,23 +48,23 @@ static void test_addition_overflow() {
 
     // a + 0 == a
     for (int i = 0; i < SCALED(1000, 50); ++i) {
-        auto a = random_fe();
+        auto a = random_fe(rng);
         auto r = a + zero;
         CHECK(r == a, "a + 0 == a");
     }
 
     // a + b == b + a (commutativity)
     for (int i = 0; i < SCALED(1000, 50); ++i) {
-        auto a = random_fe();
-        auto b = random_fe();
+        auto a = random_fe(rng);
+        auto b = random_fe(rng);
         CHECK((a + b) == (b + a), "a+b == b+a");
     }
 
     // (a + b) + c == a + (b + c) (associativity)
     for (int i = 0; i < SCALED(1000, 50); ++i) {
-        auto a = random_fe();
-        auto b = random_fe();
-        auto c = random_fe();
+        auto a = random_fe(rng);
+        auto b = random_fe(rng);
+        auto c = random_fe(rng);
         CHECK(((a + b) + c) == (a + (b + c)), "(a+b)+c == a+(b+c)");
     }
 
@@ -92,7 +80,7 @@ static void test_addition_overflow() {
 
     // Large value near p
     for (int i = 0; i < 100; ++i) {
-        auto a = random_fe();
+        auto a = random_fe(rng);
         auto neg_a = a.negate();
         auto sum = a + neg_a;
         CHECK(sum == zero, "a + (-a) == 0");
@@ -112,19 +100,19 @@ static void test_subtraction_borrow() {
 
     // a - a == 0
     for (int i = 0; i < SCALED(1000, 50); ++i) {
-        auto a = random_fe();
+        auto a = random_fe(rng);
         CHECK((a - a) == zero, "a - a == 0");
     }
 
     // a - 0 == a
     for (int i = 0; i < SCALED(1000, 50); ++i) {
-        auto a = random_fe();
+        auto a = random_fe(rng);
         CHECK((a - zero) == a, "a - 0 == a");
     }
 
     // 0 - a == -a
     for (int i = 0; i < SCALED(1000, 50); ++i) {
-        auto a = random_fe();
+        auto a = random_fe(rng);
         auto neg = a.negate();
         CHECK((zero - a) == neg, "0 - a == -a");
     }
@@ -153,36 +141,36 @@ static void test_mul_carry() {
 
     // a * 1 == a
     for (int i = 0; i < SCALED(1000, 50); ++i) {
-        auto a = random_fe();
+        auto a = random_fe(rng);
         CHECK((a * one) == a, "a * 1 == a");
     }
 
     // a * 0 == 0
     for (int i = 0; i < SCALED(1000, 50); ++i) {
-        auto a = random_fe();
+        auto a = random_fe(rng);
         CHECK((a * zero) == zero, "a * 0 == 0");
     }
 
     // a * b == b * a (commutativity)
     for (int i = 0; i < SCALED(1000, 50); ++i) {
-        auto a = random_fe();
-        auto b = random_fe();
+        auto a = random_fe(rng);
+        auto b = random_fe(rng);
         CHECK((a * b) == (b * a), "a*b == b*a");
     }
 
     // (a * b) * c == a * (b * c) (associativity)
     for (int i = 0; i < SCALED(1000, 50); ++i) {
-        auto a = random_fe();
-        auto b = random_fe();
-        auto c = random_fe();
+        auto a = random_fe(rng);
+        auto b = random_fe(rng);
+        auto c = random_fe(rng);
         CHECK(((a * b) * c) == (a * (b * c)), "(a*b)*c == a*(b*c)");
     }
 
     // a * (b + c) == a*b + a*c (distributivity)
     for (int i = 0; i < SCALED(1000, 50); ++i) {
-        auto a = random_fe();
-        auto b = random_fe();
-        auto c = random_fe();
+        auto a = random_fe(rng);
+        auto b = random_fe(rng);
+        auto c = random_fe(rng);
         CHECK((a * (b + c)) == ((a * b) + (a * c)), "a*(b+c) == a*b + a*c");
     }
 
@@ -197,7 +185,7 @@ static void test_square_vs_mul() {
     printf("[4] Square vs Mul equivalence\n");
 
     for (int i = 0; i < SCALED(10000, 200); ++i) {
-        auto a = random_fe();
+        auto a = random_fe(rng);
         auto sq = a.square();
         auto mul = a * a;
         CHECK(sq == mul, "a^2 == a*a");
@@ -247,7 +235,7 @@ static void test_reduction() {
 
     // to_bytes -> from_bytes roundtrip
     for (int i = 0; i < SCALED(1000, 50); ++i) {
-        auto a = random_fe();
+        auto a = random_fe(rng);
         auto bytes = a.to_bytes();
         auto b = FieldElement::from_bytes(bytes);
         CHECK(a == b, "to_bytes -> from_bytes roundtrip");
@@ -265,7 +253,7 @@ static void test_canonical() {
 
     // After to_bytes, all values should be < p
     for (int i = 0; i < SCALED(10000, 200); ++i) {
-        auto a = random_fe();
+        auto a = random_fe(rng);
         auto bytes = a.to_bytes();
 
         // Check bytes < P_BYTES (big-endian comparison)
@@ -309,7 +297,7 @@ static void test_limb_boundary() {
     // Stress: multiply near-max values
     for (int i = 0; i < SCALED(1000, 50); ++i) {
         // Generate value with high limbs
-        auto bytes = random_bytes();
+        auto bytes = random_bytes32(rng);
         bytes[0] = 0xFF; bytes[1] = 0xFF; bytes[2] = 0xFF; bytes[3] = 0xFF;
         auto a = FieldElement::from_bytes(bytes);
         auto b = FieldElement::from_bytes(bytes);
@@ -343,7 +331,7 @@ static void test_inverse() {
     };
 
     for (int i = 0; i < SCALED(10000, 200); ++i) {
-        auto a = random_fe();
+        auto a = random_fe(rng);
         if (a == FieldElement::from_uint64(0)) continue;
         auto inv = a.inverse();
         auto product = a * inv;
@@ -352,7 +340,7 @@ static void test_inverse() {
 
     // Double inverse: (a^-1)^-1 == a
     for (int i = 0; i < SCALED(1000, 50); ++i) {
-        auto a = random_fe();
+        auto a = random_fe(rng);
         if (a == FieldElement::from_uint64(0)) continue;
         auto inv_inv = a.inverse().inverse();
         CHECK(inv_inv == a, "(a^-1)^-1 == a");
@@ -375,7 +363,7 @@ static void test_inverse() {
     }
 
     for (int i = 0; i < SCALED(2000, 50); ++i) {
-        auto a = random_fe();
+        auto a = random_fe(rng);
         if (a == FieldElement::from_uint64(0)) continue;
         check_direct_inverse_paths(a);
     }
@@ -396,7 +384,7 @@ static void test_sqrt() {
     // sqrt(x^2) should give x or -x
     int qr_count = 0;
     for (int i = 0; i < SCALED(10000, 200); ++i) {
-        auto x = random_fe();
+        auto x = random_fe(rng);
         auto x2 = x.square();
         auto s = x2.sqrt();
         auto s2 = s.square();
@@ -419,7 +407,7 @@ static void test_batch_inverse() {
     constexpr int N = 256;
     std::vector<FieldElement> elems(N);
     for (int i = 0; i < N; ++i) {
-        elems[i] = random_fe();
+        elems[i] = random_fe(rng);
     }
 
     // Save copies
@@ -451,8 +439,8 @@ static void test_random_cross_check() {
     printf("[11] Random cross-check (100K operations)\n");
 
     for (int i = 0; i < SCALED(100000, 1000); ++i) {
-        auto a = random_fe();
-        auto b = random_fe();
+        auto a = random_fe(rng);
+        auto b = random_fe(rng);
 
         // (a + b) - b == a
         CHECK(((a + b) - b) == a, "(a+b)-b == a");
@@ -509,7 +497,7 @@ static void test_jacobi() {
     int agree = 0, qr_count = 0, nqr_count = 0;
     int total = SCALED(5000, 100);
     for (int i = 0; i < total; ++i) {
-        auto x_fe = random_fe();
+        auto x_fe = random_fe(rng);
         // Skip zero (edge case already tested)
         if (x_fe == FieldElement::zero()) continue;
 
@@ -531,7 +519,7 @@ static void test_jacobi() {
 
     // --- x^2 is always QR ---
     for (int i = 0; i < SCALED(1000, 50); ++i) {
-        auto x_fe = random_fe();
+        auto x_fe = random_fe(rng);
         if (x_fe == FieldElement::zero()) continue;
         auto x2_52 = FieldElement52::from_fe(x_fe.square());
         CHECK(x2_52.jacobi_var() == 1, "jacobi(x^2) == +1 always");
@@ -542,7 +530,7 @@ static void test_jacobi() {
     {
         auto two = FieldElement::from_uint64(2);
         for (int i = 0; i < SCALED(500, 20); ++i) {
-            auto x_fe = random_fe();
+            auto x_fe = random_fe(rng);
             if (x_fe == FieldElement::zero()) continue;
             auto x52  = FieldElement52::from_fe(x_fe);
             auto x2   = FieldElement52::from_fe(x_fe * two);

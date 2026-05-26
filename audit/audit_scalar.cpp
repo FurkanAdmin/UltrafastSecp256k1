@@ -21,24 +21,9 @@ static int g_pass = 0, g_fail = 0;
 static const char* g_section = "";
 
 #include "audit_check.hpp"
+#include "audit_helpers.hpp"
 
 static std::mt19937_64 rng(0xA0D17'5CA1A);  // NOLINT(cert-msc32-c,cert-msc51-cpp)
-
-static std::array<uint8_t, 32> random_bytes() {
-    std::array<uint8_t, 32> out{};
-    for (int i = 0; i < 4; ++i) {
-        uint64_t v = rng();
-        std::memcpy(out.data() + static_cast<std::size_t>(i) * 8, &v, 8);
-    }
-    return out;
-}
-
-static Scalar random_scalar() {
-    for (;;) {
-        auto s = Scalar::from_bytes(random_bytes());
-        if (!s.is_zero()) return s;
-    }
-}
 
 // ============================================================================
 // 1. mod n reduction
@@ -69,7 +54,7 @@ static void test_mod_n_reduction() {
     // to_bytes -> from_bytes roundtrip
     { const int total = SCALED(10000, 200);
     for (int i = 0; i < total; ++i) {
-        auto s = random_scalar();
+        auto s = random_scalar(rng);
         auto bytes = s.to_bytes();
         auto s2 = Scalar::from_bytes(bytes);
         CHECK(s == s2, "roundtrip");
@@ -97,7 +82,7 @@ static void test_overflow_normalization() {
 
     { const int total = SCALED(10000, 200);
     for (int i = 0; i < total; ++i) {
-        auto bytes = random_bytes();
+        auto bytes = random_bytes32(rng);
         auto s = Scalar::from_bytes(bytes);
         // Verify serialized form is < n
         auto out = s.to_bytes();
@@ -151,13 +136,13 @@ static void test_edge_scalars() {
 
     // 0 * anything == 0
     for (int i = 0; i < 100; ++i) {
-        auto s = random_scalar();
+        auto s = random_scalar(rng);
         CHECK((zero * s).is_zero(), "0 * s == 0");
     }
 
     // 1 * anything == anything  
     for (int i = 0; i < 100; ++i) {
-        auto s = random_scalar();
+        auto s = random_scalar(rng);
         CHECK((one * s) == s, "1 * s == s");
     }
 
@@ -179,9 +164,9 @@ static void test_scalar_laws() {
 
     { const int total = SCALED(10000, 200);
     for (int i = 0; i < total; ++i) {
-        auto a = random_scalar();
-        auto b = random_scalar();
-        auto c = random_scalar();
+        auto a = random_scalar(rng);
+        auto b = random_scalar(rng);
+        auto c = random_scalar(rng);
 
         // Commutativity
         CHECK((a + b) == (b + a), "a+b == b+a");
@@ -210,7 +195,7 @@ static void test_scalar_inverse() {
 
     { const int total = SCALED(10000, 200);
     for (int i = 0; i < total; ++i) {
-        auto a = random_scalar();
+        auto a = random_scalar(rng);
         auto inv = a.inverse();
         CHECK((a * inv) == one, "a * a^-1 == 1");
         if ((i+1) % (total/5+1) == 0) printf("      inverse %d/%d\n", i+1, total);
@@ -219,7 +204,7 @@ static void test_scalar_inverse() {
     // Double inverse
     { const int total = SCALED(1000, 50);
     for (int i = 0; i < total; ++i) {
-        auto a = random_scalar();
+        auto a = random_scalar(rng);
         CHECK(a.inverse().inverse() == a, "(a^-1)^-1 == a");
         if ((i+1) % (total/5+1) == 0) printf("      dbl_inv %d/%d\n", i+1, total);
     } }
@@ -240,7 +225,7 @@ static void test_glv_split() {
     // (scalar_mul internally uses GLV, but we verify algebraic identity)
     { const int total = SCALED(1000, 50);
     for (int i = 0; i < total; ++i) {
-        auto k = random_scalar();
+        auto k = random_scalar(rng);
 
         // Compute k*G
         auto P = G.scalar_mul(k);
@@ -298,7 +283,7 @@ static void test_negate() {
 
     { const int total = SCALED(10000, 200);
     for (int i = 0; i < total; ++i) {
-        auto a = random_scalar();
+        auto a = random_scalar(rng);
         auto neg = a.negate();
         CHECK((a + neg).is_zero(), "a + (-a) == 0");
         CHECK(neg.negate() == a, "-(-a) == a");

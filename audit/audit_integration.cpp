@@ -39,27 +39,9 @@ static int g_pass = 0, g_fail = 0;
 static const char* g_section = "";
 
 #include "audit_check.hpp"
+#include "audit_helpers.hpp"
 
 static std::mt19937_64 rng(0xA0D17'1D7E6);  // NOLINT(cert-msc32-c,cert-msc51-cpp)
-
-static Scalar random_scalar() {
-    std::array<uint8_t, 32> out{};
-    for (int i = 0; i < 4; ++i) {
-        uint64_t v = rng();
-        std::memcpy(out.data() + static_cast<std::size_t>(i) * 8, &v, 8);
-    }
-    for (;;) {
-        auto s = Scalar::from_bytes(out);
-        if (!s.is_zero()) return s;
-        out[31] ^= 0x01;
-    }
-}
-
-static bool points_equal(const Point& a, const Point& b) {
-    if (a.is_infinity() && b.is_infinity()) return true;
-    if (a.is_infinity() != b.is_infinity()) return false;
-    return a.to_compressed() == b.to_compressed();
-}
 
 // ============================================================================
 // 1. ECDH key exchange -- symmetry & correctness
@@ -72,8 +54,8 @@ static void test_ecdh() {
 
     { const int total = SCALED(1000, 50);
     for (int i = 0; i < total; ++i) {
-        auto sk_a = random_scalar();
-        auto sk_b = random_scalar();
+        auto sk_a = random_scalar(rng);
+        auto sk_b = random_scalar(rng);
         auto pk_a = secp256k1::ct::generator_mul(sk_a);
         auto pk_b = secp256k1::ct::generator_mul(sk_b);
 
@@ -103,7 +85,7 @@ static void test_ecdh() {
 
     // ECDH with infinity should return zeros
     {
-        auto sk = random_scalar();
+        auto sk = random_scalar(rng);
         auto inf = Point::infinity();
         auto result = secp256k1::ecdh_compute(sk, inf);
         std::array<uint8_t, 32> const zeros{};
@@ -132,7 +114,7 @@ static void test_schnorr_batch_verify() {
     entries.reserve(N);
 
     for (int i = 0; i < N; ++i) {
-        auto sk = random_scalar();
+        auto sk = random_scalar(rng);
         auto pkx = secp256k1::schnorr_pubkey(sk);
         std::array<uint8_t, 32> msg{};
         uint64_t v = rng();
@@ -178,7 +160,7 @@ static void test_schnorr_batch_verify() {
     {
         std::vector<secp256k1::SchnorrBatchEntry> repeated_pk;
         repeated_pk.reserve(8);
-        auto sk = random_scalar();
+        auto sk = random_scalar(rng);
         auto pkx = secp256k1::schnorr_pubkey(sk);
         std::array<uint8_t, 32> const aux{};
         for (int i = 0; i < 8; ++i) {
@@ -229,7 +211,7 @@ static void test_ecdsa_batch_verify() {
     entries.reserve(N);
 
     for (int i = 0; i < N; ++i) {
-        auto sk = random_scalar();
+        auto sk = random_scalar(rng);
         auto pk = G.scalar_mul(sk);
         std::array<uint8_t, 32> msg{};
         uint64_t v = rng();
@@ -274,7 +256,7 @@ static void test_ecdsa_full_roundtrip() {
 
     { const int total = SCALED(1000, 50);
     for (int i = 0; i < total; ++i) {
-        auto sk = random_scalar();
+        auto sk = random_scalar(rng);
         auto pk = G.scalar_mul(sk);
         std::array<uint8_t, 32> msg{};
         uint64_t v = rng();
@@ -326,7 +308,7 @@ static void test_schnorr_cross_path() {
 
     { const int total_b = SCALED(500, BATCH_N);
     for (int i = 0; i < total_b; ++i) {
-        auto sk = random_scalar();
+        auto sk = random_scalar(rng);
         auto pkx = secp256k1::schnorr_pubkey(sk);
         std::array<uint8_t, 32> msg{};
         uint64_t v = rng();
@@ -364,7 +346,7 @@ static void test_fast_vs_ct_integration() {
 
     { const int total_ct = SCALED(500, 30);
     for (int i = 0; i < total_ct; ++i) {
-        auto sk = random_scalar();
+        auto sk = random_scalar(rng);
 
         // Generate pubkey via fast path
         auto pk_fast = G.scalar_mul(sk);
@@ -399,7 +381,7 @@ static void test_combined_protocol() {
 
     for (int i = 0; i < 100; ++i) {
         // Alice and Bob generate keys
-        auto sk_a = random_scalar(), sk_b = random_scalar();
+        auto sk_a = random_scalar(rng), sk_b = random_scalar(rng);
         auto pk_a = G.scalar_mul(sk_a), pk_b = G.scalar_mul(sk_b);
 
         // ECDH: derive shared secret
@@ -439,7 +421,7 @@ static void test_multikey_consistency() {
 
     for (int i = 0; i < 200; ++i) {
         // k1 + k2 -> (k1+k2)*G should equal k1*G + k2*G
-        auto k1 = random_scalar(), k2 = random_scalar();
+        auto k1 = random_scalar(rng), k2 = random_scalar(rng);
         auto sum_scalar = k1 + k2;
 
         auto pk_sum = G.scalar_mul(sum_scalar);
@@ -462,7 +444,7 @@ static void test_schnorr_ecdsa_key_consistency() {
     auto G = Point::generator();
 
     for (int i = 0; i < 200; ++i) {
-        auto sk = random_scalar();
+        auto sk = random_scalar(rng);
 
         // ECDSA full pubkey
         auto pk = G.scalar_mul(sk);
@@ -512,7 +494,7 @@ static void test_stress_mixed() {
     int const total_ops = SCALED(5000, 100);
 
     for (int i = 0; i < total_ops; ++i) {
-        auto sk = random_scalar();
+        auto sk = random_scalar(rng);
         auto pk = G.scalar_mul(sk);
         std::array<uint8_t, 32> msg{};
         uint64_t v = rng();
@@ -533,7 +515,7 @@ static void test_stress_mixed() {
             break;
         }
         case 2: { // ECDH
-            auto sk2 = random_scalar();
+            auto sk2 = random_scalar(rng);
             auto pk2 = G.scalar_mul(sk2);
             auto s1 = secp256k1::ecdh_compute(sk, pk2);
             auto s2 = secp256k1::ecdh_compute(sk2, pk);
@@ -581,7 +563,7 @@ static void test_ecdsa_batch_nsweep() {
         entries.reserve(n);
 
         for (int i = 0; i < n; ++i) {
-            auto sk = random_scalar();
+            auto sk = random_scalar(rng);
             auto pk = G.scalar_mul(sk);
             std::array<uint8_t, 32> msg{};
             uint64_t v = rng();
@@ -635,9 +617,9 @@ static void test_pippenger_large_n() {
 
         // Generate random scalars and points
         for (int i = 0; i < n; ++i) {
-            scalars[i] = random_scalar();
+            scalars[i] = random_scalar(rng);
             // Use small multiples of G for fast generation
-            points[i] = G.scalar_mul(random_scalar());
+            points[i] = G.scalar_mul(random_scalar(rng));
         }
 
         // Compute via Pippenger

@@ -37,21 +37,9 @@ static int g_pass = 0, g_fail = 0;
 static const char* g_section = "";
 
 #include "audit_check.hpp"
+#include "audit_helpers.hpp"
 
 static std::mt19937_64 rng(0xA0D17'5EC0A);  // NOLINT(cert-msc32-c,cert-msc51-cpp)
-
-static Scalar random_scalar() {
-    std::array<uint8_t, 32> out{};
-    for (int i = 0; i < 4; ++i) {
-        uint64_t v = rng();
-        std::memcpy(out.data() + static_cast<std::size_t>(i) * 8, &v, 8);
-    }
-    for (;;) {
-        auto s = Scalar::from_bytes(out);
-        if (!s.is_zero()) return s;
-        out[31] ^= 0x01;
-    }
-}
 
 // ============================================================================
 // 1. Zero / identity key handling
@@ -180,7 +168,7 @@ static void test_zeroization() {
 
     // Scalar zeroization pattern
     {
-        auto sk = random_scalar();
+        auto sk = random_scalar(rng);
         auto sk_bytes = sk.to_bytes();
         secp256k1::ct::ct_memzero(sk_bytes.data(), sk_bytes.size());
         CHECK(secp256k1::ct::ct_is_zero(sk_bytes), "scalar bytes zeroed");
@@ -207,7 +195,7 @@ static void test_bitflip_resilience() {
     auto G = Point::generator();
 
     for (int i = 0; i < N; ++i) {
-        auto sk = random_scalar();
+        auto sk = random_scalar(rng);
         auto pk = G.scalar_mul(sk);
         std::array<uint8_t, 32> msg{};
         uint64_t v = rng();
@@ -248,7 +236,7 @@ static void test_message_bitflip() {
 
     { const int total = SCALED(1000, 50);
     for (int i = 0; i < total; ++i) {
-        auto sk = random_scalar();
+        auto sk = random_scalar(rng);
         auto pk = G.scalar_mul(sk);
         std::array<uint8_t, 32> msg{};
         uint64_t v = rng();
@@ -281,7 +269,7 @@ static void test_nonce_determinism() {
 
     // Same key + same message -> same signature
     for (int i = 0; i < 100; ++i) {
-        auto sk = random_scalar();
+        auto sk = random_scalar(rng);
         std::array<uint8_t, 32> msg{};
         uint64_t v = rng();
         std::memcpy(msg.data(), &v, 8);
@@ -295,7 +283,7 @@ static void test_nonce_determinism() {
 
     // Different messages -> different r (overwhelming probability)
     {
-        auto sk = random_scalar();
+        auto sk = random_scalar(rng);
         std::array<uint8_t, 32> msg1{}, msg2{};
         msg1[0] = 0x01;
         msg2[0] = 0x02;
@@ -321,7 +309,7 @@ static void test_serialization_integrity() {
     // Point serialization
     { const int total = SCALED(1000, 50);
     for (int i = 0; i < total; ++i) {
-        auto P = G.scalar_mul(random_scalar());
+        auto P = G.scalar_mul(random_scalar(rng));
 
         auto comp = P.to_compressed();
         auto uncomp = P.to_uncompressed();
@@ -343,7 +331,7 @@ static void test_serialization_integrity() {
     // Scalar byte round-trip
     { const int total_s = SCALED(1000, 50);
     for (int i = 0; i < total_s; ++i) {
-        auto s = random_scalar();
+        auto s = random_scalar(rng);
         auto bytes = s.to_bytes();
         auto restored = Scalar::from_bytes(bytes);
         CHECK(s == restored, "scalar byte round-trip");
@@ -382,7 +370,7 @@ static void test_compact_recovery_serial() {
 
     { const int total_r = SCALED(1000, 50);
     for (int i = 0; i < total_r; ++i) {
-        auto sk = random_scalar();
+        auto sk = random_scalar(rng);
         std::array<uint8_t, 32> msg{};
         uint64_t v = rng();
         std::memcpy(msg.data(), &v, 8);
@@ -412,7 +400,7 @@ static void test_double_ops() {
     // Double inverse: inv(inv(a)) == a
     { const int total_i = SCALED(1000, 50);
     for (int i = 0; i < total_i; ++i) {
-        auto a = random_scalar();
+        auto a = random_scalar(rng);
         auto inv1 = a.inverse();
         auto inv2 = inv1.inverse();
         CHECK(a == inv2, "scalar: inv(inv(a)) == a");
@@ -422,7 +410,7 @@ static void test_double_ops() {
     // Double negate: neg(neg(P)) == P
     { const int total_n = SCALED(1000, 50);
     for (int i = 0; i < total_n; ++i) {
-        auto P = G.scalar_mul(random_scalar());
+        auto P = G.scalar_mul(random_scalar(rng));
         auto nn = P.negate().negate();
         auto P_bytes = P.to_compressed();
         auto nn_bytes = nn.to_compressed();
@@ -432,7 +420,7 @@ static void test_double_ops() {
 
     // Double dbl consistency
     for (int i = 0; i < 100; ++i) {
-        auto P = G.scalar_mul(random_scalar());
+        auto P = G.scalar_mul(random_scalar(rng));
         auto P4a = P.dbl().dbl();
         auto P4b = P.scalar_mul(Scalar::from_uint64(4));
         CHECK(P4a.to_compressed() == P4b.to_compressed(), "dbl(dbl(P)) == 4*P");
@@ -452,7 +440,7 @@ static void test_cross_algorithm() {
     auto G = Point::generator();
 
     for (int i = 0; i < 100; ++i) {
-        auto sk = random_scalar();
+        auto sk = random_scalar(rng);
         auto ecdsa_pk = G.scalar_mul(sk);
         auto schnorr_pkx = secp256k1::schnorr_pubkey(sk);
 
@@ -489,7 +477,7 @@ static void test_high_s_rejection() {
 
     { const int total_h = SCALED(1000, 50);
     for (int i = 0; i < total_h; ++i) {
-        auto sk = random_scalar();
+        auto sk = random_scalar(rng);
         std::array<uint8_t, 32> msg{};
         uint64_t v = rng();
         std::memcpy(msg.data(), &v, 8);

@@ -52,23 +52,15 @@ static int g_pass = 0;
 static int g_fail = 0;
 
 #include "audit_check.hpp"
+#include "audit_helpers.hpp"
 
 static std::mt19937_64 rng(42);
 static int g_multiplier = 1;
 
-static std::array<uint8_t, 32> random_bytes() {
-    std::array<uint8_t, 32> out{};
-    for (int i = 0; i < 4; ++i) {
-        uint64_t v = rng();
-        std::memcpy(out.data() + i * 8, &v, 8);
-    }
-    return out;
-}
-
 // Generate valid secret key (non-zero, < curve order n)
 static std::array<uint8_t, 32> random_seckey(const secp256k1_context* ctx) {
     for (;;) {
-        auto sk = random_bytes();
+        auto sk = random_bytes32(rng);
         if (secp256k1_ec_seckey_verify(ctx, sk.data())) return sk;
     }
 }
@@ -142,7 +134,7 @@ static void test_ecdsa_uf_sign_ref_verify(const secp256k1_context* ctx) {
 
     for (int i = 0; i < N; ++i) {
         auto sk_bytes = random_seckey(ctx);
-        auto msg = random_bytes();
+        auto msg = random_bytes32(rng);
 
         // --- Sign with UltrafastSecp256k1 ---
         auto uf_sk = scalar_from_bytes32(sk_bytes.data());
@@ -179,7 +171,7 @@ static void test_ecdsa_ref_sign_uf_verify(const secp256k1_context* ctx) {
 
     for (int i = 0; i < N; ++i) {
         auto sk_bytes = random_seckey(ctx);
-        auto msg = random_bytes();
+        auto msg = random_bytes32(rng);
 
         // --- Sign with reference libsecp256k1 ---
         // Both libs expect a pre-hashed 32-byte digest -- use msg directly.
@@ -217,8 +209,8 @@ static void test_schnorr_cross(const secp256k1_context* ctx) {
 
     for (int i = 0; i < N; ++i) {
         auto sk_bytes = random_seckey(ctx);
-        auto msg = random_bytes();
-        auto aux = random_bytes();
+        auto msg = random_bytes32(rng);
+        auto aux = random_bytes32(rng);
 
         // -- Sign with UF, verify with Ref --
 
@@ -281,7 +273,7 @@ static void test_ecdsa_sig_match(const secp256k1_context* ctx) {
 
     for (int i = 0; i < N; ++i) {
         auto sk_bytes = random_seckey(ctx);
-        auto msg = random_bytes();
+        auto msg = random_bytes32(rng);
 
         // Both libraries take a pre-hashed 32-byte message digest.
         // Pass the same 32 bytes (msg) directly to both.
@@ -470,8 +462,8 @@ static void test_schnorr_batch_cross(const secp256k1_context* ctx) {
         // Generate BATCH_SIZE valid Schnorr signatures
         for (int j = 0; j < BATCH_SIZE; ++j) {
             auto sk_bytes = random_seckey(ctx);
-            auto msg = random_bytes();
-            auto aux = random_bytes();
+            auto msg = random_bytes32(rng);
+            auto aux = random_bytes32(rng);
 
             auto uf_sk = scalar_from_bytes32(sk_bytes.data());
             auto uf_sig = secp256k1::schnorr_sign(uf_sk, msg, aux);
@@ -521,7 +513,7 @@ static void test_ecdsa_batch_cross(const secp256k1_context* ctx) {
 
         for (int j = 0; j < BATCH_SIZE; ++j) {
             auto sk_bytes = random_seckey(ctx);
-            auto msg = random_bytes();
+            auto msg = random_bytes32(rng);
 
             // Sign with UF
             auto uf_sk = scalar_from_bytes32(sk_bytes.data());
@@ -613,7 +605,7 @@ static void test_extended_edge_cases(const secp256k1_context* ctx) {
         const int N = SCALED(100, 10) * g_multiplier;
         for (int i = 0; i < N; ++i) {
             auto sk_bytes = random_seckey(ctx);
-            auto msg = random_bytes();
+            auto msg = random_bytes32(rng);
 
             // Sign with UF
             auto uf_sk = scalar_from_bytes32(sk_bytes.data());
@@ -631,7 +623,7 @@ static void test_extended_edge_cases(const secp256k1_context* ctx) {
             CHECK(rejected, "mutated ECDSA sig rejected");
 
             // Same for Schnorr
-            auto aux = random_bytes();
+            auto aux = random_bytes32(rng);
             auto uf_schnorr_sig = secp256k1::schnorr_sign(uf_sk, msg, aux);
             auto pk_x = secp256k1::schnorr_pubkey(uf_sk);
 

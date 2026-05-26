@@ -37,21 +37,9 @@ static int g_pass = 0, g_fail = 0;
 static const char* g_section = "";
 
 #include "audit_check.hpp"
+#include "audit_helpers.hpp"
 
 static std::mt19937_64 rng(0xA0D17'F0220);  // NOLINT(cert-msc32-c,cert-msc51-cpp)
-
-static Scalar random_scalar() {
-    std::array<uint8_t, 32> out{};
-    for (int i = 0; i < 4; ++i) {
-        uint64_t v = rng();
-        std::memcpy(out.data() + static_cast<std::size_t>(i) * 8, &v, 8);
-    }
-    for (;;) {
-        auto s = Scalar::from_bytes(out);
-        if (!s.is_zero()) return s;
-        out[31] ^= 0x01;
-    }
-}
 
 // ============================================================================
 // 1. Malformed public key rejection
@@ -61,7 +49,7 @@ static void test_malformed_pubkeys() {
     printf("[1] Malformed public key rejection\n");
 
     auto G = Point::generator();
-    auto sk = random_scalar();
+    auto sk = random_scalar(rng);
     auto pk = G.scalar_mul(sk);
     std::array<uint8_t, 32> msg{};
     msg[0] = 0x42;
@@ -77,7 +65,7 @@ static void test_malformed_pubkeys() {
     // Verify with a point NOT on curve: modify y of a valid point
     // We can't easily construct off-curve points with the typed API,
     // but we can verify wrong-key rejection
-    auto wrong_pk = G.scalar_mul(random_scalar());
+    auto wrong_pk = G.scalar_mul(random_scalar(rng));
     CHECK(!secp256k1::ecdsa_verify(msg, wrong_pk, sig), "wrong pk fails");
 
     printf("    %d checks\n\n", g_pass);
@@ -91,7 +79,7 @@ static void test_invalid_ecdsa_sigs() {
     printf("[2] Invalid ECDSA signatures\n");
 
     auto G = Point::generator();
-    auto sk = random_scalar();
+    auto sk = random_scalar(rng);
     auto pk = G.scalar_mul(sk);
     std::array<uint8_t, 32> msg{};
     msg[0] = 0x99;
@@ -137,7 +125,7 @@ static void test_invalid_schnorr_sigs() {
     g_section = "bad_schn";
     printf("[3] Invalid Schnorr signatures\n");
 
-    auto sk = random_scalar();
+    auto sk = random_scalar(rng);
     auto pk_x = secp256k1::schnorr_pubkey(sk);
     std::array<uint8_t, 32> msg{};
     msg[0] = 0xAA;
@@ -259,7 +247,7 @@ static void test_recovery_edges() {
 
     { const int total = SCALED(1000, 50);
     for (int i = 0; i < total; ++i) {
-        auto sk = random_scalar();
+        auto sk = random_scalar(rng);
         auto pk = G.scalar_mul(sk);
         std::array<uint8_t, 32> msg{};
         uint64_t v = rng();
@@ -292,7 +280,7 @@ static void test_recovery_edges() {
 
     // Invalid recid
     {
-        auto sk = random_scalar();
+        auto sk = random_scalar(rng);
         std::array<uint8_t, 32> const msg{};
         auto rsig = secp256k1::ecdsa_sign_recoverable(msg, sk);
         // recid 4 should fail
@@ -317,7 +305,7 @@ static void test_random_op_sequence() {
     { const int total = SCALED(10000, 200);
     for (int i = 0; i < total; ++i) {
         int const op = static_cast<int>(rng() % 6);
-        auto k = random_scalar();
+        auto k = random_scalar(rng);
 
         switch (op) {
         case 0: // scalar mul
@@ -374,7 +362,7 @@ static void test_der_roundtrip() {
 
     { const int total = SCALED(1000, 50);
     for (int i = 0; i < total; ++i) {
-        auto sk = random_scalar();
+        auto sk = random_scalar(rng);
         std::array<uint8_t, 32> msg{};
         uint64_t v = rng();
         std::memcpy(msg.data(), &v, 8);
@@ -405,7 +393,7 @@ static void test_schnorr_bytes_roundtrip() {
 
     { const int total = SCALED(1000, 50);
     for (int i = 0; i < total; ++i) {
-        auto sk = random_scalar();
+        auto sk = random_scalar(rng);
         std::array<uint8_t, 32> msg{};
         uint64_t v = rng();
         std::memcpy(msg.data(), &v, 8);
@@ -434,7 +422,7 @@ static void test_sig_normalization() {
 
     { const int total = SCALED(1000, 50);
     for (int i = 0; i < total; ++i) {
-        auto sk = random_scalar();
+        auto sk = random_scalar(rng);
         auto pk = G.scalar_mul(sk);
         std::array<uint8_t, 32> msg{};
         uint64_t v = rng();

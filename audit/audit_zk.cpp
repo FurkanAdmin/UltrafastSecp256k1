@@ -34,30 +34,9 @@ static int g_pass = 0, g_fail = 0;
 static const char* g_section = "";
 
 #include "audit_check.hpp"
+#include "audit_helpers.hpp"
 
 static std::mt19937_64 rng(0xA0D17'2B9E1ULL);  // NOLINT(cert-msc32-c,cert-msc51-cpp)
-
-static Scalar random_scalar() {
-    std::array<uint8_t, 32> out{};
-    for (int i = 0; i < 4; ++i) {
-        uint64_t v = rng();
-        std::memcpy(out.data() + static_cast<std::size_t>(i) * 8, &v, 8);
-    }
-    for (;;) {
-        auto s = Scalar::from_bytes(out);
-        if (!s.is_zero()) return s;
-        out[31] ^= 0x01;
-    }
-}
-
-static std::array<uint8_t, 32> random_bytes32() {
-    std::array<uint8_t, 32> out{};
-    for (int i = 0; i < 4; ++i) {
-        uint64_t v = rng();
-        std::memcpy(out.data() + static_cast<std::size_t>(i) * 8, &v, 8);
-    }
-    return out;
-}
 
 // Flip one bit in a 32-byte array (for rejection tests)
 static std::array<uint8_t, 32> flip_bit(std::array<uint8_t, 32> arr, int byte_idx, int bit_idx) {
@@ -76,10 +55,10 @@ static void run_zk1_knowledge_standard() {
 
     constexpr int N_ROUND_TRIP = AUDIT_SCALE(100);
     for (int i = 0; i < N_ROUND_TRIP; ++i) {
-        Scalar secret = random_scalar();
+        Scalar secret = random_scalar(rng);
         Point pubkey  = Point::generator().scalar_mul(secret);
-        auto  msg     = random_bytes32();
-        auto  aux     = random_bytes32();
+        auto  msg     = random_bytes32(rng);
+        auto  aux     = random_bytes32(rng);
 
         secp256k1::zk::KnowledgeProof proof =
             secp256k1::zk::knowledge_prove(secret, pubkey, msg, aux);
@@ -89,13 +68,13 @@ static void run_zk1_knowledge_standard() {
               "knowledge_verify(valid) should be true");
 
         // 2. Wrong public key rejected
-        Scalar other_secret = random_scalar();
+        Scalar other_secret = random_scalar(rng);
         Point  wrong_pubkey = Point::generator().scalar_mul(other_secret);
         CHECK(!secp256k1::zk::knowledge_verify(proof, wrong_pubkey, msg),
               "knowledge_verify(wrong pubkey) should be false");
 
         // 3. Wrong message rejected
-        auto wrong_msg = random_bytes32();
+        auto wrong_msg = random_bytes32(rng);
         // ensure msg != wrong_msg
         wrong_msg[0] ^= 0xFF;
         CHECK(!secp256k1::zk::knowledge_verify(proof, pubkey, wrong_msg),
@@ -105,10 +84,10 @@ static void run_zk1_knowledge_standard() {
     // 4. Tampered rx rejected
     constexpr int N_TAMPER = AUDIT_SCALE(50);
     for (int i = 0; i < N_TAMPER; ++i) {
-        Scalar secret = random_scalar();
+        Scalar secret = random_scalar(rng);
         Point  pubkey = Point::generator().scalar_mul(secret);
-        auto   msg    = random_bytes32();
-        auto   aux    = random_bytes32();
+        auto   msg    = random_bytes32(rng);
+        auto   aux    = random_bytes32(rng);
 
         secp256k1::zk::KnowledgeProof proof =
             secp256k1::zk::knowledge_prove(secret, pubkey, msg, aux);
@@ -121,10 +100,10 @@ static void run_zk1_knowledge_standard() {
 
     // 5. Tampered s rejected
     for (int i = 0; i < N_TAMPER; ++i) {
-        Scalar secret = random_scalar();
+        Scalar secret = random_scalar(rng);
         Point  pubkey = Point::generator().scalar_mul(secret);
-        auto   msg    = random_bytes32();
-        auto   aux    = random_bytes32();
+        auto   msg    = random_bytes32(rng);
+        auto   aux    = random_bytes32(rng);
 
         secp256k1::zk::KnowledgeProof proof =
             secp256k1::zk::knowledge_prove(secret, pubkey, msg, aux);
@@ -155,13 +134,13 @@ static void run_zk2_knowledge_base() {
     constexpr int N_ROUND_TRIP = AUDIT_SCALE(50);
     for (int i = 0; i < N_ROUND_TRIP; ++i) {
         // Generate a random base point B = b*G (nothing-up-my-sleeve base)
-        Scalar base_scalar = random_scalar();
+        Scalar base_scalar = random_scalar(rng);
         Point  base        = Point::generator().scalar_mul(base_scalar);
 
-        Scalar secret = random_scalar();
+        Scalar secret = random_scalar(rng);
         Point  point  = base.scalar_mul(secret);  // P = secret * B
-        auto   msg    = random_bytes32();
-        auto   aux    = random_bytes32();
+        auto   msg    = random_bytes32(rng);
+        auto   aux    = random_bytes32(rng);
 
         secp256k1::zk::KnowledgeProof proof =
             secp256k1::zk::knowledge_prove_base(secret, point, base, msg, aux);
@@ -176,7 +155,7 @@ static void run_zk2_knowledge_base() {
               "standard knowledge_verify should reject arbitrary-base proof");
 
         // 3. Wrong base rejected
-        Scalar wrong_base_scalar = random_scalar();
+        Scalar wrong_base_scalar = random_scalar(rng);
         Point  wrong_base        = Point::generator().scalar_mul(wrong_base_scalar);
         CHECK(!secp256k1::zk::knowledge_verify_base(proof, point, wrong_base, msg),
               "knowledge_verify_base(wrong base) should be false");
@@ -196,14 +175,14 @@ static void run_zk3_dleq() {
     for (int i = 0; i < N_ROUND_TRIP; ++i) {
         // G1 = generator, H = hash-to-curve (use random scalar * G as independent generator)
         Point G1 = Point::generator();
-        Scalar h_scalar = random_scalar();
+        Scalar h_scalar = random_scalar(rng);
         Point  H  = Point::generator().scalar_mul(h_scalar);
 
-        Scalar secret = random_scalar();
+        Scalar secret = random_scalar(rng);
         Point  P = G1.scalar_mul(secret);   // P = secret * G
         Point  Q = H.scalar_mul(secret);    // Q = secret * H  (same discrete log!)
 
-        auto aux = random_bytes32();
+        auto aux = random_bytes32(rng);
         secp256k1::zk::DLEQProof proof =
             secp256k1::zk::dleq_prove(secret, G1, H, P, Q, aux);
 
@@ -216,7 +195,7 @@ static void run_zk3_dleq() {
               "dleq_verify(swapped P,Q) should be false");
 
         // 3. Wrong Q (computed with different scalar)
-        Scalar wrong_scalar = random_scalar();
+        Scalar wrong_scalar = random_scalar(rng);
         Point  wrong_Q      = H.scalar_mul(wrong_scalar);
         CHECK(!secp256k1::zk::dleq_verify(proof, G1, H, P, wrong_Q),
               "dleq_verify(wrong Q) should be false");
@@ -226,13 +205,13 @@ static void run_zk3_dleq() {
     constexpr int N_TAMPER = AUDIT_SCALE(50);
     for (int i = 0; i < N_TAMPER; ++i) {
         Point  G1 = Point::generator();
-        Scalar h_scalar = random_scalar();
+        Scalar h_scalar = random_scalar(rng);
         Point  H  = Point::generator().scalar_mul(h_scalar);
 
-        Scalar secret = random_scalar();
+        Scalar secret = random_scalar(rng);
         Point  P = G1.scalar_mul(secret);
         Point  Q = H.scalar_mul(secret);
-        auto   aux = random_bytes32();
+        auto   aux = random_bytes32(rng);
 
         secp256k1::zk::DLEQProof proof =
             secp256k1::zk::dleq_prove(secret, G1, H, P, Q, aux);
@@ -275,8 +254,8 @@ static void run_zk4_range_proof() {
     };
 
     for (uint64_t value : boundary_values) {
-        Scalar blinding = random_scalar();
-        auto   aux      = random_bytes32();
+        Scalar blinding = random_scalar(rng);
+        auto   aux      = random_bytes32(rng);
 
         // Commit to the value
         secp256k1::PedersenCommitment commitment =
@@ -293,8 +272,8 @@ static void run_zk4_range_proof() {
     constexpr int N_RANDOM = AUDIT_SCALE(20);
     for (int i = 0; i < N_RANDOM; ++i) {
         uint64_t value    = static_cast<uint64_t>(rng());
-        Scalar   blinding = random_scalar();
-        auto     aux      = random_bytes32();
+        Scalar   blinding = random_scalar(rng);
+        auto     aux      = random_bytes32(rng);
 
         secp256k1::PedersenCommitment commitment =
             secp256k1::pedersen_commit(Scalar::from_uint64(value), blinding);
@@ -310,8 +289,8 @@ static void run_zk4_range_proof() {
     constexpr int N_TAMPER = AUDIT_SCALE(15);
     for (int i = 0; i < N_TAMPER; ++i) {
         uint64_t value    = static_cast<uint64_t>(rng()) & 0x0FFFFFFFFFFFFFFFULL;
-        Scalar   blinding = random_scalar();
-        auto     aux      = random_bytes32();
+        Scalar   blinding = random_scalar(rng);
+        auto     aux      = random_bytes32(rng);
 
         secp256k1::PedersenCommitment commitment =
             secp256k1::pedersen_commit(Scalar::from_uint64(value), blinding);
@@ -320,7 +299,7 @@ static void run_zk4_range_proof() {
             secp256k1::zk::range_prove(value, blinding, commitment, aux);
 
         // Commitment to a different value
-        Scalar   wrong_blinding = random_scalar();
+        Scalar   wrong_blinding = random_scalar(rng);
         secp256k1::PedersenCommitment wrong_commitment =
             secp256k1::pedersen_commit(Scalar::from_uint64(value + 1), wrong_blinding);
 
@@ -340,10 +319,10 @@ static void run_zk5_serialization() {
     // KnowledgeProof round-trip
     constexpr int N = AUDIT_SCALE(30);
     for (int i = 0; i < N; ++i) {
-        Scalar secret = random_scalar();
+        Scalar secret = random_scalar(rng);
         Point  pubkey = Point::generator().scalar_mul(secret);
-        auto   msg    = random_bytes32();
-        auto   aux    = random_bytes32();
+        auto   msg    = random_bytes32(rng);
+        auto   aux    = random_bytes32(rng);
 
         secp256k1::zk::KnowledgeProof proof =
             secp256k1::zk::knowledge_prove(secret, pubkey, msg, aux);
@@ -376,13 +355,13 @@ static void run_zk5_serialization() {
     // DLEQProof round-trip
     for (int i = 0; i < N; ++i) {
         Point  G1 = Point::generator();
-        Scalar h_scalar = random_scalar();
+        Scalar h_scalar = random_scalar(rng);
         Point  H  = Point::generator().scalar_mul(h_scalar);
 
-        Scalar secret = random_scalar();
+        Scalar secret = random_scalar(rng);
         Point  P = G1.scalar_mul(secret);
         Point  Q = H.scalar_mul(secret);
-        auto   aux = random_bytes32();
+        auto   aux = random_bytes32(rng);
 
         secp256k1::zk::DLEQProof proof =
             secp256k1::zk::dleq_prove(secret, G1, H, P, Q, aux);
@@ -412,8 +391,8 @@ static void run_zk6_pedersen_homomorphism() {
         uint64_t v1 = static_cast<uint64_t>(rng()) & 0x7FFFFFFFFFFFFFFFULL;
         uint64_t v2 = static_cast<uint64_t>(rng()) & 0x0FFFFFFFFFFFFFFFULL;
 
-        Scalar r1 = random_scalar();
-        Scalar r2 = random_scalar();
+        Scalar r1 = random_scalar(rng);
+        Scalar r2 = random_scalar(rng);
 
         secp256k1::PedersenCommitment c1 =
             secp256k1::pedersen_commit(Scalar::from_uint64(v1), r1);
@@ -436,7 +415,7 @@ static void run_zk6_pedersen_homomorphism() {
               "Pedersen homomorphism: C1+C2 == commit(v1+v2, r1+r2)");
 
         // Verify sum commitment carries correct blinding (v1+v2 with wrong blinding fails)
-        Scalar wrong_r = random_scalar();
+        Scalar wrong_r = random_scalar(rng);
         secp256k1::PedersenCommitment c_wrong_r =
             secp256k1::pedersen_commit(v_sum_scalar, wrong_r);
         if (wrong_r != r_sum) {
@@ -470,8 +449,8 @@ static void run_zk7_batch_range() {
 
     for (int i = 0; i < BATCH_SIZE; ++i) {
         values[i]    = static_cast<uint64_t>(rng());
-        blindings[i] = random_scalar();
-        auto aux     = random_bytes32();
+        blindings[i] = random_scalar(rng);
+        auto aux     = random_bytes32(rng);
         commitments[i] =
             secp256k1::pedersen_commit(Scalar::from_uint64(values[i]), blindings[i]);
         proofs[i] =
@@ -485,7 +464,7 @@ static void run_zk7_batch_range() {
 
     // One tampered commitment invalidates the batch
     secp256k1::PedersenCommitment bad_commit = commitments[BATCH_SIZE / 2];
-    Scalar bad_blinding = random_scalar();
+    Scalar bad_blinding = random_scalar(rng);
     bad_commit = secp256k1::pedersen_commit(
         Scalar::from_uint64(values[BATCH_SIZE / 2] + 1), bad_blinding);
 

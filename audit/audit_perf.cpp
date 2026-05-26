@@ -19,6 +19,7 @@
 #include "secp256k1/schnorr.hpp"
 #include "secp256k1/ct/point.hpp"
 #include "secp256k1/sanitizer_scale.hpp"
+#include "audit_helpers.hpp"
 
 using namespace secp256k1::fast;
 
@@ -30,28 +31,6 @@ using namespace secp256k1::fast;
 #endif
 
 static std::mt19937_64 rng(0xA0D17'BEFFA);  // NOLINT(cert-msc32-c,cert-msc51-cpp)
-
-static Scalar random_scalar() {
-    std::array<uint8_t, 32> out{};
-    for (int i = 0; i < 4; ++i) {
-        uint64_t v = rng();
-        std::memcpy(out.data() + static_cast<std::size_t>(i) * 8, &v, 8);
-    }
-    for (;;) {
-        auto s = Scalar::from_bytes(out);
-        if (!s.is_zero()) return s;
-        out[31] ^= 0x01;
-    }
-}
-
-static FieldElement random_fe() {
-    std::array<uint8_t, 32> out{};
-    for (int i = 0; i < 4; ++i) {
-        uint64_t v = rng();
-        std::memcpy(out.data() + static_cast<std::size_t>(i) * 8, &v, 8);
-    }
-    return FieldElement::from_bytes(out);
-}
 
 struct BenchResult {
     const char* name;
@@ -98,7 +77,7 @@ int main() {
 
     printf("[Field Arithmetic]\n");
 
-    auto fe_a = random_fe(), fe_b = random_fe();
+    auto fe_a = random_fe(rng), fe_b = random_fe(rng);
 
     print_result(BENCH("field_add", N_FIELD, {}, {
         fe_a = fe_a + fe_b;
@@ -121,7 +100,7 @@ int main() {
 
     printf("[Scalar Arithmetic]\n");
 
-    auto sc_a = random_scalar(), sc_b = random_scalar();
+    auto sc_a = random_scalar(rng), sc_b = random_scalar(rng);
 
     print_result(BENCH("scalar_add", N_SCALAR, {}, {
         sc_a = sc_a + sc_b;
@@ -141,8 +120,8 @@ int main() {
 
     printf("[Point Operations]\n");
 
-    auto P = G.scalar_mul(random_scalar());
-    auto Q = G.scalar_mul(random_scalar());
+    auto P = G.scalar_mul(random_scalar(rng));
+    auto Q = G.scalar_mul(random_scalar(rng));
 
     print_result(BENCH("point_add", N_POINT, {}, {
         P = P.add(Q);
@@ -150,7 +129,7 @@ int main() {
     print_result(BENCH("point_dbl", N_POINT, {}, {
         P = P.dbl();
     }));
-    print_result(BENCH("point_scalar_mul", N_POINT, auto k = random_scalar(), {
+    print_result(BENCH("point_scalar_mul", N_POINT, auto k = random_scalar(rng), {
         P = G.scalar_mul(k);
     }));
     print_result(BENCH("point_to_compressed", N_POINT, {}, {
@@ -162,7 +141,7 @@ int main() {
 
     printf("[ECDSA]\n");
 
-    auto ecdsa_sk = random_scalar();
+    auto ecdsa_sk = random_scalar(rng);
     auto ecdsa_pk = G.scalar_mul(ecdsa_sk);
     std::array<uint8_t, 32> ecdsa_msg{};
     ecdsa_msg[0] = 0x77;
@@ -180,7 +159,7 @@ int main() {
 
     printf("[Schnorr BIP-340]\n");
 
-    auto schnorr_sk = random_scalar();
+    auto schnorr_sk = random_scalar(rng);
     auto schnorr_pkx = secp256k1::schnorr_pubkey(schnorr_sk);
     std::array<uint8_t, 32> schnorr_msg{};
     schnorr_msg[0] = 0x88;
@@ -199,10 +178,10 @@ int main() {
 
     printf("[Constant-Time (comparison)]\n");
 
-    print_result(BENCH("ct_scalar_mul", N_CT, auto k = random_scalar(), {
+    print_result(BENCH("ct_scalar_mul", N_CT, auto k = random_scalar(rng), {
         P = secp256k1::ct::scalar_mul(G, k);
     }));
-    print_result(BENCH("ct_generator_mul", N_CT, auto k = random_scalar(), {
+    print_result(BENCH("ct_generator_mul", N_CT, auto k = random_scalar(rng), {
         P = secp256k1::ct::generator_mul(k);
     }));
     printf("\n");
@@ -227,15 +206,15 @@ int main() {
 int audit_perf_run() {
     // In unified mode, run a quick sanity check (reduced iterations)
     auto G = Point::generator();
-    auto k = random_scalar();
+    auto k = random_scalar(rng);
     auto P = G.scalar_mul(k);
-    auto fe_a = random_fe(), fe_b = random_fe();
+    auto fe_a = random_fe(rng), fe_b = random_fe(rng);
 
     // Quick smoke: each op produces non-trivial result
     auto fe_c = fe_a * fe_b;
     auto fe_d = fe_c.square();
     auto fe_e = fe_d.inverse();
-    auto sc_a = random_scalar(), sc_b = random_scalar();
+    auto sc_a = random_scalar(rng), sc_b = random_scalar(rng);
     auto sc_c = sc_a * sc_b;
     auto sc_d = sc_c.inverse();
     auto Q = P.add(G.scalar_mul(sc_a));
@@ -243,7 +222,7 @@ int audit_perf_run() {
     (void)fe_e; (void)sc_d; (void)R;
 
     // Verify ECDSA round-trip
-    auto ecdsa_sk = random_scalar();
+    auto ecdsa_sk = random_scalar(rng);
     auto ecdsa_pk = G.scalar_mul(ecdsa_sk);
     std::array<uint8_t, 32> msg{};
     msg[0] = 0x42;
@@ -251,7 +230,7 @@ int audit_perf_run() {
     if (!secp256k1::ecdsa_verify(msg, ecdsa_pk, sig)) return 1;
 
     // Verify Schnorr round-trip
-    auto schnorr_sk = random_scalar();
+    auto schnorr_sk = random_scalar(rng);
     auto schnorr_pkx = secp256k1::schnorr_pubkey(schnorr_sk);
     std::array<uint8_t, 32> schnorr_msg{}, aux{};
     schnorr_msg[0] = 0x99;

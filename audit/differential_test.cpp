@@ -41,6 +41,7 @@ using namespace secp256k1::fast;
 static int g_pass = 0, g_fail = 0;
 
 #include "audit_check.hpp"
+#include "audit_helpers.hpp"
 
 // Deterministic PRNG for reproducibility (seed can be changed for different runs)
 static std::mt19937_64 rng(42);  // NOLINT(cert-msc32-c,cert-msc51-cpp)
@@ -48,24 +49,6 @@ static std::mt19937_64 rng(42);  // NOLINT(cert-msc32-c,cert-msc51-cpp)
 // Iteration multiplier: 1 = default (CI), larger = nightly/stress.
 // Set via argv[1] or DIFFERENTIAL_MULTIPLIER env var.
 static int g_multiplier = 1;
-
-static std::array<uint8_t, 32> random_bytes() {
-    std::array<uint8_t, 32> out{};
-    for (int i = 0; i < 4; ++i) {
-        uint64_t v = rng();
-        std::memcpy(out.data() + static_cast<std::size_t>(i) * 8, &v, 8);
-    }
-    return out;
-}
-
-static Scalar random_scalar() {
-    // Generate valid non-zero scalar
-    for (;;) {
-        auto bytes = random_bytes();
-        auto s = Scalar::from_bytes(bytes);
-        if (!s.is_zero()) return s;
-    }
-}
 
 // -- Test: Public Key Derivation ---------------------------------------------
 
@@ -84,7 +67,7 @@ static void test_pubkey_derivation() {
 
     // Random keys
     for (int i = 0; i < N; ++i) {
-        auto sk = random_scalar();
+        auto sk = random_scalar(rng);
         auto pk = Point::generator().scalar_mul(sk);
         CHECK(!pk.is_infinity(), "pubkey not infinity");
 
@@ -109,9 +92,9 @@ static void test_ecdsa_cross() {
     printf("[2] ECDSA Sign+Verify Internal Consistency (%d rounds)\n", N);
 
     for (int i = 0; i < N; ++i) {
-        auto sk = random_scalar();
+        auto sk = random_scalar(rng);
         auto pk = Point::generator().scalar_mul(sk);
-        auto msg = random_bytes();
+        auto msg = random_bytes32(rng);
 
         auto sig = secp256k1::ecdsa_sign(msg, sk);
         CHECK(!sig.r.is_zero() && !sig.s.is_zero(), "non-zero sig");
@@ -123,14 +106,14 @@ static void test_ecdsa_cross() {
         CHECK(sig.is_low_s(), "sig is low-S");
 
         // Wrong message should fail
-        auto bad_msg = random_bytes();
+        auto bad_msg = random_bytes32(rng);
         if (bad_msg != msg) {
             bool const bad = secp256k1::ecdsa_verify(bad_msg, pk, sig);
             CHECK(!bad, "wrong msg fails");
         }
 
         // Wrong key should fail
-        auto sk2 = random_scalar();
+        auto sk2 = random_scalar(rng);
         auto pk2 = Point::generator().scalar_mul(sk2);
         if (!(sk == sk2)) {
             bool const bad = secp256k1::ecdsa_verify(msg, pk2, sig);
@@ -147,9 +130,9 @@ static void test_schnorr_cross() {
     printf("[3] Schnorr (BIP-340) Sign+Verify Internal Consistency (%d rounds)\n", N);
 
     for (int i = 0; i < N; ++i) {
-        auto sk = random_scalar();
-        auto msg = random_bytes();
-        auto aux = random_bytes();
+        auto sk = random_scalar(rng);
+        auto msg = random_bytes32(rng);
+        auto aux = random_bytes32(rng);
 
         auto sig = secp256k1::schnorr_sign(sk, msg, aux);
 
@@ -160,7 +143,7 @@ static void test_schnorr_cross() {
         CHECK(valid, "own schnorr sig verifies");
 
         // Wrong message should fail
-        auto bad_msg = random_bytes();
+        auto bad_msg = random_bytes32(rng);
         if (bad_msg != msg) {
             bool const bad = secp256k1::schnorr_verify(pk_x, bad_msg, sig);
             CHECK(!bad, "wrong msg fails schnorr");
@@ -191,7 +174,7 @@ static void test_point_arithmetic() {
 
     // k*G + (n-k)*G = infinity (where n is the curve order)
     for (int i = 0; i < N; ++i) {
-        auto k = random_scalar();
+        auto k = random_scalar(rng);
         auto neg_k = k.negate();
         auto kG = G.scalar_mul(k);
         auto neg_kG = G.scalar_mul(neg_k);
@@ -218,8 +201,8 @@ static void test_point_arithmetic() {
 
     // Scalar mul: (a*b)*G == a*(b*G)
     for (int i = 0; i < N; ++i) {
-        auto a = random_scalar();
-        auto b = random_scalar();
+        auto a = random_scalar(rng);
+        auto b = random_scalar(rng);
         auto ab = a * b;
         auto left = G.scalar_mul(ab);
         auto bG = G.scalar_mul(b);
@@ -239,8 +222,8 @@ static void test_scalar_arithmetic() {
 
     // a + b == b + a (commutativity)
     for (int i = 0; i < N; ++i) {
-        auto a = random_scalar();
-        auto b = random_scalar();
+        auto a = random_scalar(rng);
+        auto b = random_scalar(rng);
         auto ab = a + b;
         auto ba = b + a;
         CHECK(ab == ba, "a+b == b+a");
@@ -248,8 +231,8 @@ static void test_scalar_arithmetic() {
 
     // a * b == b * a
     for (int i = 0; i < N; ++i) {
-        auto a = random_scalar();
-        auto b = random_scalar();
+        auto a = random_scalar(rng);
+        auto b = random_scalar(rng);
         auto ab = a * b;
         auto ba = b * a;
         CHECK(ab == ba, "a*b == b*a");
@@ -257,7 +240,7 @@ static void test_scalar_arithmetic() {
 
     // a * a_inv == 1
     for (int i = 0; i < N; ++i) {
-        auto a = random_scalar();
+        auto a = random_scalar(rng);
         auto inv = a.inverse();
         auto product = a * inv;
         CHECK(product == Scalar::one(), "a * a^-1 == 1");
@@ -265,7 +248,7 @@ static void test_scalar_arithmetic() {
 
     // a + (-a) == 0
     for (int i = 0; i < N; ++i) {
-        auto a = random_scalar();
+        auto a = random_scalar(rng);
         auto neg = a.negate();
         auto sum = a + neg;
         CHECK(sum.is_zero(), "a + (-a) == 0");
@@ -282,7 +265,7 @@ static void test_field_arithmetic() {
 
     // x * x_inv == 1
     for (int i = 0; i < N; ++i) {
-        auto bytes = random_bytes();
+        auto bytes = random_bytes32(rng);
         auto x = FieldElement::from_bytes(bytes);
         if (x == FieldElement::zero()) continue;
         auto inv = x.inverse();
@@ -292,7 +275,7 @@ static void test_field_arithmetic() {
 
     // sqrt(x^2) == +/-x
     for (int i = 0; i < N; ++i) {
-        auto bytes = random_bytes();
+        auto bytes = random_bytes32(rng);
         auto x = FieldElement::from_bytes(bytes);
         auto x2 = x * x;
         auto s = x2.sqrt();
@@ -310,8 +293,8 @@ static void test_ecdsa_roundtrip() {
     const int N = SCALED(100, 10) * g_multiplier;
 
     for (int i = 0; i < N; ++i) {
-        auto sk = random_scalar();
-        auto msg = random_bytes();
+        auto sk = random_scalar(rng);
+        auto msg = random_bytes32(rng);
         auto sig = secp256k1::ecdsa_sign(msg, sk);
 
         // Compact roundtrip

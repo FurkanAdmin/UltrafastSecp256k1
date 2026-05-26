@@ -49,30 +49,9 @@ static int g_pass = 0, g_fail = 0;
 static const char* g_section = "";
 
 #include "audit_check.hpp"
+#include "audit_helpers.hpp"
 
 static std::mt19937_64 rng(0xA0D17'3F8C2ULL);  // NOLINT(cert-msc32-c,cert-msc51-cpp)
-
-static Scalar random_scalar() {
-    std::array<uint8_t, 32> out{};
-    for (int i = 0; i < 4; ++i) {
-        uint64_t v = rng();
-        std::memcpy(out.data() + static_cast<std::size_t>(i) * 8, &v, 8);
-    }
-    for (;;) {
-        auto s = Scalar::from_bytes(out);
-        if (!s.is_zero()) return s;
-        out[31] ^= 0x01;
-    }
-}
-
-static std::array<uint8_t, 32> random_bytes32() {
-    std::array<uint8_t, 32> out{};
-    for (int i = 0; i < 4; ++i) {
-        uint64_t v = rng();
-        std::memcpy(out.data() + static_cast<std::size_t>(i) * 8, &v, 8);
-    }
-    return out;
-}
 
 // Core invariant: point is on secp256k1 curve (y² = x³ + 7 mod p)
 static bool point_is_on_curve(const Point& P) {
@@ -92,8 +71,8 @@ static void run_inv1_point_add() {
 
     constexpr int N = AUDIT_SCALE(500);
     for (int i = 0; i < N; ++i) {
-        Scalar k1 = random_scalar();
-        Scalar k2 = random_scalar();
+        Scalar k1 = random_scalar(rng);
+        Scalar k2 = random_scalar(rng);
         Point P = Point::generator().scalar_mul(k1);
         Point Q = Point::generator().scalar_mul(k2);
 
@@ -122,8 +101,8 @@ static void run_inv2_scalar_mul() {
 
     constexpr int N = AUDIT_SCALE(500);
     for (int i = 0; i < N; ++i) {
-        Scalar k = random_scalar();
-        Scalar base_s = random_scalar();
+        Scalar k = random_scalar(rng);
+        Scalar base_s = random_scalar(rng);
         Point base = Point::generator().scalar_mul(base_s);
 
         // k * arbitrary_point
@@ -140,7 +119,7 @@ static void run_inv2_scalar_mul() {
     // CT scalar mul must also stay on curve
     constexpr int N_CT = AUDIT_SCALE(200);
     for (int i = 0; i < N_CT; ++i) {
-        Scalar k = random_scalar();
+        Scalar k = random_scalar(rng);
         Point ct_result = secp256k1::ct::generator_mul(k);
         CHECK(point_is_on_curve(ct_result),
               "INV-2: CT k*G must lie on secp256k1 curve");
@@ -155,8 +134,8 @@ static void run_inv3_field_normalization() {
 
     constexpr int N = AUDIT_SCALE(1000);
     for (int i = 0; i < N; ++i) {
-        auto a_bytes = random_bytes32();
-        auto b_bytes = random_bytes32();
+        auto a_bytes = random_bytes32(rng);
+        auto b_bytes = random_bytes32(rng);
         FieldElement a = FieldElement::from_bytes(a_bytes);
         FieldElement b = FieldElement::from_bytes(b_bytes);
 
@@ -188,8 +167,8 @@ static void run_inv4_scalar_range() {
 
     constexpr int N = AUDIT_SCALE(500);
     for (int i = 0; i < N; ++i) {
-        Scalar a = random_scalar();
-        Scalar b = random_scalar();
+        Scalar a = random_scalar(rng);
+        Scalar b = random_scalar(rng);
 
         // add
         Scalar add_r = a + b;
@@ -223,7 +202,7 @@ static void run_inv5_glv_decomposition() {
 
     constexpr int N = AUDIT_SCALE(200);
     for (int i = 0; i < N; ++i) {
-        Scalar k = random_scalar();
+        Scalar k = random_scalar(rng);
 
         // After GLV decomposition: k*G == (k1*G) + (k2 * lambda*G)
         // We verify via the output of scalar_mul with and without GLV
@@ -233,7 +212,7 @@ static void run_inv5_glv_decomposition() {
 
         // Two different scalars multiplied by the same point must give different results
         // (unless k1 == k2, which is astronomically unlikely with random inputs)
-        Scalar k2 = random_scalar();
+        Scalar k2 = random_scalar(rng);
         Point kG2 = Point::generator().scalar_mul(k2);
         // They should both be on curve
         CHECK(point_is_on_curve(kG2),
@@ -250,7 +229,7 @@ static void run_inv6_serialization() {
 
     constexpr int N = AUDIT_SCALE(200);
     for (int i = 0; i < N; ++i) {
-        Scalar k = random_scalar();
+        Scalar k = random_scalar(rng);
         Point P = Point::generator().scalar_mul(k);
 
         auto Px = P.x();
@@ -290,8 +269,8 @@ static void run_inv7_ecdsa_output() {
 
     constexpr int N = AUDIT_SCALE(100);
     for (int i = 0; i < N; ++i) {
-        Scalar privkey = random_scalar();
-        auto msg = random_bytes32();
+        Scalar privkey = random_scalar(rng);
+        auto msg = random_bytes32(rng);
 
         secp256k1::ECDSASignature sig = secp256k1::ecdsa_sign(msg, privkey);
 
@@ -322,9 +301,9 @@ static void run_inv8_schnorr_output() {
 
     constexpr int N = AUDIT_SCALE(100);
     for (int i = 0; i < N; ++i) {
-        Scalar privkey = random_scalar();
-        auto msg = random_bytes32();
-        auto aux = random_bytes32();
+        Scalar privkey = random_scalar(rng);
+        auto msg = random_bytes32(rng);
+        auto aux = random_bytes32(rng);
 
         secp256k1::SchnorrSignature sig = secp256k1::schnorr_sign(privkey, msg, aux);
 
@@ -357,7 +336,7 @@ static void run_inv9_infinity() {
 
     constexpr int N = AUDIT_SCALE(50);
     for (int i = 0; i < N; ++i) {
-        Scalar k = random_scalar();
+        Scalar k = random_scalar(rng);
         Point P = Point::generator().scalar_mul(k);
         auto Px = P.x();
         auto Py = P.y();
@@ -391,7 +370,7 @@ static void run_inv10_negation() {
 
     constexpr int N = AUDIT_SCALE(100);
     for (int i = 0; i < N; ++i) {
-        Scalar k = random_scalar();
+        Scalar k = random_scalar(rng);
         Point P = Point::generator().scalar_mul(k);
 
         // P + (-P) = O

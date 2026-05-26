@@ -29,36 +29,9 @@ static int g_pass = 0, g_fail = 0;
 static const char* g_section = "";
 
 #include "audit_check.hpp"
+#include "audit_helpers.hpp"
 
 static std::mt19937_64 rng(0xA0D17'C7C7A);  // NOLINT(cert-msc32-c,cert-msc51-cpp)
-
-static Scalar random_scalar() {
-    std::array<uint8_t, 32> out{};
-    for (int i = 0; i < 4; ++i) {
-        uint64_t v = rng();
-        std::memcpy(out.data() + static_cast<std::size_t>(i) * 8, &v, 8);
-    }
-    for (;;) {
-        auto s = Scalar::from_bytes(out);
-        if (!s.is_zero()) return s;
-        out[31] ^= 0x01;
-    }
-}
-
-static FieldElement random_fe() {
-    std::array<uint8_t, 32> out{};
-    for (int i = 0; i < 4; ++i) {
-        uint64_t v = rng();
-        std::memcpy(out.data() + static_cast<std::size_t>(i) * 8, &v, 8);
-    }
-    return FieldElement::from_bytes(out);
-}
-
-static bool points_equal(const Point& a, const Point& b) {
-    if (a.is_infinity() && b.is_infinity()) return true;
-    if (a.is_infinity() != b.is_infinity()) return false;
-    return a.to_compressed() == b.to_compressed();
-}
 
 // ============================================================================
 // 1. CT mask generation
@@ -168,8 +141,8 @@ static void test_ct_field_differential() {
     printf("[4] CT field ops vs fast:: differential (10K)\n");
 
     for (int i = 0; i < SCALED(10000, 200); ++i) {
-        auto a = random_fe();
-        auto b = random_fe();
+        auto a = random_fe(rng);
+        auto b = random_fe(rng);
 
         // add
         auto fast_add = a + b;
@@ -199,7 +172,7 @@ static void test_ct_field_differential() {
 
     // inv (1K -- slower)
     for (int i = 0; i < SCALED(1000, 50); ++i) {
-        auto a = random_fe();
+        auto a = random_fe(rng);
         auto fast_inv = a.inverse();
         auto ct_inv = secp256k1::ct::field_inv(a);
         CHECK(fast_inv == ct_inv, "CT field_inv == fast inverse");
@@ -216,8 +189,8 @@ static void test_ct_scalar_differential() {
     printf("[5] CT scalar ops vs fast:: differential (10K)\n");
 
     for (int i = 0; i < SCALED(10000, 200); ++i) {
-        auto a = random_scalar();
-        auto b = random_scalar();
+        auto a = random_scalar(rng);
+        auto b = random_scalar(rng);
 
         // add
         auto fast_add = a + b;
@@ -246,8 +219,8 @@ static void test_ct_scalar_cmov() {
     printf("[6] CT scalar cmov/cswap (1K)\n");
 
     for (int i = 0; i < SCALED(1000, 50); ++i) {
-        auto a = random_scalar();
-        auto b = random_scalar();
+        auto a = random_scalar(rng);
+        auto b = random_scalar(rng);
         auto a_orig = a;
         auto b_orig = b;
 
@@ -283,8 +256,8 @@ static void test_ct_field_cmov() {
     printf("[7] CT field cmov/cswap/select (1K)\n");
 
     for (int i = 0; i < SCALED(1000, 50); ++i) {
-        auto a = random_fe();
-        auto b = random_fe();
+        auto a = random_fe(rng);
+        auto b = random_fe(rng);
         auto a_orig = a;
         auto b_orig = b;
 
@@ -357,8 +330,8 @@ static void test_ct_comparisons() {
 
     // Random (1K)
     for (int i = 0; i < SCALED(1000, 50); ++i) {
-        auto a = random_fe();
-        auto b = random_fe();
+        auto a = random_fe(rng);
+        auto b = random_fe(rng);
         bool const fast_eq = (a == b);
         bool const ct_eq = (secp256k1::ct::field_eq(a, b) == UINT64_MAX);
         CHECK(fast_eq == ct_eq, "fe eq matches fast");
@@ -377,7 +350,7 @@ static void test_ct_point_scalar_mul() {
     auto G = Point::generator();
 
     for (int i = 0; i < SCALED(1000, 50); ++i) {
-        auto k = random_scalar();
+        auto k = random_scalar(rng);
 
         auto fast_r = G.scalar_mul(k);
         auto ct_r = secp256k1::ct::scalar_mul(G, k);
@@ -412,8 +385,8 @@ static void test_ct_complete_addition() {
     auto G = Point::generator();
 
     for (int i = 0; i < SCALED(1000, 50); ++i) {
-        auto P = G.scalar_mul(random_scalar());
-        auto Q = G.scalar_mul(random_scalar());
+        auto P = G.scalar_mul(random_scalar(rng));
+        auto Q = G.scalar_mul(random_scalar(rng));
 
         auto fast_r = P.add(Q);
 
@@ -427,7 +400,7 @@ static void test_ct_complete_addition() {
 
     // P + O
     {
-        auto P = G.scalar_mul(random_scalar());
+        auto P = G.scalar_mul(random_scalar(rng));
         auto jp = secp256k1::ct::CTJacobianPoint::from_point(P);
         auto jo = secp256k1::ct::CTJacobianPoint::make_infinity();
         auto r = secp256k1::ct::point_add_complete(jp, jo).to_point();
@@ -436,7 +409,7 @@ static void test_ct_complete_addition() {
 
     // O + Q
     {
-        auto Q = G.scalar_mul(random_scalar());
+        auto Q = G.scalar_mul(random_scalar(rng));
         auto jo = secp256k1::ct::CTJacobianPoint::make_infinity();
         auto jq = secp256k1::ct::CTJacobianPoint::from_point(Q);
         auto r = secp256k1::ct::point_add_complete(jo, jq).to_point();
@@ -445,7 +418,7 @@ static void test_ct_complete_addition() {
 
     // P + (-P) == O
     {
-        auto P = G.scalar_mul(random_scalar());
+        auto P = G.scalar_mul(random_scalar(rng));
         auto nP = P.negate();
         auto jp = secp256k1::ct::CTJacobianPoint::from_point(P);
         auto jnp = secp256k1::ct::CTJacobianPoint::from_point(nP);
@@ -455,7 +428,7 @@ static void test_ct_complete_addition() {
 
     // P + P (doubling path)
     for (int i = 0; i < 100; ++i) {
-        auto P = G.scalar_mul(random_scalar());
+        auto P = G.scalar_mul(random_scalar(rng));
         auto fast_r = P.dbl();
         auto jp = secp256k1::ct::CTJacobianPoint::from_point(P);
         auto jr = secp256k1::ct::point_add_complete(jp, jp);
@@ -527,7 +500,7 @@ static void test_ct_generator_mul() {
     auto G = Point::generator();
 
     for (int i = 0; i < SCALED(500, 30); ++i) {
-        auto k = random_scalar();
+        auto k = random_scalar(rng);
         auto fast_r = G.scalar_mul(k);
         auto ct_r = secp256k1::ct::generator_mul(k);
         CHECK(points_equal(fast_r, ct_r), "CT generator_mul == fast G.scalar_mul");
