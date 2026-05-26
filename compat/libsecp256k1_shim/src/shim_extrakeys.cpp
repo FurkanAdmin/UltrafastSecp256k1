@@ -33,7 +33,11 @@ int secp256k1_xonly_pubkey_parse(
     const unsigned char *input32)
 {
     SHIM_REQUIRE_CTX(ctx);
-    if (!pubkey || !input32) return 0;
+    if (!pubkey || !input32) {
+        secp256k1_shim_call_illegal_cb(ctx,
+            "secp256k1_xonly_pubkey_parse: NULL argument");
+        return 0;
+    }
 
     // Reject x >= p (libsecp strict boundary)
     FieldElement x;
@@ -57,7 +61,11 @@ int secp256k1_xonly_pubkey_serialize(
     const secp256k1_xonly_pubkey *pubkey)
 {
     SHIM_REQUIRE_CTX(ctx);
-    if (!output32 || !pubkey) return 0;
+    if (!output32 || !pubkey) {
+        secp256k1_shim_call_illegal_cb(ctx,
+            "secp256k1_xonly_pubkey_serialize: NULL argument");
+        return 0;
+    }
     std::memcpy(output32, pubkey->data, 32);
     return 1;
 }

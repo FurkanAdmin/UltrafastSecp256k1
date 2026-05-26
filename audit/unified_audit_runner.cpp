@@ -677,6 +677,7 @@ int test_regression_nonce_candidate_erase_run(); // P2-CT-001/002/003/007: cand1
 // Forward declarations -- 2026-05-21 SHIM-A01/A02/A03/A07/A08: null callback
 // ============================================================================
 int test_regression_shim_null_callback_run(); // SHIM-A01..A08: illegal_callback on NULL args
+int test_regression_shim_null_arg_cb_run();   // SHIM-NEW-001/002/003: NULL non-ctx args fire illegal_callback
 
 // ============================================================================
 // Forward declarations -- 2026-05-21 P1-SEC-001: GPU extended ECDH CT fix
@@ -1449,6 +1450,9 @@ static const AuditModule ALL_MODULES[] = {
     // === 2026-05-25 T-11/12: memset→secure_erase + is_zero→is_zero_ct in shim_context.cpp ===
     // advisory=true: requires shim to be linked (source-scan + functional round-trip).
     { "regression_shim_context_erase", "T-11/12: std::memset(blind)→secure_erase in context_destroy/randomize/preallocated_destroy; ContextBlindingScope is_zero()→is_zero_ct() on secret scalar (SCE-1..5)", "shim_regression", test_regression_shim_context_erase_run, true },
+    // === 2026-05-26 SHIM-NEW-001/002/003: NULL non-ctx args must fire illegal_callback ===
+    // advisory=true: requires shim to be linked (stub returns ADVISORY_SKIP_CODE when absent).
+    { "regression_shim_null_arg_cb", "SHIM-NEW-001/002/003: ec_pubkey_create/serialize, xonly_pubkey_parse/serialize, recoverable_sig_parse/serialize fire illegal_callback on NULL non-ctx args (NAC-1..8)", "shim_regression", test_regression_shim_null_arg_cb_run, true },
     // === 2026-05-21 P1-SEC-001: GPU extended ECDH CT fix ===
     // advisory=false: exercises ufsecp_ecdh() CPU API — no GPU/shim dependency.
     // Verifies correctness of ECDH arithmetic after secp256k1_extended.cl and

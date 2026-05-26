@@ -3348,6 +3348,22 @@ if(TARGET secp256k1_shim)
         LABELS "audit;regression;shim;keypair;ecdsa;null_callback;t09_t10")
 endif()
 
+# -- 2026-05-26 SHIM-NEW-001/002/003: NULL non-ctx args fire illegal_callback (NAC-1..8) --
+if(TARGET secp256k1_shim)
+    add_executable(test_regression_shim_null_arg_cb_standalone
+        test_regression_shim_null_arg_cb.cpp)
+    audit_target_defaults(test_regression_shim_null_arg_cb_standalone)
+    target_link_libraries(test_regression_shim_null_arg_cb_standalone PRIVATE secp256k1_shim)
+    target_include_directories(test_regression_shim_null_arg_cb_standalone PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../compat/libsecp256k1_shim/include)
+    target_compile_definitions(test_regression_shim_null_arg_cb_standalone PRIVATE STANDALONE_TEST)
+    add_test(NAME regression_shim_null_arg_cb
+        COMMAND test_regression_shim_null_arg_cb_standalone)
+    set_tests_properties(regression_shim_null_arg_cb PROPERTIES
+        TIMEOUT 30 SKIP_RETURN_CODE 77
+        LABELS "audit;regression;shim;null_callback;pubkey;xonly;recovery;shim_new_001_003")
+endif()
+
 # ===========================================================================
 # Cross-library differential test (vs bitcoin-core/libsecp256k1)
 # ===========================================================================
@@ -4053,6 +4069,8 @@ if(TARGET secp256k1_shim)
         test_regression_shim_context_erase.cpp
         # 2026-05-26 ILLCB-001/002, DER-STRICT, keypair_sec BIP-340 normalization
         test_regression_shim_divergence_fixes.cpp
+        # 2026-05-26 SHIM-NEW-001/002/003: NULL non-ctx args fire illegal_callback
+        test_regression_shim_null_arg_cb.cpp
 )
     target_compile_definitions(unified_audit_runner PRIVATE SECP256K1_BUILD_COMPAT_SHIM)
     target_link_libraries(unified_audit_runner PRIVATE secp256k1_shim)

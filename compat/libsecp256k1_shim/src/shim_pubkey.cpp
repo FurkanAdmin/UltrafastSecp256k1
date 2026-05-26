@@ -93,7 +93,11 @@ int secp256k1_ec_pubkey_serialize(
     const secp256k1_pubkey *pubkey, unsigned int flags)
 {
     SHIM_REQUIRE_CTX(ctx);
-    if (!output || !outputlen || !pubkey) return 0;
+    if (!output || !outputlen || !pubkey) {
+        secp256k1_shim_call_illegal_cb(ctx,
+            "secp256k1_ec_pubkey_serialize: NULL argument");
+        return 0;
+    }
 
     // Validate flags: only SECP256K1_EC_COMPRESSED or SECP256K1_EC_UNCOMPRESSED
     // are valid. Garbage flags (e.g. 0xDEAD) must fire the illegal callback
@@ -156,7 +160,11 @@ int secp256k1_ec_pubkey_create(
     const unsigned char *seckey)
 {
     SHIM_REQUIRE_CTX(ctx);
-    if (!pubkey || !seckey) return 0;
+    if (!pubkey || !seckey) {
+        secp256k1_shim_call_illegal_cb(ctx,
+            "secp256k1_ec_pubkey_create: NULL argument");
+        return 0;
+    }
 
     Scalar k;
     if (!Scalar::parse_bytes_strict_nonzero(seckey, k)) return 0;

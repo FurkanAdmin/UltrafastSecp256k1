@@ -64,7 +64,11 @@ int secp256k1_ecdsa_recoverable_signature_parse_compact(
     int recid)
 {
     SHIM_REQUIRE_CTX(ctx);
-    if (!sig || !input64) return 0;
+    if (!sig || !input64) {
+        secp256k1_shim_call_illegal_cb(ctx,
+            "secp256k1_ecdsa_recoverable_signature_parse_compact: NULL argument");
+        return 0;
+    }
     if (recid < 0 || recid > 3) return 0;
     // Accept r and s in [0, n-1] at parse time — matches libsecp256k1 behavior.
     // Rejection of r==0 or s==0 happens at secp256k1_ecdsa_recover time, not here.
@@ -86,7 +90,11 @@ int secp256k1_ecdsa_recoverable_signature_serialize_compact(
     const secp256k1_ecdsa_recoverable_signature *sig)
 {
     SHIM_REQUIRE_CTX(ctx);
-    if (!output64 || !recid || !sig) return 0;
+    if (!output64 || !recid || !sig) {
+        secp256k1_shim_call_illegal_cb(ctx,
+            "secp256k1_ecdsa_recoverable_signature_serialize_compact: NULL argument");
+        return 0;
+    }
     *recid = static_cast<int>(sig->data[0] & 0x03);
     std::memcpy(output64, sig->data + 1, 64);
     return 1;

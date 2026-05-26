@@ -1,5 +1,20 @@
 # Audit Changelog
 
+## 2026-05-26 — Fix: SHIM-NEW-001/002/003 NULL non-ctx args fire illegal_callback
+
+- **SHIM-NEW-001**: `secp256k1_ec_pubkey_create` and `secp256k1_ec_pubkey_serialize`: NULL
+  `pubkey`, `seckey`, `output`, or `outputlen` now fires `secp256k1_shim_call_illegal_cb`
+  instead of silently returning 0.
+- **SHIM-NEW-002**: `secp256k1_xonly_pubkey_parse` and `secp256k1_xonly_pubkey_serialize`:
+  NULL `pubkey`, `input32`, or `output32` now fires the illegal callback.
+- **SHIM-NEW-003**: `secp256k1_ecdsa_recoverable_signature_parse_compact` and
+  `_serialize_compact`: NULL `sig`, `input64`, `output64`, or `recid` now fires the callback.
+- **Test**: `audit/test_regression_shim_null_arg_cb.cpp` — NAC-1..8. Wired into
+  `unified_audit_runner.cpp` (advisory=true, shim_regression) and standalone CTest.
+- **Files**: `compat/libsecp256k1_shim/src/shim_pubkey.cpp`,
+  `compat/libsecp256k1_shim/src/shim_extrakeys.cpp`,
+  `compat/libsecp256k1_shim/src/shim_recovery.cpp`.
+
 ## 2026-05-26 — Fix batch: SHIM-NEW-004, TEST-006/007, SEC-007 advisory, doc hardening
 
 - **SHIM-NEW-004**: `secp256k1_musig_pubnonce_serialize`, `pubnonce_parse`, `nonce_agg`,
