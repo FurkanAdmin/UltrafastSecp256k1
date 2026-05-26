@@ -20,7 +20,7 @@
 #        violation). Real FAIL — the binary must be fixed to return 77.
 #  77  — no advisory binaries found at all (no build dir, no standalone targets).
 #        Advisory skip — the gate could not run.
-set -uo pipefail
+set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 RUNNER_CPP="${REPO_ROOT}/audit/unified_audit_runner.cpp"
