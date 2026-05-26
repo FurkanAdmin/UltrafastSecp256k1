@@ -438,12 +438,12 @@ paths (sign, pubkey, batch) win by 2–2.7×. CT signing beats libsecp by ~7% CT
 | Batch Inv | 2.9 ns | 340 M/s | Kernel-only, batch 64K |
 | Jac->Affine | 14.9 ns | 66.9 M/s | Kernel-only, batch 64K |
 
-### GPU Signature Operations
+### GPU Signature Operations `[archived / diagnostic — kernel-only, excl. PCIe DMA; verify against current bench before citing]`
 
 > As of early 2026, this is the only multi-backend (CUDA + OpenCL + Metal) secp256k1 library
 > with CT-signed batch ECDSA and Schnorr on GPU that the authors are aware of. If you know of others, please open an issue.
 
-All throughput numbers below are **Kernel-only (excl. PCIe DMA)**. Wall-clock throughput including host↔device transfer is lower.
+All throughput numbers below are **Kernel-only (excl. PCIe DMA)**. Wall-clock throughput including host↔device transfer is lower. Numbers are from 2026-04 bench runs; re-run `bench_unified --suite gpu` on the current build before citing.
 
 | Operation | Time/Op | Throughput | Notes |
 |-----------|---------|------------|-------|
