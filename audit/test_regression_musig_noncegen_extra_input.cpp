@@ -61,7 +61,7 @@
 namespace {
 
 static int g_pass = 0, g_fail = 0;
-static bool g_marker_present = true;  // assume bug-open until proven otherwise
+static bool g_marker_present = false;  // assume bug-fixed; scan overrides to true if marker found
 
 #define CHECK(cond, msg) do { \
     if (cond) { ++g_pass; } \
@@ -221,7 +221,7 @@ static void test_two_nonnull_extra_inputs() {
 
 int test_regression_musig_noncegen_extra_input_run() {
     g_pass = 0; g_fail = 0;
-    g_marker_present = true;
+    g_marker_present = false;  // default: bug-fixed; scan overrides if marker found
     std::printf("======================================================================\n");
     std::printf("  Regression: musig_nonce_gen extra_input32 (SHIM-NONCEGEN-001, self-healing)\n");
     std::printf("  Mode selected by source-marker presence in shim_musig.cpp.\n");
