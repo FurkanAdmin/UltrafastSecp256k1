@@ -401,7 +401,8 @@ Scalar rfc6979_nonce(const Scalar& private_key,
     Scalar cand2{};
     hmac.compute_short(V, 32, V);
     std::memcpy(t.data(), V, 32);
-    (void)Scalar::parse_bytes_strict_nonzero(t.data(), cand2);
+    bool const ok2 = Scalar::parse_bytes_strict_nonzero(t.data(), cand2);
+    (void)ok2; // CT: both failing has probability 2^{-128}; caller detects r=0/s=0
 
     // CT select: mask = ~0ULL if ok1, else 0ULL (two's-complement of bool)
     // ct::scalar_select(a, b, mask) returns a when mask == all-ones, else b
@@ -496,7 +497,8 @@ Scalar rfc6979_nonce_hedged(const Scalar& private_key,
     Scalar cand2{};
     hmac.compute_short(V, 32, V);
     std::memcpy(t.data(), V, 32);
-    (void)Scalar::parse_bytes_strict_nonzero(t.data(), cand2);
+    bool const ok2 = Scalar::parse_bytes_strict_nonzero(t.data(), cand2);
+    (void)ok2; // CT: both failing has probability 2^{-128}; caller detects r=0/s=0
 
     // CT select: mask = ~0ULL if ok1 (use cand1), else 0ULL (use cand2)
     std::uint64_t const mask1 = static_cast<std::uint64_t>(
@@ -602,7 +604,8 @@ Scalar rfc6979_nonce_libsecp_compat(const Scalar& private_key,
     Scalar cand2{};
     hmac.compute_short(V, 32, V);
     std::memcpy(t.data(), V, 32);
-    (void)Scalar::parse_bytes_strict_nonzero(t.data(), cand2);
+    bool const ok2 = Scalar::parse_bytes_strict_nonzero(t.data(), cand2);
+    (void)ok2; // CT: both failing has probability 2^{-128}; caller detects r=0/s=0
 
     // CT select: mask = ~0ULL if ok1 (use cand1), else 0ULL (use cand2)
     std::uint64_t const mask1 = static_cast<std::uint64_t>(

@@ -118,8 +118,7 @@ static void test_sdf4_null_ctx_callback_note() {
     printf("  [SDF-4] context_set_illegal_callback(NULL ctx) → abort() "
            "[code-review verified, not in-process testable]\n");
     (void)std::fflush(stdout);
-    // Count as pass: the fix is code-reviewed, not executable in-process.
-    CHECK(true, "[SDF-4] note recorded");
+    // No in-process assertion: abort() cannot be caught without signal handling.
 }
 
 // ─── SDF-5: keypair_create stores BIP-340-normalized seckey ──────────────────
