@@ -26,7 +26,7 @@ exactly what to run and what to expect.
 >   measured 2026-05-12, hard turbo lock, 3 runs). PERF-002 reduced the gap from ~1.1% but did not eliminate it.
 >   Use Release+LTO for production Bitcoin Core builds.
 >
-> Taproot signing (SignSchnorrWithMerkleRoot): 36% faster (controlled run, LTO). Full numbers:
+> Taproot signing (SignSchnorrWithMerkleRoot): ~35% faster (1.35×, controlled run, LTO). Full numbers:
 > [`docs/BITCOIN_CORE_BENCH_RESULTS.json`](BITCOIN_CORE_BENCH_RESULTS.json)
 >
 > **Recommended build flags for maximum performance:**

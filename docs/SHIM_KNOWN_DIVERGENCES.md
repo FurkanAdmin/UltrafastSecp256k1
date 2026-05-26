@@ -281,27 +281,25 @@ unsupported API.
 
 ---
 
-### secp256k1_musig_session — internal raw pointer (process-local-only)
+### secp256k1_musig_session — token-based session reference (process-local-only)
 
 - **Upstream behavior:** `secp256k1_musig_session` is a 133-byte self-contained opaque
-  struct. All data needed to reconstruct the session is encoded in those bytes. The struct
-  can be copied, memcpy'd, or checkpointed safely within a process.
+  struct. All data is encoded in those bytes; the struct can be copied or checkpointed
+  safely within a process.
 - **Shim behavior:** The shim's `secp256k1_musig_session` (133 bytes) stores an 8-byte
-  raw pointer to the associated `secp256k1_musig_keyagg_cache` at byte offset 98.
-  This pointer is written by `secp256k1_musig_session_init` and read by `partial_sig_agg`.
-- **Reason:** The shim uses a global token-keyed map to associate opaque cache pointers
-  with internal state. The raw pointer allows O(1) map removal in `partial_sig_agg`.
+  `uint64_t` token at byte offset 98. The token is a key into the global session map
+  (`g_ka`); `secp256k1_musig_nonce_process` writes it, `secp256k1_musig_partial_sig_agg`
+  reads it for O(1) map lookup and removal. The token is opaque and not a heap address.
+- **Reason:** The shim uses a global token-keyed map (previously pointer-keyed, fixed 2026-05)
+  to associate opaque `secp256k1_musig_keyagg_cache` addresses with internal session state.
+  Storing a token rather than a raw pointer eliminates the ASLR-bypass concern present in
+  the prior design.
 - **Impact:** **The session struct is process-local-only.**
-  - Safe: `memcpy` within the same process (pointer remains valid).
+  - Safe: `memcpy` within the same process (token remains valid while the map entry exists).
   - Unsafe: serializing the session to disk/network and deserializing in a new process
-    — the pointer becomes dangling. Do not checkpoint or persist sessions.
-  - The pointer at offset 98–105 also leaks a heap address (ASLR bypass) in any
-    inter-process context (hypothetical only — MuSig2 sessions should never cross
-    process boundaries).
-- **Planned fix:** Store a token/index instead of a raw pointer (v2 scope, MED-3).
-- **Test:** Any attempt to serialize + deserialize a session across process restart
-  will produce a dangling-pointer UB. No differential test is feasible; the divergence
-  is structural.
+    — the token does not resolve to a map entry in the new process. Do not persist sessions.
+- **Test:** Any attempt to serialize + deserialize a session across process restart will
+  produce a map-miss (returns 0). No differential test is feasible; the divergence is structural.
 
 ---
 
@@ -351,3 +349,48 @@ unsupported API.
 - **Test:** `audit/test_regression_shim_thread_blinding.cpp` (to be added) — TBL-1: sign with
   ctx_a then sign with ctx_b on same thread, both must verify. TBL-2: randomize then sign 1000
   times with alternating contexts, all must verify.
+
+---
+
+### secp256k1_musig_nonce_gen — NULL pubkey accepted (SHIM-NEW-005)
+
+- **Upstream behavior:** `secp256k1_musig_nonce_gen` requires the `pubkey` argument to be
+  non-NULL when `seckey` is non-NULL (BIP-327 §5 recommends including the pubkey in the
+  nonce derivation to prevent cross-key attacks). Upstream libsecp256k1 returns 0 if
+  `pubkey` is NULL when `seckey` is non-NULL.
+- **Shim behavior:** `pubkey` may be NULL. When NULL, `pub_x` is zeroed and the nonce is
+  derived from `session_id32 + seckey + msg` with a zero pubkey contribution. Signing
+  still produces a valid signature; the nonce is cryptographically sound but does not
+  incorporate the public key.
+- **Reason:** Accepting NULL `pubkey` allows callers that do not have the `secp256k1_pubkey`
+  struct available at nonce generation time (e.g., those who only have the raw private key
+  bytes) to call the function without serializing a pubkey. The risk is marginal: the session
+  ID uniqueness requirement is the primary nonce-uniqueness guarantee; pubkey binding is
+  defense-in-depth.
+- **Impact:** Callers omitting `pubkey` receive a valid but suboptimally-derived nonce.
+  Cross-key binding is absent. For Bitcoin Core use (single-signer pubkey always available),
+  this is a non-issue.
+- **Fix scope:** Document-only. Enforcing non-NULL `pubkey` when `seckey` is present is a
+  possible future hardening (low priority).
+
+---
+
+### secp256k1_musig_nonce_gen — keyagg_cache parameter ignored (SHIM-NEW-006)
+
+- **Upstream behavior:** When `keyagg_cache` is non-NULL, `secp256k1_musig_nonce_gen`
+  extracts the aggregated public key `Q` from the cache and includes it in the nonce
+  derivation, binding the nonce to the specific key-aggregation context. This provides
+  an additional domain-separation guarantee against nonce reuse across different MuSig2
+  key aggregations.
+- **Shim behavior:** The `keyagg_cache` parameter is silently ignored (declared as
+  `/*keyagg_cache*/`). The aggregated public key `agg_x` is left zeroed in the nonce
+  derivation. The nonce is still derived from `session_id32`, `seckey`, `pubkey`, and
+  `msg` — which is sufficient for nonce uniqueness when `session_id32` is fresh random.
+- **Reason:** The shim's `musig2_nonce_gen` internal API does not accept the aggregated
+  key as a parameter; adding it would require a C++ API change. The missing binding only
+  matters if the same `(seckey, session_id32, pubkey, msg)` tuple is reused across
+  different key-aggregation contexts — an extremely rare accident in practice, and
+  prevented by the session ID freshness requirement.
+- **Fix scope:** Document-only. Adding `agg_x` extraction from the cache token is a
+  medium-priority improvement but not a security regression for the primary use case.
+- **Test:** No differential test currently exists for this path.

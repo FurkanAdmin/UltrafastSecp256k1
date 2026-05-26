@@ -4017,6 +4017,8 @@ if(TARGET secp256k1_shim)
         test_regression_shim_pubkey_sort.cpp
         test_regression_shim_per_context_blinding.cpp
         test_regression_musig2_session_token.cpp
+        # 2026-05-26 SHIM-NEW-004: NULL ctx rejected by 4 MuSig shim functions
+        test_regression_shim_musig_null_ctx.cpp
         # 2026-05-12 SEC-007: high-S verify diagnostic (shim-linked)
         test_regression_shim_high_s_verify.cpp
         # 2026-05-12 PERF-001/005: shim hot-path correctness regression
@@ -4900,6 +4902,22 @@ if(TARGET secp256k1_shim)
     target_compile_definitions(test_regression_musig2_session_token_standalone PRIVATE STANDALONE_TEST)
     add_test(NAME regression_musig2_session_token COMMAND test_regression_musig2_session_token_standalone)
     set_tests_properties(regression_musig2_session_token PROPERTIES TIMEOUT 60 LABELS "audit;regression;musig2")
+endif()
+
+# SHIM-NEW-004: NULL ctx rejected by 4 MuSig shim functions
+if(TARGET secp256k1_shim)
+    add_executable(test_regression_shim_musig_null_ctx_standalone
+        test_regression_shim_musig_null_ctx.cpp)
+    target_link_libraries(test_regression_shim_musig_null_ctx_standalone PRIVATE secp256k1_shim fastsecp256k1)
+    if(TARGET ufsecp_static)
+        target_link_libraries(test_regression_shim_musig_null_ctx_standalone PRIVATE ufsecp_static)
+    endif()
+    target_include_directories(test_regression_shim_musig_null_ctx_standalone PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../compat/libsecp256k1_shim/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../include/ufsecp)
+    target_compile_definitions(test_regression_shim_musig_null_ctx_standalone PRIVATE STANDALONE_TEST)
+    add_test(NAME regression_shim_musig_null_ctx COMMAND test_regression_shim_musig_null_ctx_standalone)
+    set_tests_properties(regression_shim_musig_null_ctx PROPERTIES TIMEOUT 60 LABELS "audit;regression;shim;musig2")
 endif()
 
 # CT-001: ellswift CT path

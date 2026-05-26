@@ -54,3 +54,5 @@ int test_regression_shim_keypair_null_cb_run() { return ADVISORY_SKIP_CODE; }
 int test_regression_shim_context_erase_run() { return ADVISORY_SKIP_CODE; }
 // ILLCB-001/002, DER-STRICT, keypair_sec BIP-340 normalization (2026-05-26)
 int test_regression_shim_divergence_fixes_run() { return ADVISORY_SKIP_CODE; }
+// SHIM-NEW-004: NULL ctx rejected by pubnonce_serialize/parse, nonce_agg, nonce_process (2026-05-26)
+int test_regression_shim_musig_null_ctx_run()   { return ADVISORY_SKIP_CODE; }

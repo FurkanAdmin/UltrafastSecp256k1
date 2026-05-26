@@ -505,6 +505,26 @@ RETROACTIVELY_COVERED: dict[str, tuple[list[str], str]] = {
         "the test file was needed because of the self-healing design; the test was "
         "already wired as advisory=true and is promoted to advisory=false in this commit.",
     ),
+    "546b893cc4": (
+        [
+            "audit/test_regression_bip324_session.cpp",
+            "audit/test_regression_musig2_session_token.cpp",
+            "audit/test_regression_schnorr_varlen_ct_fixes.cpp",
+            "audit/test_regression_ecdsa_batch_curve_check.cpp",
+        ],
+        "SEC-006 (P1): bip324.cpp/bip324.hpp — ephemeral key stored as Scalar member "
+        "(not raw bytes), eliminating the fork-window privkey exposure. Covered by "
+        "test_regression_bip324_session (BIP-324 session CT path). "
+        "AUDIT-004 (P2): shim_musig.cpp — MuSig2 session token replaces raw heap pointer "
+        "stash in session->data, eliminating ASLR leak. Covered by "
+        "test_regression_musig2_session_token (session token isolation checks). "
+        "AUDIT-003 (P2): shim_schnorr.cpp — sign_custom rejects msglen!=32 with "
+        "illegal_callback. Covered by test_regression_schnorr_varlen_ct_fixes (varlen "
+        "sign/verify parity). PERF-004 (P2): shim_batch_verify.cpp — remove "
+        "shrink_to_fit(). Covered by test_regression_ecdsa_batch_curve_check (batch "
+        "verify correctness including large-batch path). PERF-001 (P2): shim_schnorr.cpp "
+        "ShimSchnorrCache 1-phase warm-up — pure performance, covered by shim parity tests.",
+    ),
 }
 
 # Bot commits that auto-update evidence — skip.

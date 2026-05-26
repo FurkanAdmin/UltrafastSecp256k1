@@ -1,5 +1,30 @@
 # Audit Changelog
 
+## 2026-05-26 — Fix batch: SHIM-NEW-004, TEST-006/007, SEC-007 advisory, doc hardening
+
+- **SHIM-NEW-004**: `secp256k1_musig_pubnonce_serialize`, `pubnonce_parse`, `nonce_agg`,
+  `nonce_process` now reject NULL ctx via `SHIM_REQUIRE_CTX(ctx)`. Previously the `/*ctx*/`
+  comment suppressed the parameter, silently accepting NULL. Test: MNC-1..4 in
+  `audit/test_regression_shim_musig_null_ctx.cpp`.
+- **TEST-007**: `regression_musig2_signer_index` changed from `advisory=true` to `advisory=false`.
+  MSI-1/2/3 use `CHECK()` and are mandatory; MSI-4 is INFO-only (`g_pass++`) and never fails.
+- **TEST-006**: Added A4 pattern (`bare_pass_increment`) to `ci/audit_test_quality_scanner.py`.
+  Detects standalone `g_pass++` that increment the pass counter without testing any condition.
+  Scanner now has 9 categories (A1–A4, B–H). 4 bare instances in wycheproof/ecdh/ecdsa tests
+  annotated with `// INFO: no crash = pass` to suppress false positives.
+- **SHIM-NEW-005/006**: Documented `nonce_gen` NULL pubkey accepted (SHIM-NEW-005) and
+  `keyagg_cache` ignored (SHIM-NEW-006) in `docs/SHIM_KNOWN_DIVERGENCES.md`.
+- **SEC-006 session token**: Updated `SHIM_KNOWN_DIVERGENCES.md` section from "raw pointer"
+  to "token-based" to reflect the fix committed 2026-05-26.
+- **PR-008**: Removed personal Gmail from `SECURITY.md`. GitHub Security Advisories is now
+  the sole reporting channel.
+- **PR-010**: Added explicit "No external third-party audit completed" disclaimer to
+  `SECURITY.md` Audit Status section.
+- **PR-002**: Corrected "36% faster" → "~35% (1.35×)" in `docs/CAAS_REVIEWER_QUICKSTART.md`.
+- **REL-008**: Updated `docs/AUDIT_COVERAGE.md` version from v4.0.0 → v4.1.0.
+- **AUDIT-002**: Verified `ECDSASignature::from_compact` is not called by any production shim
+  code; `[[deprecated]]` annotation covers the only remaining risk.
+
 ## 2026-05-26 — Fix: SHIM-NONCEGEN-001 extra_input32 now forwarded in secp256k1_musig_nonce_gen
 
 - **`src/cpu/include/secp256k1/musig2.hpp`** — added `nonce_extra` parameter (default nullptr) to

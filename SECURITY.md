@@ -18,9 +18,10 @@ Security fixes apply to the latest release on the `main` branch.
 
 Report privately via one of:
 
-1. **GitHub Security Advisories** (preferred):
+1. **GitHub Security Advisories** (preferred and primary channel):
    [Create advisory](https://github.com/shrec/UltrafastSecp256k1/security/advisories/new)
-2. **Email**: [payysoon@gmail.com](mailto:payysoon@gmail.com)
+
+   GitHub Security Advisories keep the report confidential until a fix is released and are the recommended path for coordinated disclosure.
 
 We will acknowledge within **72 hours** and provide a fix timeline.
 
@@ -42,6 +43,11 @@ We will acknowledge within **72 hours** and provide a fix timeline.
 ---
 
 ## Audit Status
+
+> **No external third-party audit has been completed.**
+> The codebase has undergone intensive internal self-audit and multiple multi-agent AI review passes,
+> but has not been reviewed by a paid external cryptographic auditing firm. Treat it accordingly
+> when considering production use in high-value systems.
 
 The primary security posture is an open, reproducible self-audit program that any outside reviewer can rerun.
 The project philosophy is to strengthen assurance through internal audit on every build and every commit.

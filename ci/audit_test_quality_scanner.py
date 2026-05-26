@@ -4,9 +4,13 @@ audit_test_quality_scanner.py
 
 External-auditor-grade static analyzer for audit C++ test files.
 
-Detects eight bug classes that human auditors catch but automated test runs miss:
+Detects nine bug classes that human auditors catch but automated test runs miss:
 
   A: Vacuous checks — CHECK(true, ...) always passes, regardless of actual behavior
+     A1: CHECK(true, ...)
+     A2: CHECK(expr || true, ...)
+     A3: CHECK(x || !x, ...)
+     A4: bare g_pass++ — increments pass counter without testing any condition
   B: Mandatory security gap — security-critical else-branch has CHECK(true) weasel-out
   C: Condition/message polarity — test condition contradicts what the message asserts
   D: Weak statistical thresholds — bias/uniformity bounds so loose they catch nothing
@@ -110,6 +114,10 @@ _CHECK_OR_TRUE_RE = re.compile(r'CHECK\s*\([^)]*\|\|\s*true\s*[,)]')
 # A3: x || !x tautology
 _CHECK_OR_NOT_RE  = re.compile(r'CHECK\s*\([^)]*\b(\w+)\s*\|\|\s*!\s*\1\b')
 _ANY_CHECK_RE  = re.compile(r'(?:CHECK|check)\s*\(')
+# A4: bare g_pass++ — increments pass counter without testing any condition.
+# Matches lines whose non-whitespace content is exactly "g_pass++;" or "g_pass += 1;"
+# Does NOT flag g_pass = 0 (reset), g_pass + 1 (expression), or printf(g_pass) (report).
+_BARE_GPASS_RE = re.compile(r'^\s*g_pass\s*(?:\+\+|\+=\s*1)\s*;')
 
 # Statistical bounds: catch things like  CHECK(x >= 32 && x <= 224, ...)
 _STAT_BOUND_RE = re.compile(
@@ -214,6 +222,35 @@ class AuditTestScanner:
                           f'Message: "{msg}"',
                           raw.strip(),
                           f'Replace "{var} || !{var}" with the actual condition to test.')
+
+            # A4: bare g_pass++ — pass counter incremented without any condition check.
+            # Skip if inside a conditional block (if/else/for/while within last 6 lines).
+            # Skip if following a comment that documents the omission.
+            if _BARE_GPASS_RE.match(raw):
+                ctx_lines = lines[max(0, i - 6):i]
+                ctx_text  = " ".join(ctx_lines).lower()
+                # Inside a conditional: g_pass++ is counting conditional successes (ok)
+                in_conditional = re.search(
+                    r'\b(if|else|for|while|switch)\s*[\(\{]', ctx_text)
+                if in_conditional:
+                    pass  # legitimate conditional pass counting — not a tautology
+                else:
+                    prev = lines[i - 1].strip().lower() if i > 0 else ""
+                    current = raw.strip().lower()
+                    doc_words = ("info", "advisory", "probe", "//", "skip", "no crash",
+                                 "diagnostic", "intentional", "always passes", "= pass",
+                                 "= invalid", "= skip", "= ok")
+                    is_documented = (any(w in prev for w in doc_words) or
+                                     any(w in current for w in doc_words))
+                    sev = "info" if is_documented else "low"
+                    self._add(fname, i + 1, sev, "A4", "bare_pass_increment",
+                              "Bare g_pass++ increments the pass counter without testing any "
+                              "condition — no library behavior is verified. If this is an "
+                              "intentional INFO-only probe, precede with an explanatory comment "
+                              "so auditors can distinguish it from a forgotten CHECK().",
+                              raw.strip(),
+                              "Replace g_pass++ with CHECK(actual_condition, \"message\") or "
+                              "document the omission with a preceding INFO comment.")
 
     # ------------------------------------------------------------------
     # B: Mandatory security gap — if (ok) { CHECK(real) } else { CHECK(true) }

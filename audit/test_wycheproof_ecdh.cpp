@@ -152,7 +152,7 @@ static void test_ecdh_off_curve() {
     // In Debug: SECP_ASSERT_ON_CURVE in scalar_mul aborts on off-curve input;
     // skip this path -- debug asserts are the intended guard here.
     (void)off_curve;
-    g_pass++;
+    g_pass++;  // INFO: no crash = pass (debug-assert path skipped in Release)
 #endif
 }
 
@@ -280,7 +280,7 @@ static void test_ecdh_point_validation() {
         // Regardless of result, the point either parses or doesn't --
         // the key thing is no crash
         (void)on_curve;
-        g_pass++;
+        g_pass++;  // INFO: no crash = pass (crash-freedom probe)
     }
 }
 

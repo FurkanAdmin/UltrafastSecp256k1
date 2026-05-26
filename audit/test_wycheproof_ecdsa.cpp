@@ -414,7 +414,7 @@ static void test_wycheproof_known_vectors() {
         ECDSASignature crafted{r_nm1, sig.s};
         // Should not crash, verification will almost certainly fail
         (void)ecdsa_verify(msg.data(), G, crafted);
-        g_pass++;
+        g_pass++;  // INFO: no crash = pass (crash-freedom probe for near-order r)
     }
 
     // -- Signature with s = n/2 (half-order boundary) --
@@ -433,7 +433,7 @@ static void test_wycheproof_known_vectors() {
             "7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A1"));
         ECDSASignature crafted{sig.r, s_half_p1};
         (void)ecdsa_verify(msg.data(), G, crafted);
-        g_pass++;
+        g_pass++;  // INFO: no crash = pass (crash-freedom probe for half-order+1 s)
     }
 }
 

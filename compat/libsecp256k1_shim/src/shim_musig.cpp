@@ -496,10 +496,11 @@ int secp256k1_musig_nonce_gen(
 }
 
 int secp256k1_musig_pubnonce_serialize(
-    const secp256k1_context* /*ctx*/,
+    const secp256k1_context* ctx,
     unsigned char* out66,
     const secp256k1_musig_pubnonce* nonce)
 {
+    SHIM_REQUIRE_CTX(ctx);
     if (!out66 || !nonce) return 0;
     // Reconstruct compressed form from cached affine coords (no sqrt needed).
     uint8_t flags = nonce->data[128];
@@ -511,10 +512,11 @@ int secp256k1_musig_pubnonce_serialize(
 }
 
 int secp256k1_musig_pubnonce_parse(
-    const secp256k1_context* /*ctx*/,
+    const secp256k1_context* ctx,
     secp256k1_musig_pubnonce* nonce,
     const unsigned char* in66)
 {
+    SHIM_REQUIRE_CTX(ctx);
     if (!nonce || !in66) return 0;
     // SHIM-007: decompress once, cache affine coords. Later users call
     // pn_unpack_points() to get Points in O(1) without re-decompressing.
@@ -543,11 +545,12 @@ int secp256k1_musig_pubnonce_parse(
 }
 
 int secp256k1_musig_nonce_agg(
-    const secp256k1_context* /*ctx*/,
+    const secp256k1_context* ctx,
     secp256k1_musig_aggnonce* aggnonce,
     const secp256k1_musig_pubnonce* const* pubnonces,
     size_t n_pubnonces)
 {
+    SHIM_REQUIRE_CTX(ctx);
     if (!aggnonce || !pubnonces || n_pubnonces == 0) return 0;
     // SHIM-007: use pre-cached affine coords — no decompress (no sqrt) here.
     // P2-PERF-004: SBO — for N<=16 (common 2-of-2 case) accumulate directly on
@@ -583,12 +586,13 @@ int secp256k1_musig_nonce_agg(
 // ---------------------------------------------------------------------------
 
 int secp256k1_musig_nonce_process(
-    const secp256k1_context* /*ctx*/,
+    const secp256k1_context* ctx,
     secp256k1_musig_session* session,
     const secp256k1_musig_aggnonce* aggnonce,
     const unsigned char* msg32,
     const secp256k1_musig_keyagg_cache* keyagg_cache)
 {
+    SHIM_REQUIRE_CTX(ctx);
     if (!session || !aggnonce || !msg32 || !keyagg_cache) return 0;
     KAEntry* e = ka_get(keyagg_cache);
     if (!e) return 0;

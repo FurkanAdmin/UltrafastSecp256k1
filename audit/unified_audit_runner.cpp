@@ -630,6 +630,8 @@ int test_regression_shim_security_v8_run();               // advisory=true: shim
 int test_regression_shim_preallocated_ctx_run();          // advisory=true: shim must be linked
 // 2026-05-24 SHIM-P3-006: R-grinding functional coverage (not byte-identical)
 int test_regression_shim_rgrind_functional_run();         // advisory=true: shim must be linked
+// 2026-05-26 SHIM-NEW-004: NULL ctx rejected by 4 MuSig shim functions
+int test_regression_shim_musig_null_ctx_run();            // advisory=true: shim must be linked
 
 // ============================================================================
 // Forward declarations -- 2026-05-21 P1 security fixes (SEC-001, SEC-002, SEC-003)
@@ -1310,14 +1312,15 @@ static const AuditModule ALL_MODULES[] = {
     { "regression_shim_pubkey_sort",           "SHIM-012: secp256k1_ec_pubkey_sort no longer crashes via nullptr ctx — lexicographic order correctness (PST-1..4)",          "memory_safety",  test_regression_shim_pubkey_sort_run,           true },
     { "regression_shim_per_context_blinding",  "SHIM-001: per-context blinding — two contexts on same thread sign independently, unblinded ctx works, NULL seed clears",     "ct_analysis",    test_regression_shim_per_context_blinding_run,  true },
     { "regression_musig2_session_token",       "SHIM-010: MuSig2 token-keyed session map — non-zero token after agg, distinct tokens, reuse gets fresh token, 2-of-2 sign", "memory_safety",  test_regression_musig2_session_token_run,       true },
+    { "regression_shim_musig_null_ctx",        "SHIM-NEW-004: NULL ctx rejected (return 0) by pubnonce_serialize/parse, nonce_agg, nonce_process (MNC-1..4)", "memory_safety",  test_regression_shim_musig_null_ctx_run,        true },
     // SEC-005/SEC-009: MuSig2 infinity nonce rejection — C++ API, no shim required.
     // advisory=false: uses C++ API + fastsecp256k1 only, no GPU/shim dependency.
     { "regression_musig2_infinity_nonce",      "SEC-005/SEC-009: musig2_start_sign_session rejects infinity R1/R2 (BIP-327 §GetSessionValues step 2); musig2_nonce_agg empty-vector guard", "protocol_security", test_regression_musig2_infinity_nonce_run, false },
     // SEC-007: MuSig2 signer_index cross-check — uses C++ API directly (no shim required)
     // advisory=true: Rule 13 cannot be fully tested at C++ API level when individual_pubkeys
-    // is empty (ABI-deserialized state, MED-3). The test_abi_ctx_skips_check case uses
-    // CHECK(true,...) for that sub-case — marked advisory to reflect partial coverage.
-    { "regression_musig2_signer_index",        "SEC-007: musig2_partial_sign validates secret_key<->signer_index (Rule 13) — MSI-4 (empty individual_pubkeys path) is documented open in RESIDUAL_RISK_REGISTER.md (MED-3 partial); v2 ABI is the secure path", "protocol_security", test_regression_musig2_signer_index_validation_run, true },
+    // MSI-1/2/3 use CHECK() and are mandatory. MSI-4 is INFO-only (g_pass++, documents
+    // an open MED-3 behavior) — it never sets g_fail, so the module always passes clean.
+    { "regression_musig2_signer_index",        "SEC-007: musig2_partial_sign validates secret_key<->signer_index (Rule 13) — MSI-4 (empty individual_pubkeys path) is documented open in RESIDUAL_RISK_REGISTER.md (MED-3 partial); v2 ABI is the secure path", "protocol_security", test_regression_musig2_signer_index_validation_run, false },
     // SEC-010: adaptor binding BIP-340 domain separation (wire format: ecdsa_adaptor_bind_v2)
 #if SECP256K1_HAS_ADAPTOR
     { "regression_adaptor_binding_domain",     "SEC-010: ecdsa_adaptor_binding uses BIP-340 tagged hash (v2) — sign/verify/adapt/extract round-trips, needs_negation integrity, domain separation confirmed", "protocol_security", test_regression_adaptor_binding_domain_run, false },
