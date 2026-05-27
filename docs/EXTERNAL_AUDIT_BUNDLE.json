@@ -1683,7 +1683,7 @@
   "generated_at": "2026-05-26T22:09:50.783187+00:00",
   "git": {
     "branch": "dev",
-    "commit": "518f07ae2836b218cccaf1459d1890356896a00d",
+    "commit": "e884d22d9ff30c875fcdc8ba65dd33d409b0a78e",
     "dirty": true
   },
   "repo_root": "/home/shrek/Secp256k1/Secp256K1fast/libs/UltrafastSecp256k1",
