@@ -379,6 +379,7 @@ fix pass (SEC-001/CT-001/SEC-002/SEC-003/SHIM-001/CI-006):
 
 - `regression_adaptor_ct_secret_extract` — SEC-001/CT-001: adaptor extract CT scalar mul + s_inv erase (advisory=false)
 - `regression_ecdh_xy64_erase` — SEC-002: secp256k1_ecdh() xy64 shared-secret buffer erased after hashfp (advisory=true, shim)
+- `regression_ecdh_off_curve` — SEC-005: ecdh_compute/xonly/raw reject off-curve pubkeys (y²≠x³+7) and infinity before ct::scalar_mul (OCK-1..5) (advisory=false)
 - `regression_musig_xonly_zero_tweak` — SHIM-001: secp256k1_musig_pubkey_xonly_tweak_add accepts zero tweak (advisory=true, shim)
 - `regression_shim_security_v9` — SHIM-NEW-012/015: serialize+seckey NULL arg illegal_callback (advisory=true, shim)
 - `regression_musig_noncegen_extra_input` — SHIM-NONCEGEN-001: musig_nonce_gen extra_input32 behavioral freeze (advisory=true, shim)
