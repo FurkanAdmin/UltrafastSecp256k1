@@ -127,6 +127,14 @@ jobs:
         print(f"Benchmark artifact OK: {len(data)} entries, no zero timings")
         EOF
 
+    - name: Upload benchmark artifact
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: benchmark-json-linux-${{ github.sha }}
+        path: /tmp/benchmark_results/benchmark.json
+        retention-days: 90
+
     - name: Store benchmark result
       if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
       uses: benchmark-action/github-action-benchmark@a7bc2366eda11037936ea57d811a43b3418d3073 # v1
@@ -229,6 +237,14 @@ jobs:
         }
         Write-Error "bench_unified.exe did not produce THROUGHPUT SUMMARY (exit $benchExit)"
         exit 1
+
+    - name: Upload benchmark artifact (Windows)
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: benchmark-raw-windows-${{ github.sha }}
+        path: benchmark_results\raw_output.txt
+        retention-days: 90
 
     - name: Summary
       if: always()

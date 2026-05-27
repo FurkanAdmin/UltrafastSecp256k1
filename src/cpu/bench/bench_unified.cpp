@@ -178,6 +178,30 @@ struct BenchReport {
     int warmup;
     int pool_size;
     bool quick_mode;
+    char turbo_status[16];  // captured at measurement start, not at write time
+
+    void detect_turbo_status() {
+        // Read turbo state before measurements begin so the JSON reflects the
+        // CPU state DURING the run, not after (turbo could change between runs).
+        snprintf(turbo_status, sizeof(turbo_status), "unknown");
+        FILE* tf = fopen("/sys/devices/system/cpu/intel_pstate/no_turbo", "r");
+        if (tf) {
+            int val = -1;
+            if (fscanf(tf, "%d", &val) == 1)
+                snprintf(turbo_status, sizeof(turbo_status), "%s",
+                         (val == 1) ? "disabled" : "enabled");
+            fclose(tf);
+            return;
+        }
+        FILE* bf = fopen("/sys/devices/system/cpu/cpufreq/boost", "r");
+        if (bf) {
+            int val = -1;
+            if (fscanf(bf, "%d", &val) == 1)
+                snprintf(turbo_status, sizeof(turbo_status), "%s",
+                         (val == 0) ? "disabled" : "enabled");
+            fclose(bf);
+        }
+    }
 
     void add(const char* section, const char* name, double ns_val) {
         if (count >= MAX_ENTRIES) return;
@@ -203,28 +227,8 @@ struct BenchReport {
         FILE* f = fopen(path, "w");
         if (!f) return false;
 
-        // Detect turbo boost status at write time (Linux intel_pstate / cpufreq/boost).
-        // "disabled" = no_turbo=1 or boost=0 (controlled run).
-        // "enabled"  = no_turbo=0 or boost=1 (uncontrolled, numbers may vary).
-        // "unknown"  = sysfs not readable (non-Linux, non-Intel, or permission denied).
-        const char* turbo_status = "unknown";
-        {
-            FILE* tf = fopen("/sys/devices/system/cpu/intel_pstate/no_turbo", "r");
-            if (tf) {
-                int val = -1;
-                if (fscanf(tf, "%d", &val) == 1)
-                    turbo_status = (val == 1) ? "disabled" : "enabled";
-                fclose(tf);
-            } else {
-                FILE* bf = fopen("/sys/devices/system/cpu/cpufreq/boost", "r");
-                if (bf) {
-                    int val = -1;
-                    if (fscanf(bf, "%d", &val) == 1)
-                        turbo_status = (val == 0) ? "disabled" : "enabled";
-                    fclose(bf);
-                }
-            }
-        }
+        // turbo_status was captured by detect_turbo_status() before measurements
+        // began — it reflects the CPU state DURING the run, not at write time.
 
         // Current date (UTC) for traceability.
         char date_buf[16] = "unknown";
@@ -637,6 +641,7 @@ int main(int argc, char** argv) {
     g_report.warmup = effective_warmup;
     g_report.pool_size = 64;
     g_report.quick_mode = opts.quick;
+    g_report.detect_turbo_status();  // capture before measurements begin
 
     // Integrity check
     printf("Running integrity check... ");

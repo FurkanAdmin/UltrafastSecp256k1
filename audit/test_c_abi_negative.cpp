@@ -579,7 +579,7 @@ static void run_neg5_schnorr(ufsecp_ctx* ctx, const uint8_t* valid_sig64,
                    UFSECP_ERR_VERIFY_FAIL,
                    "NEG-5.14: schnorr_verify(wrong_key) -> VERIFY_FAIL");
     } else {
-           CHECK(ufsecp_pubkey_xonly(ctx, VALID_KEY2, xonly2) != UFSECP_OK, "NEG-5.14: skipped (xonly2 derivation failed)");
+        check(false, "NEG-5.14: setup failed — ufsecp_pubkey_xonly(VALID_KEY2) returned error");
     }
 }
 

@@ -144,6 +144,19 @@ def count_all_modules(runner: Path) -> tuple[int, int, int]:
     return total, exploit, non_exploit
 
 
+def count_sections(runner: Path) -> int:
+    """Count entries in SECTIONS[] in unified_audit_runner.cpp."""
+    text = runner.read_text()
+    start = text.find("static const SectionInfo SECTIONS[]")
+    if start == -1:
+        raise RuntimeError("Could not find SECTIONS[] in unified_audit_runner.cpp")
+    end = text.find("static constexpr int NUM_SECTIONS", start)
+    if end == -1:
+        raise RuntimeError("Could not find end of SECTIONS[] in unified_audit_runner.cpp")
+    block = text[start:end]
+    return len(re.findall(r'^\s+\{', block, re.MULTILINE))
+
+
 def count_exploit_files(audit_dir: Path) -> int:
     return len(list(audit_dir.glob('test_exploit_*.cpp')))
 
@@ -154,7 +167,8 @@ def make_replacements(content: str,
                       total: int,
                       exploit_mods: int,
                       non_exploit: int,
-                      exploit_files: int) -> tuple[str, int]:
+                      exploit_files: int,
+                      n_sections: int = 0) -> tuple[str, int]:
     """Apply all substitutions; return (new_content, n_changes)."""
     changes = 0
     new = content
@@ -256,7 +270,7 @@ def make_replacements(content: str,
     _sub(ALL_BOTH_RE,
          f'All {non_exploit} non-exploit audit modules and all {exploit_mods} exploit PoCs')
     _sub(TABLE_EXPLOIT_ROW_RE,
-         f'{non_exploit} non-exploit modules + {exploit_mods} exploit PoCs across 9 sections, 0 failures')
+         f'{non_exploit} non-exploit modules + {exploit_mods} exploit PoCs across {n_sections} sections, 0 failures')
     _sub(RUNNER_MODULE_COUNT_RE, f'{total}-module unified_audit_runner')
     _sub(RUNNER_MODULE_COUNT_BT_RE, f'{total}-module `unified_audit_runner`')
     _sub(REGISTERED_STYLE_RE,
@@ -389,12 +403,14 @@ def main() -> int:
 
     total, exploit_mods, non_exploit = count_all_modules(runner)
     exploit_files = count_exploit_files(audit_dir)
+    n_sections = count_sections(runner)
 
     print(f'Counts from audit/unified_audit_runner.cpp:')
     print(f'  ALL_MODULES total : {total}')
     print(f'  exploit-PoC mods  : {exploit_mods}')
     print(f'  non-exploit mods  : {non_exploit}')
     print(f'  exploit .cpp files: {exploit_files}')
+    print(f'  SECTIONS count    : {n_sections}')
     print()
 
     total_changed_files = 0
@@ -426,7 +442,7 @@ def main() -> int:
             continue
 
         original = path.read_text()
-        updated, n = make_replacements(original, total, exploit_mods, non_exploit, exploit_files)
+        updated, n = make_replacements(original, total, exploit_mods, non_exploit, exploit_files, n_sections)
 
         if n == 0:
             if args.verbose:

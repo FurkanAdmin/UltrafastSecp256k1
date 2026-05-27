@@ -41,6 +41,18 @@ SECURITY_DIRS = (
     "shaders/",               # Metal GPU shader files (.metal)
 )
 
+# CI files that are themselves security-critical — changes to these must include
+# a test even though they live in ci/ or .github/. Without this guard the gate
+# could be weakened in a commit that the gate itself classifies as docs-only.
+# Scope: only the gate scripts and the GitHub gate workflow. Other CI workflows
+# (security-audit.yml, benchmark.yml, etc.) may be updated without a test since
+# they configure runner behavior, not security logic.
+SECURITY_CI_FILES = frozenset({
+    "ci/check_security_fix_has_test.py",
+    "ci/run_fast_gates.sh",
+    ".github/workflows/gate.yml",
+})
+
 # If a commit touches only these directories/files, no test is required.
 DOCS_ONLY_PATTERNS = (
     r"^docs/",
@@ -588,10 +600,14 @@ def commit_message(sha: str) -> str:
 
 
 def is_security_file(path: str) -> bool:
+    if path in SECURITY_CI_FILES:
+        return True
     return any(path.startswith(d) for d in SECURITY_DIRS)
 
 
 def is_docs_only(path: str) -> bool:
+    if path in SECURITY_CI_FILES:
+        return False  # security-critical CI files are never classified as docs-only
     return any(re.search(p, path) for p in DOCS_ONLY_PATTERNS)
 
 
