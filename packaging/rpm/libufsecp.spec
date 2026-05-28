@@ -67,6 +67,10 @@ CMake config, and pkg-config files for %{name}.
 %{_libdir}/cmake/secp256k1-fast/
 
 %changelog
+* Wed May 28 2026 shrec <payysoon@gmail.com> - 4.1.0-1
+- Release 4.1.0: CT signing improvement, ConnectBlock bench evidence, CAAS 417 modules
+- No ABI break from 4.0.0 (SOVERSION remains 4)
+
 * Wed May 06 2026 shrec <shrec@users.noreply.github.com> - 4.0.0-1
 - Major version bump to 4.0.0; soversion bump to 4 (ABI breaking)
 - See CHANGELOG.md for full details

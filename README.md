@@ -158,48 +158,48 @@ cmake -S . -B out/release -DCMAKE_BUILD_TYPE=Release && cmake --build out/releas
 
 | If you want to… | Go here |
 |---|---|
-| 🔍 Run the audit | [docs/AUDIT_GUIDE.md](docs/AUDIT_GUIDE.md) |
-| ⚔️ Try to break the system | [docs/ATTACK_GUIDE.md](docs/ATTACK_GUIDE.md) |
-| 📊 Understand the guarantees | [docs/AUDIT_TRACEABILITY.md](docs/AUDIT_TRACEABILITY.md) |
-| 🧠 Audit philosophy & design rationale | [docs/AUDIT_PHILOSOPHY.md](docs/AUDIT_PHILOSOPHY.md) |
-| 📐 Audit methodology specification (CAAS) | [docs/AUDIT_STANDARD.md](docs/AUDIT_STANDARD.md) |
-| 🚀 Independent reviewer quick start | [docs/AUDITOR_QUICKSTART.md](docs/AUDITOR_QUICKSTART.md) |
-| 📄 Historical audit report (v3.9.0 baseline — ⚠ not current state) | [AUDIT_REPORT.md](docs/AUDIT_REPORT.md) |
-| 📊 Live audit dashboard | [docs/AUDIT_DASHBOARD.md](docs/AUDIT_DASHBOARD.md) |
-| 🛡️ Exploit PoC test catalog | [docs/EXPLOIT_TEST_CATALOG.md](docs/EXPLOIT_TEST_CATALOG.md) |
-| 🗺️ Exploit coverage map | [docs/EXPLOIT_COVERAGE_MAP.md](docs/EXPLOIT_COVERAGE_MAP.md) |
-| 🎯 ECDSA edge-case coverage | [docs/ECDSA_EDGE_CASE_COVERAGE.md](docs/ECDSA_EDGE_CASE_COVERAGE.md) |
-| 🔬 Interop matrix (cross-implementation) | [docs/INTEROP_MATRIX.md](docs/INTEROP_MATRIX.md) |
-| 🧨 Threat model | [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) |
-| 📐 CAAS protocol (continuous audit) | [docs/CAAS_PROTOCOL.md](docs/CAAS_PROTOCOL.md) |
-| 🏗️ Multi-CI reproducible builds | [docs/MULTI_CI_REPRODUCIBLE_BUILD.md](docs/MULTI_CI_REPRODUCIBLE_BUILD.md) |
-| 🔌 Supply-chain local parity | [docs/SUPPLY_CHAIN_LOCAL_PARITY.md](docs/SUPPLY_CHAIN_LOCAL_PARITY.md) |
-| 📡 Hardware side-channel methodology | [docs/HARDWARE_SIDE_CHANNEL_METHODOLOGY.md](docs/HARDWARE_SIDE_CHANNEL_METHODOLOGY.md) |
-| 🛂 Compliance stance | [docs/COMPLIANCE_STANCE.md](docs/COMPLIANCE_STANCE.md) |
-| 🤖 Security autonomy program | [docs/SECURITY_AUTONOMY_PLAN.md](docs/SECURITY_AUTONOMY_PLAN.md) |
-| 🔭 Research monitor | [docs/RESEARCH_MONITOR.md](docs/RESEARCH_MONITOR.md) |
-| 🧑‍⚖️ Reviewer role prompts | [docs/REVIEWER_PROMPTS/README.md](docs/REVIEWER_PROMPTS/README.md) |
-| 🔀 Backend assurance matrix | [docs/BACKEND_ASSURANCE_MATRIX.md](docs/BACKEND_ASSURANCE_MATRIX.md) |
-| 🚦 CI gating policy | [docs/CI_GATING_POLICY.md](docs/CI_GATING_POLICY.md) |
-| 🗺️ ABI layer routing matrix | [docs/LAYER_ROUTING_MATRIX.md](docs/LAYER_ROUTING_MATRIX.md) |
-| 🏗️ Build guide | [docs/BUILDING.md](docs/BUILDING.md) |
-| 🔗 C ABI / FFI reference | [docs/API_REFERENCE.md](docs/API_REFERENCE.md) |
-| 📈 Community benchmarks | [docs/COMMUNITY_BENCHMARKS.md](docs/COMMUNITY_BENCHMARKS.md) |
-| 🏛️ Architecture overview | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
-| 🔐 Security claims & contracts | [docs/SECURITY_CLAIMS.md](docs/SECURITY_CLAIMS.md) |
-| 🔑 Secret lifecycle (zeroization, CT) | [docs/SECRET_LIFECYCLE.md](docs/SECRET_LIFECYCLE.md) |
-| 🧮 Cryptographic invariants | [docs/CRYPTO_INVARIANTS.md](docs/CRYPTO_INVARIANTS.md) |
-| 🧵 Thread-safety guarantees | [docs/THREAD_SAFETY.md](docs/THREAD_SAFETY.md) |
-| 🛡️ Safe defaults | [docs/SAFE_DEFAULTS.md](docs/SAFE_DEFAULTS.md) |
-| 🔬 Differential testing | [docs/DIFFERENTIAL_TESTING.md](docs/DIFFERENTIAL_TESTING.md) |
-| 📋 Reproducible builds | [docs/REPRODUCIBLE_BUILDS.md](docs/REPRODUCIBLE_BUILDS.md) |
-| 🚨 Incident response | [docs/INCIDENT_RESPONSE.md](docs/INCIDENT_RESPONSE.md) |
-| 📦 Install packages | [Installation](#installation) |
-| 🤔 Why this library? | [WHY_ULTRAFASTSECP256K1.md](docs/WHY_ULTRAFASTSECP256K1.md) |
-| 📚 Cite this work | [CITATION.cff](CITATION.cff) |
-| 🌐 Production adopters | [docs/ADOPTION.md](docs/ADOPTION.md) |
-| 💰 Funding & grant programmes | [docs/FUNDING_TARGETS.md](docs/FUNDING_TARGETS.md) |
-| 💙 Sponsor | [github.com/sponsors/shrec](https://github.com/sponsors/shrec) |
+| Run the audit | [docs/AUDIT_GUIDE.md](docs/AUDIT_GUIDE.md) |
+| Try to break the system | [docs/ATTACK_GUIDE.md](docs/ATTACK_GUIDE.md) |
+| Understand the guarantees | [docs/AUDIT_TRACEABILITY.md](docs/AUDIT_TRACEABILITY.md) |
+| Audit philosophy & design rationale | [docs/AUDIT_PHILOSOPHY.md](docs/AUDIT_PHILOSOPHY.md) |
+| Audit methodology specification (CAAS) | [docs/AUDIT_STANDARD.md](docs/AUDIT_STANDARD.md) |
+| Independent reviewer quick start | [docs/AUDITOR_QUICKSTART.md](docs/AUDITOR_QUICKSTART.md) |
+| Historical audit report (v3.9.0 baseline — ⚠ not current state) | [AUDIT_REPORT.md](docs/AUDIT_REPORT.md) |
+| Live audit dashboard | [docs/AUDIT_DASHBOARD.md](docs/AUDIT_DASHBOARD.md) |
+| Exploit PoC test catalog | [docs/EXPLOIT_TEST_CATALOG.md](docs/EXPLOIT_TEST_CATALOG.md) |
+| Exploit coverage map | [docs/EXPLOIT_COVERAGE_MAP.md](docs/EXPLOIT_COVERAGE_MAP.md) |
+| ECDSA edge-case coverage | [docs/ECDSA_EDGE_CASE_COVERAGE.md](docs/ECDSA_EDGE_CASE_COVERAGE.md) |
+| Interop matrix (cross-implementation) | [docs/INTEROP_MATRIX.md](docs/INTEROP_MATRIX.md) |
+| Threat model | [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) |
+| CAAS protocol (continuous audit) | [docs/CAAS_PROTOCOL.md](docs/CAAS_PROTOCOL.md) |
+| Multi-CI reproducible builds | [docs/MULTI_CI_REPRODUCIBLE_BUILD.md](docs/MULTI_CI_REPRODUCIBLE_BUILD.md) |
+| Supply-chain local parity | [docs/SUPPLY_CHAIN_LOCAL_PARITY.md](docs/SUPPLY_CHAIN_LOCAL_PARITY.md) |
+| Hardware side-channel methodology | [docs/HARDWARE_SIDE_CHANNEL_METHODOLOGY.md](docs/HARDWARE_SIDE_CHANNEL_METHODOLOGY.md) |
+| Compliance stance | [docs/COMPLIANCE_STANCE.md](docs/COMPLIANCE_STANCE.md) |
+| Security autonomy program | [docs/SECURITY_AUTONOMY_PLAN.md](docs/SECURITY_AUTONOMY_PLAN.md) |
+| Research monitor | [docs/RESEARCH_MONITOR.md](docs/RESEARCH_MONITOR.md) |
+| ⚖️ Reviewer role prompts | [docs/REVIEWER_PROMPTS/README.md](docs/REVIEWER_PROMPTS/README.md) |
+| Backend assurance matrix | [docs/BACKEND_ASSURANCE_MATRIX.md](docs/BACKEND_ASSURANCE_MATRIX.md) |
+| CI gating policy | [docs/CI_GATING_POLICY.md](docs/CI_GATING_POLICY.md) |
+| ABI layer routing matrix | [docs/LAYER_ROUTING_MATRIX.md](docs/LAYER_ROUTING_MATRIX.md) |
+| Build guide | [docs/BUILDING.md](docs/BUILDING.md) |
+| C ABI / FFI reference | [docs/API_REFERENCE.md](docs/API_REFERENCE.md) |
+| Community benchmarks | [docs/COMMUNITY_BENCHMARKS.md](docs/COMMUNITY_BENCHMARKS.md) |
+| Architecture overview | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| Security claims & contracts | [docs/SECURITY_CLAIMS.md](docs/SECURITY_CLAIMS.md) |
+| Secret lifecycle (zeroization, CT) | [docs/SECRET_LIFECYCLE.md](docs/SECRET_LIFECYCLE.md) |
+| Cryptographic invariants | [docs/CRYPTO_INVARIANTS.md](docs/CRYPTO_INVARIANTS.md) |
+| Thread-safety guarantees | [docs/THREAD_SAFETY.md](docs/THREAD_SAFETY.md) |
+| Safe defaults | [docs/SAFE_DEFAULTS.md](docs/SAFE_DEFAULTS.md) |
+| Differential testing | [docs/DIFFERENTIAL_TESTING.md](docs/DIFFERENTIAL_TESTING.md) |
+| Reproducible builds | [docs/REPRODUCIBLE_BUILDS.md](docs/REPRODUCIBLE_BUILDS.md) |
+| Incident response | [docs/INCIDENT_RESPONSE.md](docs/INCIDENT_RESPONSE.md) |
+| Install packages | [Installation](#installation) |
+| Why this library? | [WHY_ULTRAFASTSECP256K1.md](docs/WHY_ULTRAFASTSECP256K1.md) |
+| Cite this work | [CITATION.cff](CITATION.cff) |
+| Production adopters | [docs/ADOPTION.md](docs/ADOPTION.md) |
+| Funding & grant programmes | [docs/FUNDING_TARGETS.md](docs/FUNDING_TARGETS.md) |
+| Sponsor | [github.com/sponsors/shrec](https://github.com/sponsors/shrec) |
 
 > **Claim map:** [docs/ASSURANCE_LEDGER.md](docs/ASSURANCE_LEDGER.md) · **Security policy:** [SECURITY.md](SECURITY.md) · **Discord:** [discord.gg/E4BK8SeMYU](https://discord.gg/E4BK8SeMYU)
 
@@ -683,7 +683,7 @@ Get a working selftest in under a minute:
 **Option A -- Linux (apt)**
 ```bash
 sudo apt install libufsecp4
-ufsecp_selftest          # Expected: "OK (version 3.x, backend CPU)"
+ufsecp_selftest          # Expected: "OK (version 4.1.x, backend CPU)"
 ```
 
 **Option B -- npm (any OS)**
@@ -722,7 +722,7 @@ cmake -S . -B out/release -G Ninja -DCMAKE_BUILD_TYPE=Release && cmake --build o
 | **macOS (x64/ARM64)** | CPU + Metal | `brew install ufsecp` / build from source | [OK] Stable |
 | **Android ARM64** | CPU | `implementation 'io.github.shrec:ufsecp'` (Maven) | [OK] Stable |
 | **iOS ARM64** | CPU | Swift Package / CocoaPods / XCFramework | [OK] Stable — **⚠️ SPM/CocoaPods builds have CT guards disabled (verification only)** |
-| **Browser / Node.js** | WASM | `npm i ufsecp` | [OK] Stable |
+| **Browser / Node.js** | WASM | `npm i ufsecp` | [~] Experimental — CT evidence incomplete |
 | **ESP32-S3 / ESP32** | CPU | PlatformIO / IDF component | [OK] Tested |
 | **ESP32-C6** | CPU (RISC-V RV32) | PlatformIO / IDF component | [OK] Tested |
 | **ESP32-P4** | CPU (RISC-V HP dual-core) | PlatformIO / IDF component | [OK] Tested |
@@ -1368,7 +1368,7 @@ Two security profiles are **always active** -- no flag-based selection:
 ### CT / Hardened Profile (`ct::` namespace)
 
 - Constant-time arithmetic -- no secret-dependent branches or memory access
-- ~1.1–1.9× performance penalty vs FAST for primitive operations (see CT overhead table in docs/BENCHMARKS.md)
+- ~1.1–1.9× performance penalty vs FAST for primitive operations (see CT overhead table in docs/BENCHMARKS.md; release-grade measurement: `docs/bench_unified_2026-05-23_gcc14_x86-64.json`, CT overhead table, GCC 14.2.0)
 - Use for: signing, private key handling, nonce generation, ECDH
 
 **Choose the appropriate profile for your use case.** Using FAST with secret data is a security vulnerability.
