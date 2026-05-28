@@ -138,6 +138,15 @@ int main(int argc, char** argv) {
         secp256k1_ecdsa_signature_serialize_der(lctx, lecdsa_der[i].data(), &lecdsa_der_len[i], &lecdsa[i]);
     }
 
+    std::fprintf(stdout,
+        "╔══════════════════════════════════════════════════════════════╗\n"
+        "║  WARNING: DIAGNOSTIC BENCHMARK — NOT PRODUCTION-EQUIVALENT  ║\n"
+        "║  FAST-path (variable-time) Ultra vs libsecp256k1 (CT).       ║\n"
+        "║  Do NOT cite these numbers as production CT vs CT comparison. ║\n"
+        "║  For CT-vs-CT comparison see bench_unified CT SIGNING section.║\n"
+        "╚══════════════════════════════════════════════════════════════╝\n\n"
+    );
+
     printf("\n");
     printf("  =====================================================================\n");
     printf("  Ultra vs libsecp256k1 | %d passes | pool=%d | %d iters/pass\n",
