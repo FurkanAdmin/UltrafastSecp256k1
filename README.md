@@ -98,7 +98,7 @@ python3 ci/caas_runner.py --profile bitcoin-core-backend --json -o btc.json
 >   profile; see [`ci/profiles.json`](ci/profiles.json) for the full module set.
 > - Taproot key-path signing (wallet, not ConnectBlock): +10% faster (SignTransactionSchnorr)
 > - Taproot script-path signing (wallet, not ConnectBlock): +35% faster (SignSchnorrWithMerkleRoot)
-> - Canonical data: [docs/BITCOIN_CORE_BENCH_RESULTS.json](docs/BITCOIN_CORE_BENCH_RESULTS.json)
+> - Canonical data: [`docs/BITCOIN_CORE_BENCH_RESULTS.json`](docs/BITCOIN_CORE_BENCH_RESULTS.json) (measured 2026-05-12, commit `48e7c02f`).
 > - For reproducibility, use the commit SHA in `docs/BITCOIN_CORE_BENCH_RESULTS.json` field `"git_commit"` — do not hardcode a SHA in prose.
 
 ---
@@ -394,12 +394,12 @@ This top-level narrative maps directly to the assurance ledger: CT secret-key ro
 | Metric | Value |
 |--------|-------|
 | Internal audit assertions per build | **~1,000,000+** |
-| Audit modules (`unified_audit_runner`) | **144 non-exploit modules + 273 exploit PoCs across 9 sections, 0 mandatory failures** (see [docs/AUDIT_COVERAGE.md](docs/AUDIT_COVERAGE.md) for advisory cluster status) |
+| Audit modules (`unified_audit_runner`) | **144 non-exploit modules + 273 exploit PoCs across 10 sections, 0 mandatory failures** (see [docs/AUDIT_COVERAGE.md](docs/AUDIT_COVERAGE.md) for advisory cluster status) |
 | Exploit PoC test files | **273 exploit-PoC modules (261 source files), 20+ coverage areas, 0 mandatory failures** |
 | CI/CD workflows | **50+ GitHub Actions workflows** |
 | Build matrix (arch × config × OS) | **7 × 17 × 5 = 595 theoretical combinations** (actual CI matrix is a subset — see `.github/workflows/` for exact matrix) |
 | Differential tests (per push + manual) | **~1,300,000+ checks per deep-assurance run** |
-| Constant-time verification pipelines | **5 independent (3 in GitHub CI: LLVM ct-verif, Valgrind taint, ct-prover; 2 manual/local: dudect statistical, ARM64 native)** |
+| Constant-time verification pipelines | **5 independent: 3 available as GitHub Actions workflows (`ct-verif.yml`, `valgrind-ct.yml`, `ct-prover.yml`) — triggered manually or on release tag push, not on every commit push; 2 manual/local: dudect statistical, ARM64 native** |
 | Fuzzing adversarial corpus | **libFuzzer + ClusterFuzz-Lite (see `.clusterfuzzlite/` and `src/cpu/fuzz/`; corpus count grows with CI runs and is not stored in-repo)** |
 | Static analysis tools | **4 (CodeQL, Clang-Tidy, CPPCheck, SonarCloud)** |
 | Self-audit documents in repo | see [`docs/`](docs/) directory |
@@ -417,7 +417,7 @@ This top-level narrative maps directly to the assurance ledger: CT secret-key ro
 ### What "Self-Audit Culture" Means in Practice
 
 - Every field arithmetic property is verified algebraically: commutativity, associativity, distributivity, carry propagation, canonical form
-- Every constant-time path is verified under **5 independent pipelines: LLVM ct-verif, Valgrind taint, ct-prover (sPIN) in GitHub CI; dudect (statistical) and ARM64 native run locally/manually**
+- Every constant-time path is verified under **5 independent pipelines: LLVM ct-verif (`ct-verif.yml`), Valgrind taint (`valgrind-ct.yml`), ct-prover/sPIN (`ct-prover.yml`) — available as GitHub Actions workflows, triggered manually or on release tag push; dudect (statistical) and ARM64 native run locally/manually**
 - Every ECDSA/Schnorr implementation is cross-validated against **Wycheproof vectors, independent reference golden vectors, and BIP test vectors**
 - Performance evidence is tracked through manual/release deep-assurance workflows instead of every-push benchmark fan-out
 - Audit results are logged as **structured artifacts** (JSON reports, per-platform logs), not just pass/fail signals
@@ -784,15 +784,15 @@ cmake -S . -B out/release -G Ninja \
     -DSECP256K1_INSTALL=ON \
     -DSECP256K1_USE_ASM=ON
 cmake --build out/release -j$(nproc)
-sudo cmake --install build
+sudo cmake --install out/release
 sudo ldconfig
 ```
 
 ### Use in your CMake project
 
 ```cmake
-find_package(ufsecp 3 REQUIRED)
-target_link_libraries(myapp PRIVATE ufsecp::ufsecp)
+find_package(secp256k1-fast REQUIRED)
+target_link_libraries(myapp PRIVATE secp256k1::fast)
 ```
 
 ### Use with pkg-config
@@ -812,6 +812,9 @@ g++ myapp.cpp $(pkg-config --cflags --libs ufsecp) -o myapp
 > exact build configuration targeted.
 
 UltrafastSecp256k1 provides full secp256k1 ECDSA + Schnorr sign/verify on GPU across four backends (CUDA, OpenCL, Metal, ROCm). As of February 2026, no other open-source library was known to the authors to cover all four backends; corrections are welcome ([open an issue](https://github.com/shrec/UltrafastSecp256k1/issues)):
+
+<details>
+<summary>GPU Performance tables (diagnostic — unverified against current build, not release-grade evidence. See <code>canonical_numbers.json</code> <code>gpu_throughput.status</code> field.)</summary>
 
 | Backend | Hardware | kG/s | ECDSA Sign | ECDSA Verify | Schnorr Sign | Schnorr Verify | FROST Verify |
 |---------|----------|------|------------|--------------|--------------|----------------|-------------|
@@ -845,7 +848,7 @@ UltrafastSecp256k1 provides full secp256k1 ECDSA + Schnorr sign/verify on GPU ac
 | **ECDSA Sign+Recid** | **311.5 ns** | **3.21 M/s** | Recoverable (EIP-155) | — |
 | **Schnorr Sign** | **273.4 ns** | **3.66 M/s** | BIP-340 | — |
 | **Schnorr Verify** | **185.9 ns** | **5.38 M/s** | BIP-340 + GLV | **+91%** |
-| **FROST Partial Verify** | **748.9 ns** | **1.34 M/s** | t-of-n threshold | ⭐ New |
+| **FROST Partial Verify** | **748.9 ns** | **1.34 M/s** | t-of-n threshold | New |
 
 ### CUDA vs OpenCL Comparison (RTX 5060 Ti)
 
@@ -872,6 +875,8 @@ UltrafastSecp256k1 provides full secp256k1 ECDSA + Schnorr sign/verify on GPU ac
 | Generator Mul (Gxk) | 3.00 us | 0.33 M/s |
 
 *Metal 2.4, 8x32-bit Comba limbs, Apple M3 Pro (18 GPU cores, Unified Memory 18 GB)*
+
+</details>
 
 ---
 
@@ -1373,6 +1378,9 @@ See [THREAT_MODEL.md](docs/THREAT_MODEL.md) for full details.
 
 ## secp256k1 Supported Coins (27 Blockchains)
 
+<details>
+<summary>Supported Coins (out of scope for Bitcoin Core CPU backend review)</summary>
+
 | # | Coin | Ticker | Address Types | BIP-44 |
 |---|------|--------|---------------|--------|
 | 1 | **Bitcoin** | BTC | P2PKH, P2WPKH (Bech32), P2TR (Bech32m) | m/86'/0' |
@@ -1404,6 +1412,8 @@ See [THREAT_MODEL.md](docs/THREAT_MODEL.md) for full details.
 | 27 | **Komodo** | KMD | P2PKH | m/44'/141' |
 
 All EVM chains (ETH, BNB, MATIC, AVAX, FTM, ARB, OP) share the same address format (EIP-55 checksummed hex).
+
+</details>
 
 ---
 

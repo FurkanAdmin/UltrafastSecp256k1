@@ -121,6 +121,11 @@ EXPLOIT_PLUS_TOTAL_RE = re.compile(
     r'\b\d+ exploit PoCs? modules? \+ \d+ non-exploit modules? = \d+ total\b'
 )
 
+# Matches "across N sections" in isolation (not caught by TABLE_EXPLOIT_ROW_RE).
+# Used to update standalone section-count references in AUDIT_COVERAGE.md and
+# other docs that mention the section count outside the full table row context.
+ACROSS_SECTIONS_RE = re.compile(r'\bacross \d+ sections\b', re.IGNORECASE)
+
 
 # ── Count sources ─────────────────────────────────────────────────────────────
 
@@ -271,6 +276,9 @@ def make_replacements(content: str,
          f'All {non_exploit} non-exploit audit modules and all {exploit_mods} exploit PoCs')
     _sub(TABLE_EXPLOIT_ROW_RE,
          f'{non_exploit} non-exploit modules + {exploit_mods} exploit PoCs across {n_sections} sections, 0 failures')
+    # Standalone "across N sections" references (outside the full table-row pattern).
+    if n_sections > 0:
+        _sub(ACROSS_SECTIONS_RE, f'across {n_sections} sections')
     _sub(RUNNER_MODULE_COUNT_RE, f'{total}-module unified_audit_runner')
     _sub(RUNNER_MODULE_COUNT_BT_RE, f'{total}-module `unified_audit_runner`')
     _sub(REGISTERED_STYLE_RE,
