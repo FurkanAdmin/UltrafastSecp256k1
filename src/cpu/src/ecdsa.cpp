@@ -730,6 +730,7 @@ ECDSASignature ecdsa_sign_hedged(const std::array<uint8_t, 32>& msg_hash,
                 secure_erase(&s, sizeof(s));
                 secure_erase(&k_inv, sizeof(k_inv));
             }
+            secure_erase(&r, sizeof(r));   // r = kG.x mod n is nonce-derived
         }
     }
 

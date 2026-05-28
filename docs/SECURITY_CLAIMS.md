@@ -2,6 +2,12 @@
 
 **UltrafastSecp256k1 v4.1.0** -- FAST / CT Dual-Layer Architecture (CPU + GPU)
 
+### 2026-05-28 — defense-in-depth: ecdsa_sign_hedged now erases r (nonce-derived)
+
+`ecdsa_sign_hedged` in `src/cpu/src/ecdsa.cpp` now erases `r = kG.x mod n` via
+`secure_erase` after the inner signing block. No security claim change — `r` is not
+a private key or nonce scalar. This is defense-in-depth stack hygiene.
+
 ### 2026-05-28 — batch parallel signing: no new secret exposure
 
 `ufsecp_ecdsa_sign_batch` / `ufsecp_schnorr_sign_batch`: parallel slot dispatch

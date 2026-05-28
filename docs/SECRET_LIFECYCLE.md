@@ -1,6 +1,14 @@
 # Secret Lifecycle Review
 
-**Last updated**: 2026-05-28 | **Version**: 4.1.5
+**Last updated**: 2026-05-28 | **Version**: 4.1.6
+
+### 2026-05-28 — defense-in-depth: erase nonce-derived r in ecdsa_sign_hedged
+
+`src/cpu/src/ecdsa.cpp` — `ecdsa_sign_hedged` now erases `r` (the x-coordinate
+of `kG` reduced mod n) via `secure_erase(&r, sizeof(r))` immediately after the
+inner block that uses it. `r` is nonce-derived and while it is not directly a
+secret scalar, defense-in-depth requires erasing all nonce-derived intermediates
+to prevent residue accumulation on the stack across repeated calls.
 
 ### 2026-05-28 — batch parallel dispatch: private key read-only, output zeroed on error
 
