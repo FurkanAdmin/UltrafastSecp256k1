@@ -4018,6 +4018,8 @@ target_sources(unified_audit_runner PRIVATE
     $<$<BOOL:${SECP256K1_BUILD_FROST}>:test_exploit_frost_absent_signer_id.cpp>
     # 2026-05-25 T-08: r/s erase in ecdsa_sign + s erase in musig2_partial_sig_agg
     test_regression_s_scalar_erasure.cpp
+    # 2026-05-28 SEC-002/003/004/005: FROST infinity group key + MuSig2 e=0 guard + nonce seed + blinded gen_mul
+    test_regression_frost_musig2_degenerate.cpp
     # Feature module stubs: when a module is OFF, these provide advisory-skip
     # _run() implementations so unified_audit_runner links without the real files.
     feature_run_stubs_unified.cpp)
@@ -4071,6 +4073,8 @@ if(TARGET secp256k1_shim)
         test_regression_shim_divergence_fixes.cpp
         # 2026-05-26 SHIM-NEW-001/002/003: NULL non-ctx args fire illegal_callback
         test_regression_shim_null_arg_cb.cpp
+        # 2026-05-28 TRNC-1..4: NULL non-ctx arg illegal_callback in extrakeys + recovery tweak/convert
+        test_regression_shim_tweak_recover_null_cb.cpp
 )
     target_compile_definitions(unified_audit_runner PRIVATE SECP256K1_BUILD_COMPAT_SHIM)
     target_link_libraries(unified_audit_runner PRIVATE secp256k1_shim)
@@ -4147,6 +4151,19 @@ if(TARGET secp256k1_shim)
         COMMAND test_regression_shim_divergence_fixes_standalone)
     set_tests_properties(regression_shim_divergence_fixes PROPERTIES
         TIMEOUT 60 LABELS "audit;regression;shim;security;illcb;keypair;bip340")
+
+    # -- 2026-05-28: TRNC-1..4: NULL non-ctx arg illegal_callback in extrakeys + recovery --
+    add_executable(test_regression_shim_tweak_recover_null_cb_standalone
+        test_regression_shim_tweak_recover_null_cb.cpp)
+    audit_target_defaults(test_regression_shim_tweak_recover_null_cb_standalone)
+    target_link_libraries(test_regression_shim_tweak_recover_null_cb_standalone PRIVATE secp256k1_shim)
+    target_include_directories(test_regression_shim_tweak_recover_null_cb_standalone PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../compat/libsecp256k1_shim/include)
+    target_compile_definitions(test_regression_shim_tweak_recover_null_cb_standalone PRIVATE STANDALONE_TEST)
+    add_test(NAME regression_shim_tweak_recover_null_cb
+        COMMAND test_regression_shim_tweak_recover_null_cb_standalone)
+    set_tests_properties(regression_shim_tweak_recover_null_cb PROPERTIES
+        TIMEOUT 60 LABELS "audit;regression;shim;security;illcb;extrakeys;recovery;SHIM-NULL-CB-2026")
 endif()
 
 # -- PERF-VAR: fe52 var-time paths correctness — standalone CTest --
@@ -4455,6 +4472,16 @@ if(SECP256K1_BUILD_PROTOCOL_TESTS)
         PROPERTIES LABELS "audit"
     )
 endif()
+
+# -- 2026-05-28 SEC-002/003/004/005: FROST infinity group key + MuSig2 degenerate session --
+add_executable(test_regression_frost_musig2_degenerate_standalone
+    test_regression_frost_musig2_degenerate.cpp)
+audit_target_defaults(test_regression_frost_musig2_degenerate_standalone)
+target_compile_definitions(test_regression_frost_musig2_degenerate_standalone PRIVATE STANDALONE_TEST)
+add_test(NAME regression_frost_musig2_degenerate
+    COMMAND test_regression_frost_musig2_degenerate_standalone)
+set_tests_properties(regression_frost_musig2_degenerate PROPERTIES
+    TIMEOUT 60 LABELS "audit;regression;frost;musig2;security;degenerate")
 
 message(STATUS "  Audit test plan: audit/AUDIT_TEST_PLAN.md")
 message(STATUS "  Full audit script (Windows): audit/run_full_audit.ps1")

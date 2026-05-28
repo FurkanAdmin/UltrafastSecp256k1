@@ -2,19 +2,20 @@
 // test_regression_ct_secret_is_zero.cpp
 // ============================================================================
 // Regression: secret-bearing code paths must not call fast::Scalar::is_zero()
-// (data-dependent early-exit) on secret scalars.  Three fixes tested here:
+// (data-dependent early-exit) on secret scalars.  Fixes tested here:
 //
 //   SIZ-1 (adaptor.cpp): removed VT if(k.is_zero()) before ct::scalar_inverse;
 //         replaced with ct-safe path: inverse(0)==0, followed by s_hat.is_zero_ct().
 //   SIZ-2 (taproot.cpp): private_key.is_zero() → private_key.is_zero_ct()
 //   SIZ-3 (taproot.cpp): tweaked.is_zero()     → tweaked.is_zero_ct()
-//
-// Tests verify correctness of the patched paths:
-//   SIZ-1a: ecdsa_adaptor_sign with a valid nonce produces non-degenerate output.
-//   SIZ-1b: ecdsa_adaptor_sign + ecdsa_adaptor_verify round-trip succeeds.
-//   SIZ-2:  taproot_tweak_privkey returns Scalar::zero() for zero private key (CT path).
-//   SIZ-3:  taproot_tweak_privkey returns Scalar::zero() when tweaked key would be zero.
 //   SIZ-4:  taproot_tweak_privkey normal round-trip: tweaked pubkey = (privkey+t)*G.
+//   SIZ-5 (ct_sign.cpp): ecdsa_sign_recoverable — r.is_zero() → r.is_zero_ct()
+//   SIZ-6 (ct_sign.cpp): ecdsa_sign_hedged_recoverable — same fix
+//   SIZ-7 (ct_sign.cpp): ecdsa_sign_libsecp_compat_recoverable — same fix
+//
+// SIZ-5/6/7 verify that after the IS-ZERO-CT fix, the recoverable signing
+// functions still produce correct, non-degenerate output and that the recovered
+// public key matches the expected public key (correctness round-trip).
 // ============================================================================
 
 #include <cstdio>
@@ -35,6 +36,8 @@ static int g_pass = 0, g_fail = 0;
 #include "secp256k1/adaptor.hpp"
 #endif
 #include "secp256k1/taproot.hpp"
+#include "secp256k1/ct/sign.hpp"
+#include "secp256k1/recovery.hpp"
 
 using namespace secp256k1;
 using fast::Scalar;
@@ -120,6 +123,67 @@ static void test_taproot_normal_roundtrip() {
     CHECK(!tweaked_pub.is_infinity(), "[SIZ-4] tweaked pubkey is not infinity");
 }
 
+// ─── SIZ-5/6/7: ct_sign.cpp r.is_zero_ct() fix — recoverable signing ────────
+//
+// The fix: in ecdsa_sign_recoverable, ecdsa_sign_hedged_recoverable, and
+// ecdsa_sign_libsecp_compat_recoverable, r.is_zero() was replaced with
+// r.is_zero_ct(). r is derived from k*G.x (secret nonce) so the IS-ZERO-CT
+// constraint applies. These tests verify correctness (non-degenerate output +
+// recovery round-trip) is preserved after the fix.
+
+static const uint8_t kSizSk[32] = {
+    0x03,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x07
+};
+static const uint8_t kSizMsg[32] = {
+    0xAA,0xBB,0xCC,0xDD,0xEE,0xFF,0x00,0x11,
+    0x22,0x33,0x44,0x55,0x66,0x77,0x88,0x99,
+    0xAA,0xBB,0xCC,0xDD,0xEE,0xFF,0x00,0x11,
+    0x22,0x33,0x44,0x55,0x66,0x77,0x88,0x99
+};
+
+static void test_recoverable_sign_ct_roundtrip(const char* label,
+    const RecoverableSignature& rsig, const Point& expected_pubkey,
+    const std::array<uint8_t,32>& msg) {
+    CHECK(rsig.recid >= 0 && rsig.recid <= 3, label);
+    CHECK(!rsig.sig.r.is_zero(), label);
+    CHECK(!rsig.sig.s.is_zero(), label);
+    auto [recovered, ok] = ecdsa_recover(msg, rsig.sig, rsig.recid);
+    CHECK(ok, label);
+    // Compare recovered pubkey to expected via (x, y_parity)
+    auto [exp_x, exp_odd] = expected_pubkey.x_bytes_and_parity();
+    auto [rec_x, rec_odd] = recovered.x_bytes_and_parity();
+    CHECK(exp_x == rec_x, label);
+    CHECK(exp_odd == rec_odd, label);
+}
+
+static void test_recoverable_sign_is_zero_ct() {
+    SECP256K1_INIT();
+
+    Scalar sk{};
+    CHECK(Scalar::parse_bytes_strict_nonzero(kSizSk, sk), "[SIZ-5] parse sk");
+    std::array<uint8_t,32> msg{};
+    std::memcpy(msg.data(), kSizMsg, 32);
+
+    Point expected_pk = ct::generator_mul(sk);
+
+    // SIZ-5: ecdsa_sign_recoverable CT path
+    auto rsig5 = ct::ecdsa_sign_recoverable(msg, sk);
+    test_recoverable_sign_ct_roundtrip("[SIZ-5] ecdsa_sign_recoverable CT", rsig5, expected_pk, msg);
+
+    // SIZ-6: ecdsa_sign_hedged_recoverable CT path
+    std::array<uint8_t,32> aux{};
+    std::memset(aux.data(), 0x42, 32);
+    auto rsig6 = ct::ecdsa_sign_hedged_recoverable(msg, sk, aux);
+    test_recoverable_sign_ct_roundtrip("[SIZ-6] ecdsa_sign_hedged_recoverable CT", rsig6, expected_pk, msg);
+
+    // SIZ-7: ecdsa_sign_libsecp_compat_recoverable CT path (no ndata)
+    auto rsig7 = ct::ecdsa_sign_libsecp_compat_recoverable(msg, sk, nullptr);
+    test_recoverable_sign_ct_roundtrip("[SIZ-7] ecdsa_sign_libsecp_compat_recoverable CT", rsig7, expected_pk, msg);
+}
+
 // ─── Entry point ─────────────────────────────────────────────────────────────
 
 #ifndef UNIFIED_AUDIT_RUNNER
@@ -128,7 +192,7 @@ int main() {
 #else
 int test_regression_ct_secret_is_zero_run() {
 #endif
-    printf("[ct_secret_is_zero] SIZ-1..4: CT is_zero fix — adaptor + taproot\n");
+    printf("[ct_secret_is_zero] SIZ-1..7: CT is_zero fix — adaptor + taproot + ct_sign\n");
 
 #if SECP256K1_HAS_ADAPTOR
     test_adaptor_ct_nonce_path();
@@ -138,6 +202,7 @@ int test_regression_ct_secret_is_zero_run() {
 #endif
     test_taproot_zero_privkey();
     test_taproot_normal_roundtrip();
+    test_recoverable_sign_is_zero_ct();
 
     printf("[ct_secret_is_zero] %d passed, %d failed\n", g_pass, g_fail);
     return g_fail;

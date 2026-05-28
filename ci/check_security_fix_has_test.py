@@ -567,12 +567,24 @@ RETROACTIVELY_COVERED: dict[str, tuple[list[str], str]] = {
         "Covered by test_regression_ecdh_off_curve (OCK-1..5: off-curve + infinity rejection "
         "in all three ecdh_compute* variants, plus positive guard for valid key).",
     ),
+    "1b73e45abc": (
+        ["audit/test_parse_strictness.cpp",
+         "audit/test_regression_shim_security_v8.cpp"],
+        "fix(bench): add cold-start Schnorr benchmark + fix stale ShimSchnorrCache — "
+        "shim_schnorr.cpp ShimSchnorrCache stale-entry fix (replace iteration-count "
+        "guard with explicit is_valid() flag). Pure performance/correctness fix to the "
+        "cache; no new signing surface. Covered by test_parse_strictness (PS-EC-02/03 "
+        "cache correctness: same-pubkey miss+hit paths) and test_regression_shim_security_v8 "
+        "(ShimEcdsaCache roundtrip exercising the same cache lifecycle). Retroactive entry "
+        "added in the same session as TRNC-1..4 shim null-arg fixes "
+        "(test_regression_shim_tweak_recover_null_cb).",
+    ),
 }
 
 # Frozen count guard (CAAS-006): prevents silent whitelist growth.
 # When adding a new entry above, increment this constant too.
 # Unauthorized bypass (adding an entry without incrementing) → import-time assertion failure.
-RETROACTIVELY_COVERED_FROZEN_COUNT: int = 51
+RETROACTIVELY_COVERED_FROZEN_COUNT: int = 52
 assert len(RETROACTIVELY_COVERED) == RETROACTIVELY_COVERED_FROZEN_COUNT, (
     f"RETROACTIVELY_COVERED has {len(RETROACTIVELY_COVERED)} entries but "
     f"RETROACTIVELY_COVERED_FROZEN_COUNT={RETROACTIVELY_COVERED_FROZEN_COUNT}. "

@@ -104,13 +104,13 @@ lags behind the generated validation surfaces, prefer the generated counts.
 |------|---------|-------|
 | `opencl/tests/test_opencl.cpp` | OpenCL | Kernel correctness |
 | `opencl/tests/opencl_extended_test.cpp` | OpenCL | Extended operations |
-| `opencl/src/opencl_audit_runner.cpp` | OpenCL | Unified GPU audit ( 414 modules, 8 sections) |
+| `opencl/src/opencl_audit_runner.cpp` | OpenCL | Unified GPU audit ( 416 modules, 8 sections) |
 | `metal/tests/test_metal_host.cpp` | Metal | Metal shader correctness |
-| `metal/src/metal_audit_runner.mm` | Metal | `secp256k1_metal_audit`: unified GPU audit ( 414 modules, 8 sections) |
+| `metal/src/metal_audit_runner.mm` | Metal | `secp256k1_metal_audit`: unified GPU audit ( 416 modules, 8 sections) |
 | `src/cuda/src/test_ct_smoke.cu` | CUDA | CT smoke tests incl. ZK knowledge + DLEQ prove/verify (9 tests) |
 | `src/cuda/src/gpu_ct_leakage_probe.cu` | CUDA | Fixed-vs-random device-cycle Welch t-test for CT generator/signing kernels with JSON evidence output |
 | `src/cuda/src/test_suite.cu` | CUDA | `cuda_selftest`: kernel correctness, field + scalar + point ops |
-| `src/cuda/src/gpu_audit_runner.cu` | CUDA | `gpu_audit`: unified GPU audit ( 414 modules, 8 sections) |
+| `src/cuda/src/gpu_audit_runner.cu` | CUDA | `gpu_audit`: unified GPU audit ( 416 modules, 8 sections) |
 | `metal/app/metal_test.mm` | Metal | `secp256k1_metal_test`: shader correctness, compute pipeline |
 | `metal/app/bench_metal.mm` | Metal | `secp256k1_metal_bench_full`: comprehensive Metal benchmark |
 | `compat/libsecp256k1_shim/tests/shim_test.cpp` | CPU | `secp256k1_shim_test`: libsecp256k1 API compatibility shim |
@@ -386,6 +386,7 @@ fix pass (SEC-001/CT-001/SEC-002/SEC-003/SHIM-001/CI-006):
 - `regression_shim_keypair_null_cb` — T-09/10: per-arg illegal_callback for keypair_create/sec/pub/xonly_pub + sig parse (advisory=true, shim)
 - `regression_shim_context_erase` — T-11/12: secure_erase ctx->blind + is_zero_ct in ContextBlindingScope (advisory=true, shim)
 - `regression_shim_null_arg_cb` — SHIM-NEW-001/002/003: ec_pubkey_create/serialize, xonly_pubkey_parse/serialize, recoverable_sig_parse/serialize fire illegal_callback on NULL non-ctx args (advisory=true, shim)
+- `regression_shim_tweak_recover_null_cb` — TRNC-1..4: xonly_pubkey_tweak_add, tweak_add_check, keypair_xonly_tweak_add, recoverable_sig_convert fire illegal_callback on NULL non-ctx args (SHIM-NULL-CB-2026) (advisory=true, shim)
 
 ### Generated Inventory Sync (2026-05-12)
 
@@ -908,3 +909,4 @@ ctest --test-dir build-audit -R "exploit" --output-on-failure
 | `test_exploit_sp_scanner_parity.cpp` | `audit/test_exploit_sp_scanner_parity.cpp` | SilentPaymentScanner + LtcSpScanner parity: scan_tx==scan_batch, BTC↔LTC cross-chain isolation, spend key correctness | exploit_sp_scanner_parity | 60 | audit;exploit;sp;ltcsp;parity;scan-batch |
 | `regression_shim_rfc6979_compat` | `audit/test_regression_shim_rfc6979_compat.cpp` | SHIM-P3-006: rfc6979_nonce_libsecp_compat determinism + signing correctness — same inputs same nonce, NULL vs non-NULL ndata differ, ecdsa_sign_libsecp_compat verifies (RFC-1..9); advisory=false |
 | `regression_shim_divergence_fixes` | `audit/test_regression_shim_divergence_fixes.cpp` | ILLCB-001/002: pubkey_parse NULL args fire illegal_cb; DER-STRICT: r=0/s=0 accepted at parse; keypair_sec BIP-340: stored sk produces even-Y pubkey (SDF-1..6); advisory=true |
+| `regression_shim_tweak_recover_null_cb` | `audit/test_regression_shim_tweak_recover_null_cb.cpp` | TRNC-1..4: xonly_pubkey_tweak_add, tweak_add_check, keypair_xonly_tweak_add, recoverable_sig_convert fire illegal_callback on NULL non-ctx args (SHIM-NULL-CB-2026); advisory=true |

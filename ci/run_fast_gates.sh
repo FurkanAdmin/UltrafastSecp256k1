@@ -58,6 +58,7 @@ MANDATORY_GATES=(
     "ci/check_protocol_invariants.py"
     "ci/check_nonce_erase_coverage.py"
     "ci/check_doc_drift.py"
+    "ci/check_advisory_skip_ceiling.py"
     "tools/render_repo_map.py"
     "ci/validate_assurance.py"
 )

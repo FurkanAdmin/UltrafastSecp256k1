@@ -18,15 +18,18 @@ using secp256k1::fast::Point;
 using secp256k1::fast::FieldElement;
 
 // Write X[0..31] || Y[32..63] from a Point into a 64-byte opaque buffer.
-// Uses the fast affine path (Z=1) when available; falls back to full
-// to_uncompressed() for Jacobian points (avoids field inversion ~99% of time).
+// Fast path (Z=1): extract X and Y field elements directly — no allocation.
+// Fallback (Jacobian): copy the point and normalize (one field inversion) then
+// extract, avoiding the 65-byte to_uncompressed() heap allocation + memcpy.
 inline void point_to_pubkey_data(const Point& pt, unsigned char data[64]) noexcept {
     if (pt.is_normalized()) {
         pt.x_raw().to_bytes_into(reinterpret_cast<uint8_t*>(data));
         pt.y_raw().to_bytes_into(reinterpret_cast<uint8_t*>(data) + 32);
     } else {
-        auto unc = pt.to_uncompressed();
-        std::memcpy(data, unc.data() + 1, 64);
+        Point n = pt;
+        n.normalize();
+        n.x_raw().to_bytes_into(reinterpret_cast<uint8_t*>(data));
+        n.y_raw().to_bytes_into(reinterpret_cast<uint8_t*>(data) + 32);
     }
 }
 

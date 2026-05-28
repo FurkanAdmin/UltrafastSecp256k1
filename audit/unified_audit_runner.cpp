@@ -232,6 +232,7 @@ int test_regression_adaptor_ct_secret_extract_run(); // SEC-001/CT-001: adaptor 
 int test_regression_ecdh_xy64_erase_run();           // SEC-002: shim_ecdh xy64 erased after hashfp call (2026-05-23)
 int test_regression_ecdh_off_curve_run();            // SEC-005: ecdh_compute* reject off-curve and infinity pubkeys (2026-05-27)
 int test_regression_musig_xonly_zero_tweak_run();    // SHIM-001: xonly_tweak_add accepts zero tweak (2026-05-23)
+int test_regression_shim_tweak_recover_null_cb_run(); // TRNC-1..4: NULL non-ctx arg fires illegal_callback in xonly_tweak_add, tweak_add_check, keypair_xonly_tweak_add, recoverable_sig_convert (2026-05-28)
 
 // ============================================================================
 // Forward declarations -- Wycheproof & batch-randomness (Track I3, I6-3)
@@ -716,6 +717,11 @@ int test_regression_shim_rfc6979_compat_run(); // SHIM-P3-006: rfc6979_nonce_lib
 int test_regression_shim_divergence_fixes_run(); // SDF-1..6: pubkey_parse NULL callbacks, DER r=0, keypair BIP-340
 
 // ============================================================================
+// Forward declarations -- 2026-05-28 SEC-002/003/004/005 degenerate input guards
+// ============================================================================
+int test_regression_frost_musig2_degenerate_run(); // FMD-1..4: FROST infinity group key + MuSig2 e=0 guard
+
+// ============================================================================
 // Report section IDs -- 10 audit categories
 // ============================================================================
 //   1. math_invariants   -- Mathematical Invariants (Fp, Zn, Group Laws)
@@ -859,6 +865,7 @@ static const AuditModule ALL_MODULES[] = {
     { "musig2_frost",      "MuSig2 + FROST protocol suite",              "protocol_security", test_musig2_frost_protocol_run, false },
     { "musig2_frost_adv",  "MuSig2 + FROST advanced/adversar",           "protocol_security", test_musig2_frost_advanced_run, false },
 #endif // SECP256K1_HAS_FROST
+    { "frost_musig2_degen","FROST infinity key + MuSig2 e=0 guard (FMD-1..4)", "protocol_security", test_regression_frost_musig2_degenerate_run, false },
     { "audit_integration", "Integration (ECDH/batch/cross-proto)",        "protocol_security", audit_integration_run, false },
     { "batch_randomness",  "Batch verify weight randomness audit",        "protocol_security", test_batch_randomness_run, false },
 #if SECP256K1_HAS_ZK
@@ -1322,7 +1329,7 @@ static const AuditModule ALL_MODULES[] = {
     // advisory=true: Rule 13 cannot be fully tested at C++ API level when individual_pubkeys
     // MSI-1/2/3 use CHECK() and are mandatory. MSI-4 is INFO-only (g_pass++, documents
     // an open MED-3 behavior) — it never sets g_fail, so the module always passes clean.
-    { "regression_musig2_signer_index",        "SEC-007: musig2_partial_sign validates secret_key<->signer_index (Rule 13) — MSI-4 (empty individual_pubkeys path) is documented open in RESIDUAL_RISK_REGISTER.md (MED-3 partial); v2 ABI is the secure path", "protocol_security", test_regression_musig2_signer_index_validation_run, false },
+    { "regression_musig2_signer_index",        "SEC-007: musig2_partial_sign validates secret_key<->signer_index (Rule 13) — MSI-4 (empty individual_pubkeys path) is documented open in RESIDUAL_RISK_REGISTER.md (MED-3 partial); v2 ABI is the secure path", "protocol_security", test_regression_musig2_signer_index_validation_run, true },
     // SEC-010: adaptor binding BIP-340 domain separation (wire format: ecdsa_adaptor_bind_v2)
 #if SECP256K1_HAS_ADAPTOR
     { "regression_adaptor_binding_domain",     "SEC-010: ecdsa_adaptor_binding uses BIP-340 tagged hash (v2) — sign/verify/adapt/extract round-trips, needs_negation integrity, domain separation confirmed", "protocol_security", test_regression_adaptor_binding_domain_run, false },
@@ -1488,6 +1495,9 @@ static const AuditModule ALL_MODULES[] = {
     // === 2026-05-26 ILLCB-001/002, DER-STRICT, keypair_sec BIP-340 normalization ===
     // advisory=true: depends on libsecp256k1 shim ABI.
     { "regression_shim_divergence_fixes", "ILLCB-001/002: pubkey_parse NULL args fire illegal_cb; DER-STRICT: r=0/s=0 accepted at parse; keypair_sec BIP-340: stored sk produces even-Y pubkey (SDF-1..6)", "protocol_security", test_regression_shim_divergence_fixes_run, true },
+    // === 2026-05-28 TRNC-1..4: NULL non-ctx arg illegal_callback in extrakeys + recovery tweak/convert ===
+    // advisory=true: requires shim to be linked (stub returns ADVISORY_SKIP_CODE when absent).
+    { "regression_shim_tweak_recover_null_cb", "TRNC-1..4: xonly_pubkey_tweak_add, tweak_add_check, keypair_xonly_tweak_add, recoverable_sig_convert now fire illegal_callback on NULL non-ctx args (SHIM-NULL-CB-2026)", "shim_regression", test_regression_shim_tweak_recover_null_cb_run, true },
 };
 
 static constexpr int NUM_MODULES = sizeof(ALL_MODULES) / sizeof(ALL_MODULES[0]);

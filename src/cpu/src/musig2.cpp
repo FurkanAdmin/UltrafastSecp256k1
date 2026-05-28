@@ -415,7 +415,7 @@ Scalar musig2_partial_sign(
     // hard-failed at entry (cannot validate without pubkeys), forcing callers to v2.
     if (!key_agg_ctx.individual_pubkeys.empty() &&
         signer_index < key_agg_ctx.individual_pubkeys.size()) {
-        Point const derived = ct::generator_mul(secret_key);
+        Point const derived = ct::generator_mul_blinded(secret_key);
         if (SECP256K1_UNLIKELY(derived.is_infinity())) {
             return Scalar::zero();
         }
@@ -432,6 +432,15 @@ Scalar musig2_partial_sign(
         if (diff != 0) {
             return Scalar::zero();
         }
+    }
+
+    // Reject degenerate session: e==0 means the challenge hash is zero (impossible
+    // in a correct FROST/MuSig2 run). If e==0, s_i = k + 0*a_i*d = k, which
+    // would expose the secret nonce. Erase and fail-closed.
+    if (session.e.is_zero_ct()) {
+        secure_erase(&sec_nonce.k1, sizeof(sec_nonce.k1));
+        secure_erase(&sec_nonce.k2, sizeof(sec_nonce.k2));
+        return Scalar::zero();
     }
 
     // k = k1 + b * k2

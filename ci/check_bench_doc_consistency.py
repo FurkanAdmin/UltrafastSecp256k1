@@ -12,9 +12,9 @@ benchmark artifacts. Catches two classes of problems:
      benchmark JSON artifact so claims are traceable.
 
 Source of truth:
-  docs/bench_unified_2026-05-11_gcc14_x86-64.json  (library-level benchmarks)
-  docs/BITCOIN_CORE_BENCH_RESULTS.json              (Bitcoin Core integration)
-  docs/canonical_numbers.json                       (sync source for prose)
+  docs/bench_unified_<YYYY-MM-DD>_gcc14_x86-64.json  (library-level benchmarks; latest wins)
+  docs/BITCOIN_CORE_BENCH_RESULTS.json                (Bitcoin Core integration)
+  docs/canonical_numbers.json                         (sync source for prose)
 
 Exit codes:
   0  — all checks pass

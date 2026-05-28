@@ -59,3 +59,6 @@ int test_regression_shim_musig_null_ctx_run()   { return ADVISORY_SKIP_CODE; }
 // SHIM-NEW-001/002/003: NULL non-ctx args fire illegal_callback — pubkey_create/serialize,
 // xonly_pubkey_parse/serialize, recoverable_sig_parse/serialize (2026-05-26)
 int test_regression_shim_null_arg_cb_run()      { return ADVISORY_SKIP_CODE; }
+// TRNC-1..4: NULL non-ctx args fire illegal_callback in xonly_tweak_add, tweak_add_check,
+// keypair_xonly_tweak_add, recoverable_sig_convert (2026-05-28, SHIM-NULL-CB-2026)
+int test_regression_shim_tweak_recover_null_cb_run() { return ADVISORY_SKIP_CODE; }

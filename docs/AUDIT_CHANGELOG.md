@@ -1,5 +1,43 @@
 # Audit Changelog
 
+## 2026-05-28 — Fix + test: SHIM-NULL-CB-2026 extrakeys + recovery NULL non-ctx arg callbacks (TRNC-1..4)
+
+- **SHIM-NULL-CB-2026 (shim_extrakeys.cpp)**: `secp256k1_xonly_pubkey_tweak_add`,
+  `secp256k1_xonly_pubkey_tweak_add_check`, `secp256k1_keypair_xonly_tweak_add` previously
+  returned 0 silently on NULL non-ctx args without firing `secp256k1_shim_call_illegal_cb`,
+  diverging from libsecp256k1 ARG_CHECK contract. All three now fire the callback.
+- **SHIM-NULL-CB-2026 (shim_recovery.cpp)**: `secp256k1_ecdsa_recoverable_signature_convert`
+  had the same silent-return bug on NULL `sig`/`sigin`. Now fires the illegal callback.
+- **Test (TRNC-1..4)**: `audit/test_regression_shim_tweak_recover_null_cb.cpp` — new file
+  covering all four functions with a callback trap. Wired into `unified_audit_runner.cpp`
+  (`shim_regression`, advisory=true).
+- **Files**: `compat/libsecp256k1_shim/src/shim_extrakeys.cpp`,
+  `compat/libsecp256k1_shim/src/shim_recovery.cpp`.
+
+## 2026-05-28 — Fix + test: SEC-001..005 ct_sign/FROST/MuSig2 degenerate input guards
+
+- **SEC-001 (ct_sign.cpp)**: Six `r.is_zero()` calls in `ecdsa_sign_recoverable`,
+  `ecdsa_sign_hedged_recoverable`, and `ecdsa_sign_libsecp_compat_recoverable` changed to
+  `r.is_zero_ct()`. `r` is derived from the secret nonce (k*G.x) so the IS-ZERO-CT constraint
+  applies; the VT variant had a data-dependent branch that could leak nonce bits via timing.
+- **SEC-002 (frost.cpp)**: Added `if (group_key.is_infinity()) return {pkg, false}` in
+  `frost_keygen_finalize`. Without this guard, adversarial polynomial commitments that cancel
+  (e.g. G + (-G)) produced an infinity group key that would propagate to wallets as a valid key.
+- **SEC-003 (musig2.cpp)**: Added `if (session.e.is_zero_ct())` guard in `musig2_partial_sign`
+  before the signing computation. If e==0, the formula s_i = k + 0·a_i·d = k exposes the nonce;
+  the guard erases nonces and returns Scalar::zero() (fail-closed).
+- **SEC-004 (frost.cpp)**: `frost_sign_nonce_gen` now takes `nonce_seed` by value and calls
+  `secure_erase` on the local copy after the nonces are derived.
+- **SEC-005 (musig2.cpp)**: Changed `ct::generator_mul(secret_key)` →
+  `ct::generator_mul_blinded(secret_key)` in the signer-index validation branch of
+  `musig2_partial_sign` for DPA blinding.
+- **Test (SIZ-5/6/7)**: `audit/test_regression_ct_secret_is_zero.cpp` extended with three
+  recoverable-sign round-trip cases.
+- **Test (FMD-1..4)**: `audit/test_regression_frost_musig2_degenerate.cpp` — new file covering
+  all four fixes. Wired into `unified_audit_runner.cpp` (`protocol_security`, advisory=false).
+- **Files**: `src/cpu/src/ct_sign.cpp`, `src/cpu/src/frost.cpp`, `src/cpu/src/musig2.cpp`,
+  `src/cpu/include/secp256k1/frost.hpp`.
+
 ## 2026-05-27 — Regression test: SEC-005 ECDH off-curve pubkey rejection (OCK-1..5)
 
 - **SEC-005**: `ecdh_compute`, `ecdh_compute_xonly`, `ecdh_compute_raw` now reject pubkeys that

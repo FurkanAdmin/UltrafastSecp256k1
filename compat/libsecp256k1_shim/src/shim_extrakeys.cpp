@@ -271,7 +271,11 @@ int secp256k1_xonly_pubkey_tweak_add(
     const unsigned char *tweak32)
 {
     SHIM_REQUIRE_CTX(ctx);  // SHIM-006: NULL ctx must fire illegal callback
-    if (!output_pubkey || !internal_pubkey || !tweak32) return 0;
+    if (!output_pubkey || !internal_pubkey || !tweak32) {
+        secp256k1_shim_call_illegal_cb(ctx,
+            "secp256k1_xonly_pubkey_tweak_add: NULL argument");
+        return 0;
+    }
 
     auto P = xonly_to_point(internal_pubkey);
     if (P.is_infinity()) return 0;
@@ -299,7 +303,11 @@ int secp256k1_xonly_pubkey_tweak_add_check(
     const unsigned char *tweak32)
 {
     SHIM_REQUIRE_CTX(ctx);  // SHIM-006: NULL ctx must fire illegal callback
-    if (!tweaked_pubkey32 || !internal_pubkey || !tweak32) return 0;
+    if (!tweaked_pubkey32 || !internal_pubkey || !tweak32) {
+        secp256k1_shim_call_illegal_cb(ctx,
+            "secp256k1_xonly_pubkey_tweak_add_check: NULL argument");
+        return 0;
+    }
 
     auto P = xonly_to_point(internal_pubkey);
     if (P.is_infinity()) return 0;
@@ -327,7 +335,11 @@ int secp256k1_keypair_xonly_tweak_add(
     const unsigned char *tweak32)
 {
     SHIM_REQUIRE_CTX(ctx);  // SHIM-006: NULL ctx must fire illegal callback
-    if (!keypair || !tweak32) return 0;
+    if (!keypair || !tweak32) {
+        secp256k1_shim_call_illegal_cb(ctx,
+            "secp256k1_keypair_xonly_tweak_add: NULL argument");
+        return 0;
+    }
 
     Scalar sk;
     if (!Scalar::parse_bytes_strict_nonzero(keypair->data, sk)) return 0;

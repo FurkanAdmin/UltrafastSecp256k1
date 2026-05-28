@@ -454,6 +454,10 @@ frost_keygen_finalize(ParticipantId participant_id,
             group_key = group_key.add(c.coeffs[0]);
         }
     }
+    // A group public key of infinity means the shares cancel — reject as degenerate.
+    if (group_key.is_infinity()) {
+        return {pkg, false};
+    }
     pkg.group_public_key = group_key;
 
     return {pkg, true};
@@ -463,10 +467,12 @@ frost_keygen_finalize(ParticipantId participant_id,
 
 std::pair<FrostNonce, FrostNonceCommitment>
 frost_sign_nonce_gen(ParticipantId participant_id,
-                     const std::array<std::uint8_t, 32>& nonce_seed) {
+                     std::array<std::uint8_t, 32> nonce_seed) {
     FrostNonce nonce;
     nonce.hiding_nonce = derive_scalar(nonce_seed.data(), 32, "FROST_nonce_hiding", participant_id);
     nonce.binding_nonce = derive_scalar(nonce_seed.data(), 32, "FROST_nonce_binding", participant_id);
+    // Erase the local copy of the seed — the secret has been consumed into the nonces.
+    secure_erase(nonce_seed.data(), nonce_seed.size());
 
     FrostNonceCommitment commitment;
     commitment.id = participant_id;

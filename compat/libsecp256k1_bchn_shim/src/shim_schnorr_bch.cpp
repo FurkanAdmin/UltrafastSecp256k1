@@ -173,11 +173,11 @@ int secp256k1_schnorr_verify(
         // e = SHA256(R.x || P_compressed || msg)
         auto e = bch_schnorr_e(rx, pubkey->data, p_y_odd, msg);
 
-        // R_check = s*G - e*P
-        auto sG = scalar_mul_generator(s);     // fast table
-        auto neg_e = e.negate();
-        auto eP  = P.scalar_mul(neg_e);        // fast GLV
-        auto R_check = sG.add(eP);
+        // R_check = s*G + (-e)*P  via Shamir's wNAF trick (SHIM-004 fix).
+        // dual_scalar_mul_gen_point(a, b, Q) = a*G + b*Q using interleaved
+        // wNAF — ~1.5× faster than two separate scalar_mul calls.
+        auto neg_e   = e.negate();
+        auto R_check = Point::dual_scalar_mul_gen_point(s, neg_e, P);
         if (R_check.is_infinity()) return 0;
 
         // Valid iff R_check.x == rx

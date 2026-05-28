@@ -110,9 +110,11 @@ frost_keygen_finalize(ParticipantId participant_id,
 
 // Generate nonces for a signing round
 // Returns: (secret nonce pair, public commitment)
+// nonce_seed is taken by value and securely erased inside — the caller's copy
+// is NOT erased. Callers MUST erase their own nonce_seed after this call.
 std::pair<FrostNonce, FrostNonceCommitment>
 frost_sign_nonce_gen(ParticipantId participant_id,
-                     const std::array<std::uint8_t, 32>& nonce_seed);
+                     std::array<std::uint8_t, 32> nonce_seed);
 
 // Compute partial signature
 // key_pkg: this signer's key package

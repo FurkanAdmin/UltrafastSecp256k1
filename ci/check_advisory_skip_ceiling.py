@@ -30,9 +30,11 @@ import sys
 from pathlib import Path
 
 # Ceiling: maximum allowed advisory=true entries in ALL_MODULES[].
-# Counted from unified_audit_runner.cpp on 2026-05-27.
+# Counted from unified_audit_runner.cpp on 2026-05-28.
 # Increment this when adding a new advisory module (with documentation).
-ADVISORY_CEILING: int = 61
+# +1: regression_shim_tweak_recover_null_cb (shim-dependent, TRNC-1..4, 2026-05-28)
+# +1: regression_musig2_signer_index (MSI-4 open behavior, advisory=true, 2026-05-28)
+ADVISORY_CEILING: int = 63
 
 RUNNER_PATH = Path("audit/unified_audit_runner.cpp")
 

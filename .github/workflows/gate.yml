@@ -704,6 +704,11 @@ jobs:
           PYEOF
 
       - name: Run standalone shim regression CTest targets
+        # if: always() — run even if the unified_audit_runner step above exited non-zero
+        # (e.g. an advisory module failed). The build succeeded; CTest targets are present.
+        # Without this, a single advisory FAIL in the runner silently skips all shim
+        # regression CTest targets (CAAS-001 fix).
+        if: always()
         # The unified_audit_runner above has advisory stubs for shim tests (by-design
         # CMakeLists ordering). The standalone CTest targets are built with the real
         # shim-linked test bodies. Invoke them explicitly so shim security regressions

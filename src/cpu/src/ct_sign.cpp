@@ -50,8 +50,9 @@ ECDSASignature ecdsa_sign(const std::array<uint8_t, 32>& msg_hash,
     // from_limbs() skips the byte-swap round-trip; ge(ORDER) check is still
     // performed because secp256k1 p > n (rare values in [n,p) need reduction).
     auto r = Scalar::from_limbs(R.x().limbs());  // NOT a secret scalar — public curve point x-coord
-    // r.is_zero() requires R.x = n exactly — negligible (≈2^−128) probability.
-    if (r.is_zero()) return {Scalar::zero(), Scalar::zero()};
+    // r is derived from k*G.x (secret nonce): use is_zero_ct() per IS-ZERO-CT constraint.
+    // Probability of r==0 is ≈2^−128 (requires R.x == curve order exactly).
+    if (r.is_zero_ct()) return {Scalar::zero(), Scalar::zero()};
 
     // s = k^{-1} * (z + r * d) mod n
     // CT inverse: SafeGCD Bernstein-Yang divsteps-59, constant-time.
@@ -121,8 +122,8 @@ ECDSASignature ecdsa_sign_hedged(const std::array<uint8_t, 32>& msg_hash,
     // from_limbs: direct 4×64 copy + ge(ORDER) check — same as ct::ecdsa_sign.
     // Avoids to_bytes()+from_bytes() round-trip (~15 ns of byte-swap overhead).
     auto r = Scalar::from_limbs(R.x().limbs());
-    // r.is_zero() requires R.x = n exactly — negligible (≈2^−128) probability.
-    if (r.is_zero()) return {Scalar::zero(), Scalar::zero()};
+    // r is derived from k*G.x (secret nonce): use is_zero_ct() per IS-ZERO-CT constraint.
+    if (r.is_zero_ct()) return {Scalar::zero(), Scalar::zero()};
 
     // CT inverse + CT scalar multiplication (V-01 fix: operator* is variable-time).
     auto k_inv = ct::scalar_inverse(k);
@@ -180,7 +181,8 @@ ECDSASignature ecdsa_sign_libsecp_compat(const std::array<uint8_t, 32>& msg_hash
     auto R = ct::generator_mul_blinded(k);
 
     auto r = Scalar::from_limbs(R.x().limbs());
-    if (r.is_zero()) return {Scalar::zero(), Scalar::zero()};
+    // r is derived from k*G.x (secret nonce): use is_zero_ct() per IS-ZERO-CT constraint.
+    if (r.is_zero_ct()) return {Scalar::zero(), Scalar::zero()};
 
     auto k_inv = ct::scalar_inverse(k);
     auto s = ct::scalar_mul(k_inv, ct::scalar_add(z, ct::scalar_mul(r, private_key)));
@@ -219,7 +221,8 @@ RecoverableSignature ecdsa_sign_libsecp_compat_recoverable(
     auto r_fe = R.x();
     auto r_bytes = r_fe.to_bytes();
     auto r = Scalar::from_bytes(r_bytes);
-    if (r.is_zero()) return {{Scalar::zero(), Scalar::zero()}, 0};
+    // r is derived from k*G.x (secret nonce): use is_zero_ct() per IS-ZERO-CT constraint.
+    if (r.is_zero_ct()) return {{Scalar::zero(), Scalar::zero()}, 0};
 
     // Recovery ID bit 0: parity of R.y (branchless)
     int recid = static_cast<int>(R.y().limbs()[0] & 1u);
@@ -431,8 +434,9 @@ RecoverableSignature ecdsa_sign_recoverable(
     auto r_fe = R.x();
     auto r_bytes = r_fe.to_bytes();
     auto r = Scalar::from_bytes(r_bytes);
-    // r.is_zero() requires R.x = n exactly — negligible (≈2^−128) probability.
-    if (r.is_zero()) return {{Scalar::zero(), Scalar::zero()}, 0};
+    // r is derived from k*G.x (secret nonce): use is_zero_ct() per IS-ZERO-CT constraint.
+    // r == 0 requires R.x = n exactly — negligible (≈2^−128) probability.
+    if (r.is_zero_ct()) return {{Scalar::zero(), Scalar::zero()}, 0};
 
     // Recovery ID bit 0: parity of R.y
     // Branchless: mask LSB directly -- no conditional branch on the secret nonce.
@@ -522,7 +526,8 @@ RecoverableSignature ecdsa_sign_hedged_recoverable(
     auto r_fe = R.x();
     auto r_bytes = r_fe.to_bytes();
     auto r = Scalar::from_bytes(r_bytes);
-    if (r.is_zero()) return {{Scalar::zero(), Scalar::zero()}, 0};
+    // r is derived from k*G.x (secret nonce): use is_zero_ct() per IS-ZERO-CT constraint.
+    if (r.is_zero_ct()) return {{Scalar::zero(), Scalar::zero()}, 0};
 
     // Recovery ID bit 0: parity of R.y (branchless, no branch on secret nonce).
     int recid = static_cast<int>(R.y().limbs()[0] & 1u);

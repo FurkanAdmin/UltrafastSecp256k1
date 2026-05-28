@@ -2,6 +2,27 @@
 
 **UltrafastSecp256k1 v4.1.0** -- FAST / CT Dual-Layer Architecture (CPU + GPU)
 
+### 2026-05-28 — Security fix bundle: SEC-001..005 (ct_sign/FROST/MuSig2), SHIM-NULL-CB, TEST-003, CAAS-007/008
+
+**SEC-001 (P1):** All 6 `r.is_zero()` calls in `ct_sign.cpp` converted to `r.is_zero_ct()`
+(SIZ-1..7 — includes recoverable + hedged-recoverable sign variants).
+
+**SEC-002 (P1):** `frost_keygen_finalize` rejects group public key that accumulates to infinity
+(adversarial commitments that cancel; guard: `group_key.is_infinity()` before share verification).
+
+**SEC-003 (P1):** `musig2_partial_sign` fail-closed on degenerate session where `e == 0`
+(returns `Scalar::zero()` and erases `k1`/`k2` before returning).
+
+**SEC-004 (P2):** `frost_sign_nonce_gen` takes `nonce_seed` by value and securely erases it
+(was const-ref — caller's copy could be inspected after call).
+
+**SEC-005 (P2):** `musig2_partial_sign` signer-index validation uses `ct::generator_mul_blinded`
+(was `ct::generator_mul` — DPA-vulnerable under power analysis).
+
+**SHIM-NULL-CB (P2):** `secp256k1_xonly_pubkey_tweak_add`, `secp256k1_xonly_pubkey_tweak_add_check`,
+`secp256k1_keypair_xonly_tweak_add`, and `secp256k1_ecdsa_recoverable_signature_convert` now fire
+`secp256k1_shim_call_illegal_cb` on NULL non-ctx args (was silent return 0).
+
 ### 2026-05-27 — Security fix bundle: SEC-001/004/005/006, CT-007/008, COMPAT-001/004/006/010, VER-006
 
 **SEC-006 (P1):** `compute_challenge` in `frost.cpp` now erases `e_hash` (32 B,

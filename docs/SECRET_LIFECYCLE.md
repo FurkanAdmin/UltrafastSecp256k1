@@ -1,6 +1,18 @@
 # Secret Lifecycle Review
 
-**Last updated**: 2026-05-27 | **Version**: 4.1.3
+**Last updated**: 2026-05-28 | **Version**: 4.1.4
+
+### 2026-05-28 — SEC-002/003/004: FROST/MuSig2 degenerate input guards + nonce seed erasure
+
+`src/cpu/src/frost.cpp` — `frost_sign_nonce_gen` now takes `nonce_seed` by value
+and calls `secure_erase(nonce_seed.data(), nonce_seed.size())` before returning,
+preventing the caller's seed copy from being the only place the secret resides
+after the function returns. `frost_keygen_finalize` now rejects a group public key
+that accumulates to the point at infinity (adversarial commitment cancellation).
+
+`src/cpu/src/musig2.cpp` — `musig2_partial_sign` erases `k1` and `k2` (the two
+nonce scalars from `sec_nonce`) before returning when `session.e == 0` (degenerate
+challenge), ensuring no nonce residue remains on the stack in the error path.
 
 ### 2026-05-27 — SEC-006: FROST compute_challenge — e_hash and challenge_data erasure
 

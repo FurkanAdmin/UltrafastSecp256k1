@@ -106,7 +106,11 @@ int secp256k1_ecdsa_recoverable_signature_convert(
     const secp256k1_ecdsa_recoverable_signature *sigin)
 {
     SHIM_REQUIRE_CTX(ctx);
-    if (!sig || !sigin) return 0;
+    if (!sig || !sigin) {
+        secp256k1_shim_call_illegal_cb(ctx,
+            "secp256k1_ecdsa_recoverable_signature_convert: NULL argument");
+        return 0;
+    }
     // Non-recoverable sig is r||s (64 bytes); strip the recid byte.
     std::memcpy(sig->data, sigin->data + 1, 64);
     return 1;
