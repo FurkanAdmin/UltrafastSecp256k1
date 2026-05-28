@@ -49,6 +49,10 @@ We will acknowledge within **72 hours** and provide a fix timeline.
 > but has not been reviewed by a paid external cryptographic auditing firm. Treat it accordingly
 > when considering production use in high-value systems.
 
+For details on the reproducible self-audit system (CAAS — Continuous Automated Assurance System)
+that provides structured, replayable security evidence, see
+[`docs/CAAS_REVIEWER_QUICKSTART.md`](docs/CAAS_REVIEWER_QUICKSTART.md).
+
 The primary security posture is an open, reproducible self-audit program that any outside reviewer can rerun.
 The project philosophy is to strengthen assurance through internal audit on every build and every commit.
 The project is designed to make external review as efficient as possible: reproducible artifacts, graph-backed code navigation, structured traceability, and CI-backed verification that any reviewer can replay independently.
