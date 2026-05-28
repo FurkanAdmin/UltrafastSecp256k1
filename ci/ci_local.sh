@@ -89,6 +89,11 @@ _sync_fail=0
 run_check "Module count sync"        python3 ci/sync_module_count.py
 run_check "Canonical numbers sync"   python3 ci/sync_canonical_numbers.py
 run_check "Docs from canonical sync" python3 ci/sync_docs_from_canonical.py
+# Rebuild project graph immediately after sync so preflight --freshness
+# (step [3]) sees up-to-date timestamps. Without this, any sync-modified
+# doc file causes a spurious freshness FAIL because the graph built in [4]
+# comes too late.
+python3 ci/build_project_graph.py --rebuild >/dev/null 2>&1 || true
 _post_sync_status=$(git status --porcelain 2>/dev/null || true)
 if [[ "$_pre_sync_status" != "$_post_sync_status" ]]; then
   echo ""

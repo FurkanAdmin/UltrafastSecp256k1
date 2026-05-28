@@ -579,12 +579,21 @@ RETROACTIVELY_COVERED: dict[str, tuple[list[str], str]] = {
         "added in the same session as TRNC-1..4 shim null-arg fixes "
         "(test_regression_shim_tweak_recover_null_cb).",
     ),
+    "9d4a8b30": (
+        ["audit/test_regression_shim_xonly_parse.cpp"],
+        "PASS4-003: shim_extrakeys.cpp secp256k1_xonly_pubkey_parse replaces manual "
+        "FieldElement::sqrt() with schnorr_xonly_pubkey_parse (FE52 Jacobi QR pre-rejection "
+        "+ lift_x/GLV cache). Pure performance optimization — parse semantics unchanged. "
+        "Covered by test_regression_shim_xonly_parse (SXP-1..5: parse roundtrip, "
+        "not-on-curve rejection, x>=p strict boundary, from_pubkey consistency, parity flag). "
+        "Test added in the follow-up commit (batch parallel + build-dir fixes).",
+    ),
 }
 
 # Frozen count guard (CAAS-006): prevents silent whitelist growth.
 # When adding a new entry above, increment this constant too.
 # Unauthorized bypass (adding an entry without incrementing) → import-time assertion failure.
-RETROACTIVELY_COVERED_FROZEN_COUNT: int = 52
+RETROACTIVELY_COVERED_FROZEN_COUNT: int = 53
 assert len(RETROACTIVELY_COVERED) == RETROACTIVELY_COVERED_FROZEN_COUNT, (
     f"RETROACTIVELY_COVERED has {len(RETROACTIVELY_COVERED)} entries but "
     f"RETROACTIVELY_COVERED_FROZEN_COUNT={RETROACTIVELY_COVERED_FROZEN_COUNT}. "

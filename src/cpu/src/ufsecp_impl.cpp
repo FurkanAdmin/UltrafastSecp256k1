@@ -23,6 +23,7 @@
 #include <limits>
 #include <string>
 #include <new>
+#include <thread>
 #include <vector>
 
 /* -- UltrafastSecp256k1 C++ headers ---------------------------------------- */

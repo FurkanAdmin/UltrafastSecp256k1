@@ -411,8 +411,16 @@ int secp256k1_musig_pubkey_ec_tweak_add(
     Point tG = secp256k1::fast::scalar_mul_generator(t);
     e->ctx.Q = e->ctx.Q.add(tG);
     if (e->ctx.Q.is_infinity()) return 0;
-    compress(e->ctx.Q, e->agg_pk_comp.data());
-    if (output_pubkey) secp256k1_ec_pubkey_parse(secp256k1_context_static, output_pubkey, e->agg_pk_comp.data(), 33);
+    {
+        auto unc_q = e->ctx.Q.to_uncompressed();
+        bool q_odd = (unc_q[64] & 1) != 0;
+        e->agg_pk_comp[0] = q_odd ? 0x03 : 0x02;
+        std::memcpy(e->agg_pk_comp.data() + 1, unc_q.data() + 1, 32);
+        if (output_pubkey) {
+            std::memcpy(output_pubkey->data,      unc_q.data() + 1,  32);
+            std::memcpy(output_pubkey->data + 32, unc_q.data() + 33, 32);
+        }
+    }
     return 1;
 }
 
@@ -437,8 +445,16 @@ int secp256k1_musig_pubkey_xonly_tweak_add(
     Point tG = secp256k1::fast::scalar_mul_generator(t);
     e->ctx.Q = e->ctx.Q.add(tG);
     if (e->ctx.Q.is_infinity()) return 0;
-    compress(e->ctx.Q, e->agg_pk_comp.data());
-    if (output_pubkey) secp256k1_ec_pubkey_parse(secp256k1_context_static, output_pubkey, e->agg_pk_comp.data(), 33);
+    {
+        auto unc_q = e->ctx.Q.to_uncompressed();
+        bool q_odd = (unc_q[64] & 1) != 0;
+        e->agg_pk_comp[0] = q_odd ? 0x03 : 0x02;
+        std::memcpy(e->agg_pk_comp.data() + 1, unc_q.data() + 1, 32);
+        if (output_pubkey) {
+            std::memcpy(output_pubkey->data,      unc_q.data() + 1,  32);
+            std::memcpy(output_pubkey->data + 32, unc_q.data() + 33, 32);
+        }
+    }
     return 1;
 }
 
@@ -477,9 +493,7 @@ int secp256k1_musig_nonce_gen(
 
     std::array<unsigned char, 32> pub_x = {};
     if (pubkey) {
-        unsigned char buf[33]; size_t len = 33;
-        secp256k1_ec_pubkey_serialize(secp256k1_context_static, buf, &len, pubkey, SECP256K1_EC_COMPRESSED);
-        std::memcpy(pub_x.data(), buf + 1, 32);
+        std::memcpy(pub_x.data(), pubkey->data, 32);
     }
 
     std::array<unsigned char, 32> msg = {};

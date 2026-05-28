@@ -5372,6 +5372,22 @@ set_tests_properties(regression_shim_null_callback PROPERTIES TIMEOUT 30
     LABELS "audit;regression;shim;null_callback;shim-a01;shim-a02;shim-a03;shim-a07;shim-a08")
 target_sources(unified_audit_runner PRIVATE test_regression_shim_null_callback.cpp)
 
+# PASS4-003: secp256k1_xonly_pubkey_parse via schnorr_xonly_pubkey_parse
+# Correctness regression: parse roundtrip, not-on-curve, x>=p, from_pubkey consistency, parity.
+# advisory=false: no special infrastructure required.
+add_executable(test_regression_shim_xonly_parse_standalone
+    test_regression_shim_xonly_parse.cpp)
+audit_target_defaults(test_regression_shim_xonly_parse_standalone)
+target_compile_definitions(test_regression_shim_xonly_parse_standalone PRIVATE STANDALONE_TEST)
+if(TARGET secp256k1_shim)
+    target_link_libraries(test_regression_shim_xonly_parse_standalone PRIVATE secp256k1_shim)
+endif()
+add_test(NAME regression_shim_xonly_parse
+    COMMAND test_regression_shim_xonly_parse_standalone)
+set_tests_properties(regression_shim_xonly_parse PROPERTIES TIMEOUT 30
+    LABELS "audit;regression;shim;xonly;pass4-003")
+target_sources(unified_audit_runner PRIVATE test_regression_shim_xonly_parse.cpp)
+
 # P1-SEC-001: GPU extended ECDH paths CT fix — correctness guard.
 # Verifies ufsecp_ecdh() ECDH arithmetic after secp256k1_extended.cl and
 # secp256k1_extended.h replaced scalar_mul_glv_impl/scalar_mul_glv (VT wNAF)

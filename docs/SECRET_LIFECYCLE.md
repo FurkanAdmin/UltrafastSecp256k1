@@ -1,6 +1,18 @@
 # Secret Lifecycle Review
 
-**Last updated**: 2026-05-28 | **Version**: 4.1.4
+**Last updated**: 2026-05-28 | **Version**: 4.1.5
+
+### 2026-05-28 — batch parallel dispatch: private key read-only, output zeroed on error
+
+`src/cpu/src/impl/ufsecp_ecdsa.cpp` — `ufsecp_ecdsa_sign_batch` and
+`ufsecp_schnorr_sign_batch` now dispatch slots in parallel via `std::thread`.
+Private key material (`privkeys32`) is accessed read-only by each thread
+(non-overlapping slot indices, no aliasing). Output buffers (`sigs64_out`) are
+fail-closed: on any slot error all output bytes are zeroed before the function
+returns. Threads do not retain references to private key data beyond their
+signing call; each slot routes through the existing CT signing primitive
+(`ecdsa_sign_ct` / `schnorr_sign_ct`), so the per-slot secret lifecycle is
+unchanged. `ctx->last_err` is `std::atomic<int>` — thread-safe.
 
 ### 2026-05-28 — SEC-002/003/004: FROST/MuSig2 degenerate input guards + nonce seed erasure
 

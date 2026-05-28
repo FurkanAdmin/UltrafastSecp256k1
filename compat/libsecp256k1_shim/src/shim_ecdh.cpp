@@ -53,7 +53,9 @@ int secp256k1_ecdh(
     void* data)
 {
     SHIM_REQUIRE_CTX(ctx);
-    if (!output || !pubkey || !seckey) return 0;
+    if (!output) { secp256k1_shim_call_illegal_cb(ctx, "secp256k1_ecdh: NULL output"); return 0; }
+    if (!pubkey) { secp256k1_shim_call_illegal_cb(ctx, "secp256k1_ecdh: NULL pubkey"); return 0; }
+    if (!seckey) { secp256k1_shim_call_illegal_cb(ctx, "secp256k1_ecdh: NULL seckey"); return 0; }
 
     if (!hashfp) hashfp = default_hashfp;
 

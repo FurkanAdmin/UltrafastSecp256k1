@@ -2,6 +2,13 @@
 
 **UltrafastSecp256k1 v4.1.0** -- FAST / CT Dual-Layer Architecture (CPU + GPU)
 
+### 2026-05-28 — batch parallel signing: no new secret exposure
+
+`ufsecp_ecdsa_sign_batch` / `ufsecp_schnorr_sign_batch`: parallel slot dispatch
+via `std::thread` does not weaken CT guarantees. Each slot calls the same CT
+signing primitive as the serial path; private keys are accessed read-only;
+output is zeroed on any error (fail-closed). No new attack surface vs serial.
+
 ### 2026-05-28 — Security fix bundle: SEC-001..005 (ct_sign/FROST/MuSig2), SHIM-NULL-CB, TEST-003, CAAS-007/008
 
 **SEC-001 (P1):** All 6 `r.is_zero()` calls in `ct_sign.cpp` converted to `r.is_zero_ct()`

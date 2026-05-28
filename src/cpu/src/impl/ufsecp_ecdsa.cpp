@@ -447,6 +447,76 @@ ufsecp_error_t ufsecp_schnorr_sign_verified(ufsecp_ctx* ctx,
     return UFSECP_OK;
 }
 
+// ---------------------------------------------------------------------------
+// batch_parallel: dispatch sign_one(i) over [0, count) using N CPU threads.
+// Each slot i writes to sigs64_out[i*64..(i+1)*64-1] — non-overlapping so
+// no synchronisation is needed on the output buffer.  On any slot error the
+// first error code is captured atomically; remaining slots in every thread
+// are zeroed and skipped.  After joining, the whole output is re-zeroed
+// fail-closed and the captured error is returned.
+// Serial fallback: when hardware_concurrency() <= 1 or count == 1.
+// ---------------------------------------------------------------------------
+template<typename Fn>
+static ufsecp_error_t batch_parallel(size_t count, uint8_t* sigs64_out, Fn sign_one)
+{
+    unsigned hw = std::thread::hardware_concurrency();
+    unsigned n_threads = (hw > 1) ? static_cast<unsigned>(
+        std::min<size_t>(hw, count)) : 1u;
+
+    if (n_threads <= 1) {
+        for (size_t i = 0; i < count; ++i) {
+            ufsecp_error_t e = sign_one(i);
+            if (SECP256K1_UNLIKELY(e != UFSECP_OK)) return e;
+        }
+        return UFSECP_OK;
+    }
+
+    // Stack-allocated thread pool — no heap allocation. kMaxParallelThreads
+    // caps at 64 (no real CPU batch-signing use-case needs more).
+    // std::thread default constructor is noexcept and creates an empty thread
+    // (joinable()==false), so the array init is safe and cheap.
+    static constexpr unsigned kMaxParallelThreads = 64u;
+    std::array<std::thread, kMaxParallelThreads> pool{};
+    n_threads = std::min(n_threads, kMaxParallelThreads);
+
+    std::atomic<int> first_err{static_cast<int>(UFSECP_OK)};
+    const size_t chunk = (count + n_threads - 1) / n_threads;
+    unsigned n_active = 0;
+    for (unsigned t = 0; t < n_threads; ++t) {
+        const size_t start = t * chunk;
+        const size_t end   = std::min(start + chunk, count);
+        if (start >= end) break;
+        pool[t] = std::thread([&, start, end]() {
+            for (size_t i = start; i < end; ++i) {
+                if (first_err.load(std::memory_order_relaxed) != static_cast<int>(UFSECP_OK)) {
+                    std::memset(sigs64_out + i * 64, 0, 64);
+                    continue;
+                }
+                const ufsecp_error_t e = sign_one(i);
+                if (SECP256K1_UNLIKELY(e != UFSECP_OK)) {
+                    int expected = static_cast<int>(UFSECP_OK);
+                    first_err.compare_exchange_strong(
+                        expected, static_cast<int>(e),
+                        std::memory_order_acq_rel, std::memory_order_relaxed);
+                    // zero remaining slots in this chunk
+                    for (size_t j = i + 1; j < end; ++j)
+                        std::memset(sigs64_out + j * 64, 0, 64);
+                    return;
+                }
+            }
+        });
+        ++n_active;
+    }
+    for (unsigned t = 0; t < n_active; ++t) pool[t].join();
+
+    const int err = first_err.load(std::memory_order_acquire);
+    if (err != static_cast<int>(UFSECP_OK)) {
+        std::memset(sigs64_out, 0, count * 64);
+        return static_cast<ufsecp_error_t>(err);
+    }
+    return UFSECP_OK;
+}
+
 ufsecp_error_t ufsecp_ecdsa_sign_batch(
     ufsecp_ctx* ctx,
     size_t count,
@@ -462,30 +532,32 @@ ufsecp_error_t ufsecp_ecdsa_sign_batch(
     if (!checked_mul_size(count, std::size_t{32}, total_msg_bytes)
         || !checked_mul_size(count, std::size_t{64}, total_sig_bytes))
         return ctx_set_err(ctx, UFSECP_ERR_BAD_INPUT, "batch size overflow");
-    // SEC-003/SEC-008/BSG-12 Fail-closed invariant: pre-zero the full output buffer
-    // upfront, AND re-zero on any mid-loop error so partial valid signatures from
-    // earlier slots are never visible to the caller. The upfront memset alone is
-    // insufficient once any slot has been written: an error in slot N>0 must
-    // erase slots 0..N-1 as well.
+    // SEC-003/SEC-008/BSG-12 Fail-closed: pre-zero output so any partial-write
+    // before an error is not visible.  batch_parallel re-zeros on error too.
     std::memset(sigs64_out, 0, count * 64);
-    for (size_t i = 0; i < count; ++i) {
-        std::array<uint8_t, 32> msg;
-        std::memcpy(msg.data(), msgs32 + i * 32, 32);
-        Scalar sk;
-        if (SECP256K1_UNLIKELY(!scalar_parse_strict_nonzero(privkeys32 + i * 32, sk))) {
+
+    const ufsecp_error_t err = batch_parallel(count, sigs64_out,
+        [&](size_t i) -> ufsecp_error_t {
+            std::array<uint8_t, 32> msg;
+            std::memcpy(msg.data(), msgs32 + i * 32, 32);
+            Scalar sk;
+            if (SECP256K1_UNLIKELY(!scalar_parse_strict_nonzero(privkeys32 + i * 32, sk))) {
+                secp256k1::detail::secure_erase(&sk, sizeof(sk));
+                return UFSECP_ERR_BAD_KEY;
+            }
+            auto sig = secp256k1::ct::ecdsa_sign(msg, sk);
             secp256k1::detail::secure_erase(&sk, sizeof(sk));
-            std::memset(sigs64_out, 0, count * 64);
-            return ctx_set_err(ctx, UFSECP_ERR_BAD_KEY,
-                               "privkey[i] is zero or >= n");
-        }
-        auto sig = secp256k1::ct::ecdsa_sign(msg, sk);
-        secp256k1::detail::secure_erase(&sk, sizeof(sk));
-        if (SECP256K1_UNLIKELY(!sig.is_valid())) {
-            std::memset(sigs64_out, 0, count * 64);
-            return ctx_set_err(ctx, UFSECP_ERR_INTERNAL, "signing produced degenerate output");
-        }
-        auto compact = sig.to_compact();
-        std::memcpy(sigs64_out + i * 64, compact.data(), 64);
+            if (SECP256K1_UNLIKELY(!sig.is_valid())) return UFSECP_ERR_INTERNAL;
+            const auto compact = sig.to_compact();
+            std::memcpy(sigs64_out + i * 64, compact.data(), 64);
+            return UFSECP_OK;
+        });
+
+    if (SECP256K1_UNLIKELY(err != UFSECP_OK)) {
+        std::memset(sigs64_out, 0, count * 64);
+        return ctx_set_err(ctx, err,
+            err == UFSECP_ERR_BAD_KEY ? "privkey[i] is zero or >= n"
+                                       : "signing produced degenerate output");
     }
     return UFSECP_OK;
 }
@@ -499,8 +571,6 @@ ufsecp_error_t ufsecp_schnorr_sign_batch(
     uint8_t* sigs64_out)
 {
     // SEC-006: aux_rands32 is required — null pointer means no hedging, reject explicitly.
-    // Silent fallback to zero-entropy aux (kZeroAux) was removed: it silently degraded
-    // security by dropping the caller-supplied entropy without any error signal.
     if (SECP256K1_UNLIKELY(!ctx || !msgs32 || !privkeys32 || !sigs64_out || !aux_rands32)) return UFSECP_ERR_NULL_ARG;
     ctx_clear_err(ctx);
     if (count == 0) return UFSECP_ERR_BAD_INPUT;
@@ -509,45 +579,37 @@ ufsecp_error_t ufsecp_schnorr_sign_batch(
     if (!checked_mul_size(count, std::size_t{32}, total_msg_bytes)
         || !checked_mul_size(count, std::size_t{64}, total_sig_bytes))
         return ctx_set_err(ctx, UFSECP_ERR_BAD_INPUT, "batch size overflow");
-
-    // SEC-008/BSG-12 Fail-closed invariant: pre-zero the full output buffer upfront,
-    // AND re-zero on any mid-loop error so partial valid signatures from earlier
-    // slots are never visible to the caller. The upfront memset alone is
-    // insufficient once any slot has been written: an error in slot N>0 must
-    // erase slots 0..N-1 as well.
+    // SEC-008/BSG-12 Fail-closed: pre-zero output.  batch_parallel re-zeros on error.
     std::memset(sigs64_out, 0, count * 64);
 
-    for (size_t i = 0; i < count; ++i) {
-        Scalar sk;
-        if (SECP256K1_UNLIKELY(!scalar_parse_strict_nonzero(privkeys32 + i * 32, sk))) {
-            secp256k1::detail::secure_erase(&sk, sizeof(sk));
-            std::memset(sigs64_out, 0, count * 64);
-            return ctx_set_err(ctx, UFSECP_ERR_BAD_KEY,
-                               "privkey[i] is zero or >= n");
-        }
-
-        std::array<uint8_t, 32> msg_arr, aux_arr;
-        std::memcpy(msg_arr.data(), msgs32 + i * 32, 32);
-        std::memcpy(aux_arr.data(), aux_rands32 + i * 32, 32);
-
-        auto kp  = secp256k1::ct::schnorr_keypair_create(sk);
-        auto sig = secp256k1::ct::schnorr_sign(kp, msg_arr, aux_arr);
-        secp256k1::detail::secure_erase(&sk, sizeof(sk));
-        secp256k1::detail::secure_erase(&kp.d, sizeof(kp.d));
-        if (SECP256K1_UNLIKELY(sig.s.is_zero())) {
-            std::memset(sigs64_out, 0, count * 64);
-            return ctx_set_err(ctx, UFSECP_ERR_INTERNAL, "signing produced degenerate output");
-        }
-        {
-            bool r_all_zero = std::all_of(sig.r.begin(), sig.r.end(),
-                                          [](uint8_t b) { return b == 0; });
-            if (SECP256K1_UNLIKELY(r_all_zero)) {
-                std::memset(sigs64_out, 0, count * 64);
-                return ctx_set_err(ctx, UFSECP_ERR_INTERNAL, "signing produced degenerate output");
+    const ufsecp_error_t err = batch_parallel(count, sigs64_out,
+        [&](size_t i) -> ufsecp_error_t {
+            Scalar sk;
+            if (SECP256K1_UNLIKELY(!scalar_parse_strict_nonzero(privkeys32 + i * 32, sk))) {
+                secp256k1::detail::secure_erase(&sk, sizeof(sk));
+                return UFSECP_ERR_BAD_KEY;
             }
-        }
-        auto sig_bytes = sig.to_bytes();
-        std::memcpy(sigs64_out + i * 64, sig_bytes.data(), 64);
+            std::array<uint8_t, 32> msg_arr, aux_arr;
+            std::memcpy(msg_arr.data(), msgs32 + i * 32, 32);
+            std::memcpy(aux_arr.data(), aux_rands32 + i * 32, 32);
+            auto kp  = secp256k1::ct::schnorr_keypair_create(sk);
+            auto sig = secp256k1::ct::schnorr_sign(kp, msg_arr, aux_arr);
+            secp256k1::detail::secure_erase(&sk, sizeof(sk));
+            secp256k1::detail::secure_erase(&kp.d, sizeof(kp.d));
+            if (SECP256K1_UNLIKELY(sig.s.is_zero())) return UFSECP_ERR_INTERNAL;
+            const bool r_all_zero = std::all_of(sig.r.begin(), sig.r.end(),
+                                                [](uint8_t b) { return b == 0; });
+            if (SECP256K1_UNLIKELY(r_all_zero)) return UFSECP_ERR_INTERNAL;
+            const auto sig_bytes = sig.to_bytes();
+            std::memcpy(sigs64_out + i * 64, sig_bytes.data(), 64);
+            return UFSECP_OK;
+        });
+
+    if (SECP256K1_UNLIKELY(err != UFSECP_OK)) {
+        std::memset(sigs64_out, 0, count * 64);
+        return ctx_set_err(ctx, err,
+            err == UFSECP_ERR_BAD_KEY ? "privkey[i] is zero or >= n"
+                                       : "signing produced degenerate output");
     }
     return UFSECP_OK;
 }

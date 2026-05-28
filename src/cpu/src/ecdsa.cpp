@@ -727,6 +727,7 @@ ECDSASignature ecdsa_sign_hedged(const std::array<uint8_t, 32>& msg_hash,
                 if (!s.is_zero_ct()) {
                     result = ECDSASignature{r, s}.normalize();
                 }
+                secure_erase(&s, sizeof(s));
                 secure_erase(&k_inv, sizeof(k_inv));
             }
         }

@@ -680,6 +680,7 @@ int test_regression_nonce_candidate_erase_run(); // P2-CT-001/002/003/007: cand1
 // ============================================================================
 int test_regression_shim_null_callback_run(); // SHIM-A01..A08: illegal_callback on NULL args
 int test_regression_shim_null_arg_cb_run();   // SHIM-NEW-001/002/003: NULL non-ctx args fire illegal_callback
+int test_regression_shim_xonly_parse_run();   // PASS4-003: xonly_parse via schnorr_xonly_pubkey_parse
 
 // ============================================================================
 // Forward declarations -- 2026-05-21 P1-SEC-001: GPU extended ECDH CT fix
@@ -1450,8 +1451,7 @@ static const AuditModule ALL_MODULES[] = {
     // advisory=false: C++ API only (ct::ecdsa_sign, musig2_nonce_gen), no shim/GPU dependency.
     { "regression_nonce_candidate_erase", "P2-CT-001/002/003/007: cand1+cand2 secure_erase after ct::scalar_select in rfc6979_nonce, rfc6979_nonce_hedged, musig2_nonce_gen (k1+k2), derive_scalar_from_hash — stack residue zeroization; correctness (NCER-1..5): 200 ECDSA roundtrips, determinism, uniqueness, 50 hedged roundtrips, source scan", "ct_analysis", test_regression_nonce_candidate_erase_run, false },
     // === 2026-05-21 SHIM-A01/A02/A03/A07/A08: null-arg illegal_callback ===
-    // advisory=true: requires shim to be linked (shim-gate only).
-    { "regression_shim_null_callback", "SHIM-A01/A02/A03/A07/A08: libsecp256k1 shim fires illegal_callback on NULL args — normalize(NULL sigin), pubkey_sort(NULL ctx), tagged_sha256(NULL msg/len=0 OK vs len>0 fires CB), pubkey_negate(NULL pubkey); (SNC-1..5)", "shim_regression", test_regression_shim_null_callback_run, true },
+    { "regression_shim_null_callback", "SHIM-A01/A02/A03/A07/A08: libsecp256k1 shim fires illegal_callback on NULL args — normalize(NULL sigin), pubkey_sort(NULL ctx), tagged_sha256(NULL msg/len=0 OK vs len>0 fires CB), pubkey_negate(NULL pubkey); (SNC-1..5)", "shim_regression", test_regression_shim_null_callback_run, false },
     // === 2026-05-25 T-09/10: NULL-arg illegal_callback for extrakeys + ecdsa parse ===
     // advisory=true: requires shim to be linked (stub returns ADVISORY_SKIP_CODE when absent).
     { "regression_shim_keypair_null_cb", "T-09/10: shim fires illegal_callback on NULL args — keypair_create/sec/pub/xonly_pub + ecdsa_signature_parse_compact/der; previously silent return 0 (NCA-1..9)", "shim_regression", test_regression_shim_keypair_null_cb_run, true },
@@ -1461,6 +1461,8 @@ static const AuditModule ALL_MODULES[] = {
     // === 2026-05-26 SHIM-NEW-001/002/003: NULL non-ctx args must fire illegal_callback ===
     // advisory=true: requires shim to be linked (stub returns ADVISORY_SKIP_CODE when absent).
     { "regression_shim_null_arg_cb", "SHIM-NEW-001/002/003: ec_pubkey_create/serialize, xonly_pubkey_parse/serialize, recoverable_sig_parse/serialize fire illegal_callback on NULL non-ctx args (NAC-1..8)", "shim_regression", test_regression_shim_null_arg_cb_run, true },
+    // === 2026-05-28 PASS4-003: xonly_parse via schnorr_xonly_pubkey_parse ===
+    { "regression_shim_xonly_parse", "PASS4-003: secp256k1_xonly_pubkey_parse uses schnorr_xonly_pubkey_parse (FE52 Jacobi QR + lift_x cache) — parse roundtrip (SXP-1), not-on-curve (SXP-2), x>=p (SXP-3), from_pubkey/parse consistency (SXP-4), parity flag (SXP-5)", "shim_regression", test_regression_shim_xonly_parse_run, false },
     // === 2026-05-21 P1-SEC-001: GPU extended ECDH CT fix ===
     // advisory=false: exercises ufsecp_ecdh() CPU API — no GPU/shim dependency.
     // Verifies correctness of ECDH arithmetic after secp256k1_extended.cl and

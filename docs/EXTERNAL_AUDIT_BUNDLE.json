@@ -33,20 +33,20 @@
     {
       "exists": true,
       "path": "docs/TEST_MATRIX.md",
-      "sha256": "3a0c1425d13dd7bf766d19226bd3d03759b1e0b2fe3a269e5f884b8edf3b7fed",
-      "size": 61497
+      "sha256": "392904191784dde120ad679b324b8c41b5b68dd22fca03061d56cf2c69e653ef",
+      "size": 61529
     },
     {
       "exists": true,
       "path": "docs/CT_VERIFICATION.md",
-      "sha256": "6f05844160febe13290120c2bb13c7a54b1f51e22f3dbfaeb39b1f8a48ff3f28",
+      "sha256": "69f3864259de2b7d1df9579e714eb241c481bd5e793137269c4f0e3010bbf334",
       "size": 46195
     },
     {
       "exists": true,
       "path": "docs/FFI_HOSTILE_CALLER.md",
-      "sha256": "8bcd6247db5ef2b4054c85692334f1e15cd57a35a37a14e5df485cb40ff1e8b3",
-      "size": 17295
+      "sha256": "37d04ff7cf8e85319e484349ff3a3147d0f47f02b0aa6d4a91f4be0dafc123f7",
+      "size": 17940
     },
     {
       "exists": true,
@@ -126,11 +126,11 @@
           {
             "findings": [
               {
-                "message": "CT secret-bearing surfaces: src/cpu/src/ct_sign.cpp",
+                "message": "Secret lifecycle and zeroization surfaces: src/cpu/src/ecdsa.cpp, src/cpu/src/ufsecp_impl.cpp",
                 "severity": "INFO"
               },
               {
-                "message": "Secret lifecycle and zeroization surfaces: src/cpu/src/frost.cpp, src/cpu/src/musig2.cpp",
+                "message": "Secret-bearing ABI boundary: src/cpu/src/ufsecp_impl.cpp",
                 "severity": "INFO"
               },
               {
@@ -164,7 +164,7 @@
           {
             "findings": [
               {
-                "message": "Audit test-quality findings: files=418, critical=0, high=0, medium=0, low=0",
+                "message": "Audit test-quality findings: files=419, critical=0, high=0, medium=0, low=0",
                 "severity": "INFO"
               },
               {
@@ -178,7 +178,7 @@
           {
             "findings": [
               {
-                "message": "All 698 security patterns preserved",
+                "message": "All 703 security patterns preserved",
                 "severity": "PASS"
               }
             ],
@@ -208,8 +208,12 @@
           {
             "findings": [
               {
-                "message": "Graph is fresh (built: 2026-05-28T02:41:21)",
-                "severity": "PASS"
+                "message": "1 files modified/deleted since graph build (2026-05-28T19:50:48)",
+                "severity": "WARN"
+              },
+              {
+                "message": "MODIFIED: docs/SECURITY_AUTONOMY_KPI.json",
+                "severity": "INFO"
               }
             ],
             "name": "P6: Graph Freshness",
@@ -382,14 +386,6 @@
               {
                 "message": "CMakeLists.txt changed but docs/BUILDING.md not updated",
                 "severity": "WARN"
-              },
-              {
-                "message": "src/cpu/src/musig2.cpp changed but docs/API_REFERENCE.md not updated",
-                "severity": "WARN"
-              },
-              {
-                "message": "src/cpu/src/frost.cpp changed but docs/API_REFERENCE.md not updated",
-                "severity": "WARN"
               }
             ],
             "name": "P10: Doc-Code Pairing",
@@ -398,11 +394,11 @@
           {
             "findings": [
               {
-                "message": "Mutation report age: 43.8 days (threshold: 14)",
+                "message": "Mutation report age: 44.5 days (threshold: 14)",
                 "severity": "INFO"
               },
               {
-                "message": "Mutation report is stale (43.8 > 14 days) \u2014 rerun recommended",
+                "message": "Mutation report is stale (44.5 > 14 days) \u2014 rerun recommended",
                 "severity": "WARN"
               }
             ],
@@ -612,7 +608,7 @@
                 "severity": "INFO"
               },
               {
-                "message": "Source graph \"files\" has 1322 rows (threshold: 200)",
+                "message": "Source graph \"files\" has 1323 rows (threshold: 200)",
                 "severity": "PASS"
               }
             ],
@@ -626,11 +622,11 @@
           "value": {
             "dirty": true,
             "ref": "dev",
-            "sha": "1b73e45abcbe57731282abf9dba4a07e492b1bb5",
-            "short": "1b73e45abc"
+            "sha": "9d4a8b30926c6ab4d9dbef7ec4a286d25c76f902",
+            "short": "9d4a8b3092"
           }
         },
-        "generated_at": "2026-05-28T02:41:28.538818+00:00",
+        "generated_at": "2026-05-28T19:51:38.104472+00:00",
         "platform": "Linux",
         "provenance": {
           "build_flags": {
@@ -647,12 +643,12 @@
             },
             "flags_hash": "f6054a07e934d755"
           },
-          "collected_at": "2026-05-28T02:41:28.538778+00:00",
+          "collected_at": "2026-05-28T19:51:38.104419+00:00",
           "git": {
             "dirty": true,
             "ref": "dev",
-            "sha": "1b73e45abcbe57731282abf9dba4a07e492b1bb5",
-            "short": "1b73e45abc"
+            "sha": "9d4a8b30926c6ab4d9dbef7ec4a286d25c76f902",
+            "short": "9d4a8b3092"
           },
           "platform": {
             "machine": "x86_64",
@@ -673,7 +669,7 @@
           },
           "version": "4.1.0"
         },
-        "run_id": "audit_gate-1b73e45abc-20260528T024128",
+        "run_id": "audit_gate-9d4a8b3092-20260528T195138",
         "runner": "audit_gate",
         "schema_version": "1.0.0",
         "sections": [
@@ -746,12 +742,12 @@
               {
                 "check_id": "p0__secret-path_change_gate",
                 "severity": "info",
-                "title": "CT secret-bearing surfaces: src/cpu/src/ct_sign.cpp"
+                "title": "Secret lifecycle and zeroization surfaces: src/cpu/src/ecdsa.cpp, src/cpu/src/ufsecp_impl.cpp"
               },
               {
                 "check_id": "p0__secret-path_change_gate",
                 "severity": "info",
-                "title": "Secret lifecycle and zeroization surfaces: src/cpu/src/frost.cpp, src/cpu/src/musig2.cpp"
+                "title": "Secret-bearing ABI boundary: src/cpu/src/ufsecp_impl.cpp"
               },
               {
                 "check_id": "p0__secret-path_change_gate",
@@ -789,7 +785,7 @@
               {
                 "check_id": "p2__audit_test_quality",
                 "severity": "info",
-                "title": "Audit test-quality findings: files=418, critical=0, high=0, medium=0, low=0"
+                "title": "Audit test-quality findings: files=419, critical=0, high=0, medium=0, low=0"
               },
               {
                 "check_id": "p2__audit_test_quality",
@@ -805,7 +801,7 @@
               {
                 "check_id": "p3__security_patterns",
                 "severity": "pass",
-                "title": "All 698 security patterns preserved"
+                "title": "All 703 security patterns preserved"
               }
             ],
             "name": "P3: Security Patterns",
@@ -837,12 +833,17 @@
             "findings": [
               {
                 "check_id": "p6__graph_freshness",
-                "severity": "pass",
-                "title": "Graph is fresh (built: 2026-05-28T02:41:21)"
+                "severity": "advisory:medium",
+                "title": "1 files modified/deleted since graph build (2026-05-28T19:50:48)"
+              },
+              {
+                "check_id": "p6__graph_freshness",
+                "severity": "info",
+                "title": "MODIFIED: docs/SECURITY_AUTONOMY_KPI.json"
               }
             ],
             "name": "P6: Graph Freshness",
-            "verdict": "PASS"
+            "verdict": "PASS with advisory"
           },
           {
             "findings": [
@@ -1048,16 +1049,6 @@
                 "check_id": "p10__doc-code_pairing",
                 "severity": "advisory:medium",
                 "title": "CMakeLists.txt changed but docs/BUILDING.md not updated"
-              },
-              {
-                "check_id": "p10__doc-code_pairing",
-                "severity": "advisory:medium",
-                "title": "src/cpu/src/musig2.cpp changed but docs/API_REFERENCE.md not updated"
-              },
-              {
-                "check_id": "p10__doc-code_pairing",
-                "severity": "advisory:medium",
-                "title": "src/cpu/src/frost.cpp changed but docs/API_REFERENCE.md not updated"
               }
             ],
             "name": "P10: Doc-Code Pairing",
@@ -1068,12 +1059,12 @@
               {
                 "check_id": "p2__mutation_evidence_freshness",
                 "severity": "info",
-                "title": "Mutation report age: 43.8 days (threshold: 14)"
+                "title": "Mutation report age: 44.5 days (threshold: 14)"
               },
               {
                 "check_id": "p2__mutation_evidence_freshness",
                 "severity": "advisory:medium",
-                "title": "Mutation report is stale (43.8 > 14 days) \u2014 rerun recommended"
+                "title": "Mutation report is stale (44.5 > 14 days) \u2014 rerun recommended"
               }
             ],
             "name": "P2: Mutation Evidence Freshness",
@@ -1322,7 +1313,7 @@
               {
                 "check_id": "g-12__source_graph_quality",
                 "severity": "pass",
-                "title": "Source graph \"files\" has 1322 rows (threshold: 200)"
+                "title": "Source graph \"files\" has 1323 rows (threshold: 200)"
               }
             ],
             "name": "G-12: Source Graph Quality",
@@ -1332,19 +1323,19 @@
         "summary": {
           "advisory": 52,
           "blocking": 0,
-          "info": 44,
+          "info": 45,
           "sections": 26,
           "skipped_sections": 0,
-          "total_findings": 99,
-          "warnings": 8
+          "total_findings": 98,
+          "warnings": 7
         },
         "verdict": "PASS with advisory"
       },
       "passing": true,
       "required": true,
       "returncode": 0,
-      "stderr_sha256": "b63cc5d5fbfe2239bc6be4e12052f56c3438f5dba380ece4358153c665515583",
-      "stdout_sha256": "7cb3e9c3cb34bf78fe318d9725712a9f8233975f15f151be5e68dbce687a4970"
+      "stderr_sha256": "9ef9df32b4e56430ce3b7d5fc8e967e288c6eacf1190d527f8849f54e5c0214d",
+      "stdout_sha256": "bfcad45bd0bd2603d2fd2891f67da78bb31cf938f4540520c3a1cc448aa57f26"
     },
     {
       "name": "audit_gap_report_strict",
@@ -1646,13 +1637,13 @@
         "gates_skipped": 0,
         "gates_total": 8,
         "overall_pass": true,
-        "timestamp": "2026-05-28T02:41:31.044101+00:00"
+        "timestamp": "2026-05-28T19:51:40.708550+00:00"
       },
       "passing": true,
       "required": true,
       "returncode": 0,
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stdout_sha256": "3e8a357298d467cc2e3dc391b119f47ed1bc9a3998f6c15c674b25429ddd37fc"
+      "stdout_sha256": "864986a4b178ee9ccdb953c3150ee11ac606a169566d90d29c6b7c53a068db89"
     },
     {
       "name": "supply_chain_gate",
@@ -1698,19 +1689,19 @@
         "checks_total": 5,
         "failing_checks": [],
         "overall_pass": true,
-        "timestamp": "2026-05-28T02:41:31.082065+00:00"
+        "timestamp": "2026-05-28T19:51:40.744577+00:00"
       },
       "passing": true,
       "required": true,
       "returncode": 0,
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stdout_sha256": "8d3fd37ecad64e8fd0b00d210419fb413662a85c2a66c8d8b44689f10c234a96"
+      "stdout_sha256": "8167dc1339996778f47d238053e948922e5fed14ce9ee47db390441e6c52ebad"
     }
   ],
-  "generated_at": "2026-05-28T02:41:31.096666+00:00",
+  "generated_at": "2026-05-28T19:51:40.760701+00:00",
   "git": {
     "branch": "dev",
-    "commit": "1b73e45abcbe57731282abf9dba4a07e492b1bb5",
+    "commit": "9d4a8b30926c6ab4d9dbef7ec4a286d25c76f902",
     "dirty": true
   },
   "repo_root": "/home/shrek/Secp256k1/Secp256K1fast/libs/UltrafastSecp256k1",

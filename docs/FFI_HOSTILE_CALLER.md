@@ -1,6 +1,17 @@
 # FFI Hostile-Caller Coverage
 
-**Last updated**: 2026-05-24 | **Version**: 4.1.0
+**Last updated**: 2026-05-28 | **Version**: 4.1.5
+
+### 2026-05-28 — batch parallel dispatch: hostile-caller contract
+
+`ufsecp_ecdsa_sign_batch` / `ufsecp_schnorr_sign_batch` (ABI layer in
+`src/cpu/src/ufsecp_impl.cpp`): a hostile caller supplying overlapping or
+aliased `sigs64_out` / `privkeys32` / `msgs32` buffers triggers undefined
+behaviour at the C layer (same as any other buffer-overlap violation). The
+parallel path does not create new aliasing vulnerabilities: threads operate on
+non-overlapping slot-index ranges computed at entry. On first error the entire
+`sigs64_out` is zeroed before return — a hostile caller cannot read a partial
+valid signature out of a failed batch call.
 
 ### 2026-05-24 — v9 RT-002 / TASK-002: Adaptor signing DPA blinding
 

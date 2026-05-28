@@ -19,7 +19,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 TESTS_DIR="$REPO_ROOT/tests"
 CPU_TESTS_DIR="$REPO_ROOT/cpu/tests"
 DOCS_DIR="$REPO_ROOT/docs"
-BUILD_DIR="${1:-$REPO_ROOT/build}"
+BUILD_DIR="${1:-$REPO_ROOT/out/build}"
 
 OUTPUT_JSON="$DOCS_DIR/traceability_report.json"
 OUTPUT_SUMMARY="$DOCS_DIR/traceability_summary.txt"

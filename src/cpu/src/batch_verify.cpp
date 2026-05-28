@@ -123,7 +123,7 @@ bool schnorr_batch_verify_impl(const Entry* entries, std::size_t n,
                                VerifyOneFn&& verify_one,
                                ResolvePubkeyFn&& resolve_pubkey,
                                PubkeyBytesFn&& pubkey_bytes) {
-    if (n == 0) return true;
+    if (n == 0) return false;
     if (n == 1) return verify_one(entries[0]);
 
     // ---- Small-batch fast path: individual verification ----
@@ -339,7 +339,7 @@ bool schnorr_batch_verify(const std::vector<SchnorrBatchCachedEntry>& entries) {
 // We pre-compute all R'_i = u1_i*G + u2_i*Q_i using multi_scalar_mul tricks.
 
 bool ecdsa_batch_verify(const ECDSABatchEntry* entries, std::size_t n) {
-    if (n == 0) return true;
+    if (n == 0) return false;
 
     // Pre-validate all entries before any further processing to enforce
     // BIP-62 low-S: reject any s > n/2 and reject zero r/s.

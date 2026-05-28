@@ -189,7 +189,6 @@ static void test_abi_ctx_skips_check() {
     // Advisory probe: asserts only that the code path runs without crashing.
     // The psig_is_zero value is INFO-only — MED-3 is a documented open behavior.
     // When MED-3 is closed at the C++ layer, replace with: CHECK(psig_is_zero, "[MSI-4] ...")
-    g_pass++;
 }
 
 // ── _run() ───────────────────────────────────────────────────────────────

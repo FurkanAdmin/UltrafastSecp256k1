@@ -73,7 +73,9 @@ int secp256k1_ellswift_encode(
     const unsigned char* rnd32)
 {
     SHIM_REQUIRE_CTX(ctx);
-    if (!ell64 || !pubkey || !rnd32) return 0;
+    if (!ell64)  { secp256k1_shim_call_illegal_cb(ctx, "secp256k1_ellswift_encode: NULL ell64");  return 0; }
+    if (!pubkey) { secp256k1_shim_call_illegal_cb(ctx, "secp256k1_ellswift_encode: NULL pubkey"); return 0; }
+    if (!rnd32)  { secp256k1_shim_call_illegal_cb(ctx, "secp256k1_ellswift_encode: NULL rnd32");  return 0; }
 
     std::array<uint8_t, 32> xb{};
     std::memcpy(xb.data(), pubkey->data, 32);
@@ -125,7 +127,8 @@ int secp256k1_ellswift_create(
     const unsigned char* auxrnd32)
 {
     SHIM_REQUIRE_CTX(ctx);
-    if (!ell64 || !seckey32) return 0;
+    if (!ell64)    { secp256k1_shim_call_illegal_cb(ctx, "secp256k1_ellswift_create: NULL ell64");    return 0; }
+    if (!seckey32) { secp256k1_shim_call_illegal_cb(ctx, "secp256k1_ellswift_create: NULL seckey32"); return 0; }
 
     std::array<uint8_t, 32> kb{};
     std::memcpy(kb.data(), seckey32, 32);
@@ -160,7 +163,10 @@ int secp256k1_ellswift_xdh(
         secp256k1_shim_call_illegal_cb(ctx, "secp256k1_ellswift_xdh: NULL hashfp");
         return 0;
     }
-    if (!output || !ell_a64 || !ell_b64 || !seckey32) return 0;
+    if (!output)   { secp256k1_shim_call_illegal_cb(ctx, "secp256k1_ellswift_xdh: NULL output");   return 0; }
+    if (!ell_a64)  { secp256k1_shim_call_illegal_cb(ctx, "secp256k1_ellswift_xdh: NULL ell_a64");  return 0; }
+    if (!ell_b64)  { secp256k1_shim_call_illegal_cb(ctx, "secp256k1_ellswift_xdh: NULL ell_b64");  return 0; }
+    if (!seckey32) { secp256k1_shim_call_illegal_cb(ctx, "secp256k1_ellswift_xdh: NULL seckey32"); return 0; }
 
     std::array<uint8_t, 32> kb{};
     std::memcpy(kb.data(), seckey32, 32);

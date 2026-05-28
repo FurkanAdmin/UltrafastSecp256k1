@@ -52,15 +52,18 @@ ADVISORY_COUNT=$(echo "${ADVISORY_IDS}" | wc -l | tr -d ' ')
 echo "  Enumerated ${ADVISORY_COUNT} advisory=true modules from ALL_MODULES[]"
 
 # Candidate build directories — first one with any standalone binary wins.
-# These cover the common in-tree build paths (developer-driven and CI-driven).
+# All paths are under out/ (canonical). Root-level build-* dirs are legacy
+# and no longer created by any script. UFSECP_BUILD_DIR may override for CI.
 CANDIDATE_BUILDS=(
     "${UFSECP_BUILD_DIR:-}"
-    "${REPO_ROOT}/build_bench_opt"
-    "${REPO_ROOT}/build-runner"
-    "${REPO_ROOT}/build-audit"
-    "${REPO_ROOT}/build"
+    "${REPO_ROOT}/out/auditor"
     "${REPO_ROOT}/out/ci-shim"
     "${REPO_ROOT}/out/release"
+    "${REPO_ROOT}/out/owner_audit"
+    "${REPO_ROOT}/out/auditor_mode"
+    "${REPO_ROOT}/out/build"
+    "${REPO_ROOT}/out/cpu-release"
+    "${REPO_ROOT}/out/cpu-debug"
 )
 
 BUILD=""

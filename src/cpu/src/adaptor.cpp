@@ -174,13 +174,16 @@ schnorr_adaptor_sign(const Scalar& private_key,
     std::memcpy(challenge_data + 32, P_x.data(), 32);
     std::memcpy(challenge_data + 64, msg.data(), 32);
     auto e_hash = tagged_hash("BIP0340/challenge", challenge_data, 96);
-    Scalar const e = Scalar::from_bytes(e_hash);
+    Scalar e = Scalar::from_bytes(e_hash);
 
     // s = k + e * sk — CT: both k (secret nonce) and sk (secret key) are secret
     Scalar const s_hat = ct::scalar_add(k, ct::scalar_mul(e, sk));
 
     detail::secure_erase(&k, sizeof(k));  // SEC-005: const_cast was unnecessary — k is non-const
     detail::secure_erase(&sk, sizeof(sk));
+    detail::secure_erase(e_hash.data(), e_hash.size());
+    detail::secure_erase(&e, sizeof(e));
+    detail::secure_erase(challenge_data, sizeof(challenge_data));
     return SchnorrAdaptorSig{R_hat, s_hat, needs_neg};
 }
 
@@ -335,6 +338,7 @@ ecdsa_adaptor_sign(const Scalar& private_key,
     detail::secure_erase(&k, sizeof(k));
     detail::secure_erase(&k_inv, sizeof(k_inv));
     detail::secure_erase(&binding, sizeof(binding));
+    detail::secure_erase(R_x_bytes.data(), R_x_bytes.size());
 
     if (s_hat.is_zero_ct()) {
         detail::secure_erase(&s_hat, sizeof(s_hat));

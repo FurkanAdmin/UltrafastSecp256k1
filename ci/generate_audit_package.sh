@@ -14,7 +14,7 @@
 # ============================================================================
 set -euo pipefail
 
-BUILD_DIR="build-audit"
+BUILD_DIR="out/auditor"
 SECTION=""
 SKIP_BUILD=0
 
@@ -28,7 +28,7 @@ while [[ $# -gt 0 ]]; do
 generate_audit_package.sh -- Comprehensive Audit Evidence Generator
 
 OPTIONS:
-  --build-dir <dir>     Build directory (default: build-audit)
+  --build-dir <dir>     Build directory (default: out/auditor)
   --section <id>        Run only one section (default: all 8)
   --skip-build          Skip cmake configure + build
   --help                Show this message
@@ -62,7 +62,7 @@ fi
 
 # -- Timestamp & output directory -------------------------------------------
 TS="$(date +%Y%m%d-%H%M%S)"
-OUTPUT_DIR="$PROJECT_ROOT/audit-evidence-$TS"
+OUTPUT_DIR="$PROJECT_ROOT/out/audit-evidence-$TS"
 mkdir -p "$OUTPUT_DIR/tool_evidence"
 mkdir -p "$OUTPUT_DIR/ct_evidence"
 

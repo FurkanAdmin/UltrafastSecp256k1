@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BUILD_DIR="build-audit"
+BUILD_DIR="out/auditor"
 TRACEABILITY_BUILD_DIR=""
 OUTPUT_DIR=""
 WITH_PACKAGE=0
@@ -17,10 +17,10 @@ Usage:
 
 Options:
   --build-dir <dir>             Build directory for optional audit package
-                                generation. Default: build-audit
+                                generation. Default: out/auditor
   --traceability-build <dir>    Build directory passed to generate_traceability.sh
-                                Default: build
-  --output-dir <dir>            Output directory. Default: external-audit-prep-<ts>
+                                Default: out/build
+  --output-dir <dir>            Output directory. Default: out/external-audit-prep-<ts>
   --with-package                Also run generate_audit_package.sh and attach the
                                 resulting evidence bundle
   --skip-graph                  Skip project graph rebuild
@@ -80,11 +80,11 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 
 if [[ -z "$TRACEABILITY_BUILD_DIR" ]]; then
-    TRACEABILITY_BUILD_DIR="build"
+    TRACEABILITY_BUILD_DIR="out/build"
 fi
 
 if [[ -z "$OUTPUT_DIR" ]]; then
-    OUTPUT_DIR="$PROJECT_ROOT/external-audit-prep-$TIMESTAMP"
+    OUTPUT_DIR="$PROJECT_ROOT/out/external-audit-prep-$TIMESTAMP"
 fi
 
 mkdir -p "$OUTPUT_DIR/logs"
