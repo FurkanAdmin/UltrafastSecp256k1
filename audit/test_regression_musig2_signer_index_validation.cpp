@@ -160,6 +160,11 @@ static void test_full_roundtrip_correct_indices() {
 // strictly enforcing real regressions, MSI-4 now records the observed
 // behaviour as INFO (printed but not CHECK'd) and the module exits
 // PASS unless one of the mandatory subtests fails.
+/* INTENTIONALLY non-asserting: MSI-4 probes an open MED-3 behavior (RR-010).
+   The signer-index bypass via ABI-deserialized keyagg (empty individual_pubkeys)
+   is a documented known limitation, out-of-scope for Bitcoin Core PR.
+   This test CANNOT detect MED-3 regression — it always passes regardless.
+   When MED-3 is fixed (v5.0.0): replace printf with CHECK(psig_is_zero, ...). */
 static void test_abi_ctx_skips_check() {
     // Simulate ABI-deserialized keyagg: individual_pubkeys is empty
     auto kagg = make_2party_keyagg();

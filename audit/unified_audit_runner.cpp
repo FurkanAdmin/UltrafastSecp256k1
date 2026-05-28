@@ -740,7 +740,7 @@ int test_regression_frost_musig2_degenerate_run(); // FMD-1..4: FROST infinity g
 struct AuditModule {
     const char* id;           // short ID for JSON
     const char* name;         // human-readable name
-    const char* section;      // one of 8 report sections
+    const char* section;      // one of 10 report sections
     int (*run)();             // returns 0=PASS, non-zero=FAIL
     bool advisory;            // if true, failure does not block audit verdict
 };
@@ -1330,7 +1330,7 @@ static const AuditModule ALL_MODULES[] = {
     // advisory=true: Rule 13 cannot be fully tested at C++ API level when individual_pubkeys
     // MSI-1/2/3 use CHECK() and are mandatory. MSI-4 is INFO-only (g_pass++, documents
     // an open MED-3 behavior) — it never sets g_fail, so the module always passes clean.
-    { "regression_musig2_signer_index",        "SEC-007: musig2_partial_sign validates secret_key<->signer_index (Rule 13) — MSI-4 (empty individual_pubkeys path) is documented open in RESIDUAL_RISK_REGISTER.md (MED-3 partial); v2 ABI is the secure path", "protocol_security", test_regression_musig2_signer_index_validation_run, true },
+    { "regression_musig2_signer_index",        "SEC-007: musig2_partial_sign validates secret_key<->signer_index (Rule 13) — MSI-4 (empty individual_pubkeys path) is documented open in RESIDUAL_RISK_REGISTER.md (MED-3 partial); v2 ABI is the secure path", "protocol_security", test_regression_musig2_signer_index_validation_run, true }, // advisory=true: MSI-4 sub-test is INFO-only and cannot detect MED-3 regression — see RR-010
     // SEC-010: adaptor binding BIP-340 domain separation (wire format: ecdsa_adaptor_bind_v2)
 #if SECP256K1_HAS_ADAPTOR
     { "regression_adaptor_binding_domain",     "SEC-010: ecdsa_adaptor_binding uses BIP-340 tagged hash (v2) — sign/verify/adapt/extract round-trips, needs_negation integrity, domain separation confirmed", "protocol_security", test_regression_adaptor_binding_domain_run, false },
