@@ -588,12 +588,31 @@ RETROACTIVELY_COVERED: dict[str, tuple[list[str], str]] = {
         "not-on-curve rejection, x>=p strict boundary, from_pubkey consistency, parity flag). "
         "Test added in the follow-up commit (batch parallel + build-dir fixes).",
     ),
+    "cc88b0cf56": (
+        ["audit/test_regression_s_scalar_erasure.cpp"],
+        "fix(security): erase nonce-derived r in ecdsa_sign_hedged (src/cpu/src/ecdsa.cpp, "
+        "one-line secure_erase(&r) defense-in-depth, companion to the secure_erase(&s) it "
+        "sits beside). Covered by test_regression_s_scalar_erasure.cpp, whose header and "
+        "scan explicitly cover BOTH secure_erase(&s) and secure_erase(&r) in ecdsa.cpp "
+        "(added immediately after secure_erase(&k_inv)). The commit also updated "
+        "SECRET_LIFECYCLE.md + SECURITY_CLAIMS.md (the secret-path doc pairing). No new "
+        "signing surface; pure stack-residue hardening.",
+    ),
+    "7d094c7c09": (
+        ["ci/test_caas_integrity.py"],
+        "fix(ci): increase shim_audit_report artifact retention 90→365 days in "
+        ".github/workflows/gate.yml. Operational config-only change (retention-days), NO "
+        "security logic touched — flagged solely because gate.yml ∈ SECURITY_CI_FILES. "
+        "There is no executable security surface to test; gate.yml workflow structure / CAAS "
+        "gate integrity is exercised by ci/test_caas_integrity.py. Retroactively whitelisted "
+        "as a benign CI-retention change.",
+    ),
 }
 
 # Frozen count guard (CAAS-006): prevents silent whitelist growth.
 # When adding a new entry above, increment this constant too.
 # Unauthorized bypass (adding an entry without incrementing) → import-time assertion failure.
-RETROACTIVELY_COVERED_FROZEN_COUNT: int = 53
+RETROACTIVELY_COVERED_FROZEN_COUNT: int = 55
 assert len(RETROACTIVELY_COVERED) == RETROACTIVELY_COVERED_FROZEN_COUNT, (
     f"RETROACTIVELY_COVERED has {len(RETROACTIVELY_COVERED)} entries but "
     f"RETROACTIVELY_COVERED_FROZEN_COUNT={RETROACTIVELY_COVERED_FROZEN_COUNT}. "

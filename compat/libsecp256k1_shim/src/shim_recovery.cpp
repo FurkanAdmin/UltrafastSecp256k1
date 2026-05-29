@@ -18,6 +18,7 @@
 #include "secp256k1/field.hpp"
 #include "secp256k1/recovery.hpp"
 #include "secp256k1/ct/sign.hpp"
+#include "secp256k1/detail/secure_erase.hpp"   // CT-01: erase parsed private-key scalar
 #include "secp256k1/ct/point.hpp"
 
 using namespace secp256k1::fast;
@@ -151,13 +152,18 @@ int secp256k1_ecdsa_sign_recoverable(
 
     Scalar privkey_scalar;
     if (!Scalar::parse_bytes_strict_nonzero(
-            reinterpret_cast<const uint8_t*>(seckey), privkey_scalar)) return 0;
+            reinterpret_cast<const uint8_t*>(seckey), privkey_scalar)) {
+        secp256k1::detail::secure_erase(&privkey_scalar, sizeof(privkey_scalar));  // CT-01
+        return 0;
+    }
 
     secp256k1::RecoverableSignature rsig;
 #ifdef SECP256K1_SHIM_RFC6979_COMPAT
     rsig = secp256k1::ct::ecdsa_sign_libsecp_compat_recoverable(
         msg, privkey_scalar,
         ndata ? reinterpret_cast<const uint8_t*>(ndata) : nullptr);
+    // CT-01: privkey_scalar consumed by the sign call — erase before any return.
+    secp256k1::detail::secure_erase(&privkey_scalar, sizeof(privkey_scalar));
     if (rsig.sig.r.is_zero() || rsig.sig.s.is_zero()) return 0;
 #else
     if (ndata) {
@@ -170,9 +176,13 @@ int secp256k1_ecdsa_sign_recoverable(
         std::array<uint8_t, 32> aux{};
         std::memcpy(aux.data(), ndata, 32);
         rsig = secp256k1::ct::ecdsa_sign_hedged_recoverable(msg, privkey_scalar, aux);
+        // CT-01: erase the parsed key scalar and the hedging entropy.
+        secp256k1::detail::secure_erase(&privkey_scalar, sizeof(privkey_scalar));
+        secp256k1::detail::secure_erase(aux.data(), aux.size());
         if (rsig.sig.r.is_zero() || rsig.sig.s.is_zero()) return 0;
     } else {
         rsig = secp256k1::ct::ecdsa_sign_recoverable(msg, privkey_scalar);
+        secp256k1::detail::secure_erase(&privkey_scalar, sizeof(privkey_scalar));  // CT-01
     }
 #endif
 

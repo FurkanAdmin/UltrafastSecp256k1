@@ -4010,6 +4010,8 @@ target_sources(unified_audit_runner PRIVATE
     test_regression_musig2_v1_partial_sign_deprecated.cpp
     # v9 RT-006/-007/-014/-015 / TASK-022: secret stack residue bundle (no special dependency)
     test_regression_secret_stack_residue_v9.cpp
+    # 2026-05-28 CT-01/SHIM-01/02 + CT-02 + RT-02: shim+bip32 secret-key erase + strict-DER (source-scan + functional, no special dependency)
+    test_regression_shim_seckey_erase.cpp
     # P1-SEC-002: schnorr_sign e_hash erasure (no special dependency)
     test_regression_schnorr_sign_e_hash_erased.cpp
     # P2: CT-001/002/003 + SHIM-002/003/004 fixes (includes secp256k1.h — needs shim include path)
@@ -5162,6 +5164,17 @@ add_test(NAME regression_secret_stack_residue_v9
     COMMAND test_regression_secret_stack_residue_v9_standalone)
 set_tests_properties(regression_secret_stack_residue_v9 PROPERTIES TIMEOUT 60
     LABELS "audit;regression;ct;stack-residue;v9;task-022")
+
+# 2026-05-28 CT-01/SHIM-01/02 + CT-02 + RT-02: shim+bip32 secret-key erasure + strict-DER.
+# Source-scan + functional combo, no shim/GPU dependency (functional uses internal CPU API).
+add_executable(test_regression_shim_seckey_erase_standalone
+    test_regression_shim_seckey_erase.cpp)
+audit_target_defaults(test_regression_shim_seckey_erase_standalone)
+target_compile_definitions(test_regression_shim_seckey_erase_standalone PRIVATE STANDALONE_TEST)
+add_test(NAME regression_shim_seckey_erase
+    COMMAND test_regression_shim_seckey_erase_standalone)
+set_tests_properties(regression_shim_seckey_erase PROPERTIES TIMEOUT 60
+    LABELS "audit;regression;ct;stack-residue;shim;der")
 
 # 2026-05-21 CT ops regression: CT-004/005, SEC-002/007/008
 # Uses C++ API only (no shim/GPU dependency). advisory=false.

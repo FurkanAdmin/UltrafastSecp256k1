@@ -32,6 +32,7 @@
 #include "secp256k1/ecdsa.hpp"
 #include "secp256k1/ct/sign.hpp"
 #include "secp256k1/ct/point.hpp"
+#include "secp256k1/detail/secure_erase.hpp"   // CT-01: erase parsed private-key scalar
 
 using namespace secp256k1::fast;
 
@@ -281,6 +282,14 @@ int secp256k1_ecdsa_signature_parse_der(
     if (!parse_int(p, end, sig->data))      return 0;  // r → data[0..31]
     if (!parse_int(p, end, sig->data + 32)) return 0;  // s → data[32..63]
 
+    // RT-02 (strict-DER): the SEQUENCE body must be EXACTLY consumed by r and s.
+    // The line-255 check only verifies the declared SEQUENCE length fills the
+    // input buffer; it does not catch trailing bytes *inside* the SEQUENCE after
+    // s (e.g. 30 08 02 01 0F 02 01 01 7F 7F — seqlen=8 covers offsets 2..9 but
+    // r,s consume only 2..7). Upstream secp256k1_ecdsa_sig_parse rejects this, and
+    // the native C-ABI parser (src/cpu/src/impl/ufsecp_ecdsa.cpp) already does.
+    if (p != end) return 0;
+
     // Validate r, s ∈ [1, n-1]: reject overflow (>= n) AND zero.
     //
     // Fast path: load 4 big-endian uint64_t limbs and compare against the
@@ -301,10 +310,15 @@ int secp256k1_ecdsa_signature_parse_der(
         return UFSECP_SHIM_BSWAP64(v);
     };
 
-    // Returns true if the 32-byte big-endian value is in [0, n-1].
-    // DER-STRICT fix: r=0/s=0 accepted at parse time — verify rejects degenerate sigs.
-    // This matches upstream libsecp256k1 behavior (secp256k1_ecdsa_sig_parse does not
-    // reject zero; secp256k1_ecdsa_sig_verify does).
+    // Returns true if the 32-byte big-endian value is in [0, n-1] (i.e. < n).
+    // NOTE on r=0/s=0: this predicate alone would accept a zero VALUE, but the
+    // canonical DER encoding of zero is `02 01 00`, which parse_int above already
+    // rejects via its minimal-encoding rule (a single leading 0x00 byte fails the
+    // `len < 2` check). There is no minimal DER encoding of zero that reaches this
+    // predicate, so in practice r=0/s=0 are rejected AT PARSE. This is a documented
+    // divergence from upstream libsecp256k1 (secp256k1_ecdsa_sig_parse accepts zero
+    // and defers rejection to verify) — see docs/SHIM_KNOWN_DIVERGENCES.md and the
+    // regression test compat/libsecp256k1_shim/tests/test_shim_der_zero_r.cpp.
     auto in_range_scalar = [&](const unsigned char* b) noexcept -> bool {
         uint64_t a0 = load64be(b);       // most significant
         uint64_t a1 = load64be(b + 8);
@@ -312,7 +326,6 @@ int secp256k1_ecdsa_signature_parse_der(
         uint64_t a3 = load64be(b + 24);  // least significant
 
         // Check < n: lexicographic comparison from most-significant limb.
-        // Zero (r=0 or s=0) satisfies 0 < N0 → returns true. Verify will reject it.
         if (a0 < N0) return true;   if (a0 > N0) return false;
         if (a1 < N1) return true;   if (a1 > N1) return false;
         if (a2 < N2) return true;   if (a2 > N2) return false;
@@ -530,7 +543,10 @@ int secp256k1_ecdsa_sign(
     std::array<uint8_t, 32> msg{};
     std::memcpy(msg.data(), msghash32, 32);
     Scalar k;
-    if (!Scalar::parse_bytes_strict_nonzero(seckey, k)) return 0;
+    if (!Scalar::parse_bytes_strict_nonzero(seckey, k)) {
+        secp256k1::detail::secure_erase(&k, sizeof(k));   // CT-01
+        return 0;
+    }
 
     secp256k1::ECDSASignature result;
 #ifdef SECP256K1_SHIM_RFC6979_COMPAT
@@ -541,10 +557,14 @@ int secp256k1_ecdsa_sign(
         std::array<uint8_t, 32> aux{};
         std::memcpy(aux.data(), ndata, 32);
         result = secp256k1::ct::ecdsa_sign_hedged(msg, k, aux);
+        secp256k1::detail::secure_erase(aux.data(), aux.size());  // CT-01: hedging entropy
     } else {
         result = secp256k1::ct::ecdsa_sign(msg, k);
     }
 #endif
+    // CT-01: erase the parsed private-key scalar `k` on every return path below.
+    // (Mirrors secp256k1_schnorrsig_sign32, which erases sk before its checks.)
+    secp256k1::detail::secure_erase(&k, sizeof(k));
     // C5: explicit error propagation via ECDSASignature::is_valid() rather than
     // ad-hoc zero-checks. is_valid() ↔ (r ∈ [1,n-1] ∧ s ∈ [1,n-1]).
     // CT signing returns zero (r,s) on any degenerate case (k≡0 mod n, etc.).

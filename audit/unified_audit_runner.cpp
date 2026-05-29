@@ -587,6 +587,7 @@ int test_regression_ct_ops_run(); // CT correctness: FROST lagrange CT, batch_we
 int test_regression_musig2_abi_signer_index_run(); // SEC-001: partial_sign_v2 validates privkey<->signer_index
 int test_regression_musig2_v1_partial_sign_deprecated_run(); // v9 RT-001 / TASK-001: v1 partial_sign hard-fails with UFSECP_ERR_DEPRECATED_API
 int test_regression_secret_stack_residue_v9_run(); // v9 RT-006/-007/-014/-015 / TASK-022: schnorr raw-key erase + BIP32 is_zero_ct + FROST SHA erase + adaptor degen-r erase
+int test_regression_shim_seckey_erase_run(); // 2026-05-28 CT-01/SHIM-01/02 + CT-02 + RT-02: shim ecdsa/ellswift secret-key erase + bip32 il_scalar erase + strict-DER exact-SEQUENCE
 
 // ============================================================================
 // Forward declarations -- 2026-05-12 SEC-002/004/006/010 security fixes
@@ -1360,6 +1361,11 @@ static const AuditModule ALL_MODULES[] = {
     // schnorr raw-key overloads erase kp.d; BIP32 derive_child uses is_zero_ct;
     // FROST derive_scalar erases SHA state; adaptor degenerate-r early return erases secrets.
     { "regression_secret_stack_residue_v9", "v9 RT-006/-007/-014/-015 / TASK-022: schnorr raw-key overload + BIP32 + FROST + adaptor — secret stack residue hardening", "differential", test_regression_secret_stack_residue_v9_run, false },
+    // === 2026-05-28 read-only review: shim/bip32 secret-key erasure + strict-DER ===
+    // CT-01 shim ecdsa_sign/sign_recoverable erase parsed key; SHIM-01/02 ellswift
+    // create/xdh erase sk/kb on all returns; CT-02 bip32 derive_child erases il_scalar;
+    // RT-02 parse_der requires exact SEQUENCE consumption. Source-scan + functional.
+    { "regression_shim_seckey_erase", "2026-05-28 CT-01/SHIM-01/02/CT-02/RT-02: shim ecdsa+ellswift secret-key erasure, bip32 il_scalar erasure, strict-DER exact-SEQUENCE consumption", "differential", test_regression_shim_seckey_erase_run, false },
     // === 2026-05-13 v7 security regression guards ===
     // advisory=true: shim must be linked.
     { "regression_shim_security_v7", "v7: T-01 MuSig2 blinding scope + T-07 sig strict parse + T-08 cache memcmp + T-10 context_randomize NULL callback", "exploit_poc", test_regression_shim_security_v7_run, true },

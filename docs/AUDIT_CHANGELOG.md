@@ -1,5 +1,37 @@
 # Audit Changelog
 
+## 2026-05-28 — Fix + test: shim/bip32 secret-key erasure + strict-DER (CT-01/SHIM-01/02/CT-02/RT-02)
+
+- **CT-01 (shim_ecdsa.cpp, shim_recovery.cpp)**: `secp256k1_ecdsa_sign` and
+  `secp256k1_ecdsa_sign_recoverable` did not `secure_erase` the parsed private-key scalar
+  (`k` / `privkey_scalar`) on their return paths, unlike the Schnorr shim. Added erasure on
+  every return (incl. parse-fail), plus erasure of the hedging `aux` entropy.
+- **SHIM-01/02 (shim_ellswift.cpp)**: `secp256k1_ellswift_create` never erased `sk`/`kb`
+  (success + parse-fail); `secp256k1_ellswift_xdh`'s general path skipped erasure on the
+  parse-fail and three error returns (sqrt-fail, two `is_infinity`) — only the success path
+  erased. BIP-324 handshake key material. All paths now erase (`xdh` via an `erase_secrets()`
+  scope helper).
+- **CT-02 (bip32.cpp)**: `ExtendedKey::derive_child` erased `I`/`IL`/`parent_scalar`/
+  `child_scalar` but never `il_scalar` (HMAC image of the parent private key on hardened
+  paths) on any of its 7 return paths; the two early returns also skipped `I`/`IL`. Now
+  erases `il_scalar` on every path and `I`/`IL` on the early returns.
+- **RT-02 (shim_ecdsa.cpp)**: `secp256k1_ecdsa_signature_parse_der` lacked an exact-SEQUENCE
+  consumption check; an inflated SEQUENCE leaving trailing bytes after `s` (e.g.
+  `30 08 02 01 0F 02 01 01 7F 7F`) was accepted. Added `if (p != end) return 0;` — matches
+  upstream and the native C-ABI parser. Probe-verified.
+- **RT-01 (investigated, NOT a bug)**: a review pass claimed `parse_der` now accepts r=0/s=0
+  and that the DER tests were stale-failing. An empirical probe disproved it — `parse_der`
+  rejects r=0/s=0 at parse (the `02 01 00` minimal-encoding rule). The misleading
+  `in_range_scalar` comment was clarified; `test_shim_der_zero_r.cpp` was rewritten to assert
+  the true behavior (reject r=0/s=0/trailing, accept valid) and `shim_test.cpp` left unchanged.
+- **Test (new)**: `audit/test_regression_shim_seckey_erase.cpp` — source-scan assertions for
+  every erase site + strict-DER check, plus functional round-trips (CT ECDSA, ellswift XDH,
+  bip32 hardened derive). Wired into `unified_audit_runner.cpp` (`differential`, advisory=false)
+  and `audit/CMakeLists.txt` (standalone CTest `regression_shim_seckey_erase`). 28/28 checks pass.
+- **Files**: `compat/libsecp256k1_shim/src/{shim_ecdsa.cpp,shim_recovery.cpp,shim_ellswift.cpp}`,
+  `src/cpu/src/bip32.cpp`, `compat/libsecp256k1_shim/tests/test_shim_der_zero_r.cpp`,
+  `audit/test_regression_shim_seckey_erase.cpp`.
+
 ## 2026-05-28 — Fix + test: SHIM-NULL-CB-2026 extrakeys + recovery NULL non-ctx arg callbacks (TRNC-1..4)
 
 - **SHIM-NULL-CB-2026 (shim_extrakeys.cpp)**: `secp256k1_xonly_pubkey_tweak_add`,

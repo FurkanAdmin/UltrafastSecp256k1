@@ -134,12 +134,19 @@ int secp256k1_ellswift_create(
     std::memcpy(kb.data(), seckey32, 32);
     // Strict: reject sk >= n or sk == 0 (Rule 11: no silent mod-n reduction)
     Scalar sk;
-    if (!Scalar::parse_bytes_strict_nonzero(kb, sk)) return 0;
+    if (!Scalar::parse_bytes_strict_nonzero(kb, sk)) {
+        secp256k1::detail::secure_erase(&sk, sizeof(sk));   // SHIM-01
+        secp256k1::detail::secure_erase(kb.data(), 32);
+        return 0;
+    }
 
     // CT path: secret key requires constant-time generator multiplication.
     // ellswift_create() uses ct::generator_mul() internally.
     auto enc = secp256k1::ellswift_create(sk, auxrnd32);
     std::memcpy(ell64, enc.data(), 64);
+    // SHIM-01: erase the secret scalar and its byte copy (BIP-324 handshake key).
+    secp256k1::detail::secure_erase(&sk, sizeof(sk));
+    secp256k1::detail::secure_erase(kb.data(), 32);
     return 1;
 }
 
@@ -172,7 +179,11 @@ int secp256k1_ellswift_xdh(
     std::memcpy(kb.data(), seckey32, 32);
     // Strict: reject sk >= n or sk == 0 (Rule 11: no silent mod-n reduction)
     Scalar sk;
-    if (!Scalar::parse_bytes_strict_nonzero(kb, sk)) return 0;
+    if (!Scalar::parse_bytes_strict_nonzero(kb, sk)) {
+        secp256k1::detail::secure_erase(&sk, sizeof(sk));   // SHIM-02
+        secp256k1::detail::secure_erase(kb.data(), 32);
+        return 0;
+    }
 
     bool initiating = (party == 0);
 
@@ -186,21 +197,27 @@ int secp256k1_ellswift_xdh(
         return 1;
     }
 
-    // General path: decode → ECDH → custom hashfp
+    // General path: decode → ECDH → custom hashfp.
+    // SHIM-02: every error return below must erase the secret scalar `sk` and its
+    // byte copy `kb` (previously only the success path at the end erased them).
+    auto erase_secrets = [&]() {
+        secp256k1::detail::secure_erase(&sk, sizeof(sk));
+        secp256k1::detail::secure_erase(kb.data(), 32);
+    };
     const unsigned char* their_ell = initiating ? ell_b64 : ell_a64;
 
     auto their_x = secp256k1::ellswift_decode(their_ell);
     auto y2 = their_x * their_x * their_x + FieldElement::from_uint64(7);
     auto y = y2.sqrt();
-    if (!(y.square() == y2)) return 0;
+    if (!(y.square() == y2)) { erase_secrets(); return 0; }
     auto yb = y.to_bytes();
     if (yb[31] & 1) y = y.negate();
 
     auto their_point = Point::from_affine(their_x, y);
-    if (their_point.is_infinity()) return 0;
+    if (their_point.is_infinity()) { erase_secrets(); return 0; }
 
     auto ecdh_point = secp256k1::ct::scalar_mul(their_point, sk);
-    if (ecdh_point.is_infinity()) return 0;
+    if (ecdh_point.is_infinity()) { erase_secrets(); return 0; }
 
     auto x32_arr = ecdh_point.x().to_bytes();
     int rc = hashfp(output, x32_arr.data(), ell_a64, ell_b64, data);

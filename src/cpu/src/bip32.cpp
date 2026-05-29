@@ -379,12 +379,25 @@ std::pair<ExtendedKey, bool> ExtendedKey::derive_child(uint32_t index) const {
 
     auto il_scalar = Scalar{};
     // BIP-32: IL must be < curve order n; reject (skip to next index) if >= n
-    if (!Scalar::parse_bytes_strict(IL, il_scalar)) return {ExtendedKey{}, false};
+    if (!Scalar::parse_bytes_strict(IL, il_scalar)) {
+        // CT-02: IL/I and il_scalar are HMAC images of the parent private key on
+        // hardened paths (data = 0x00 || private_key || index) — erase on this
+        // early return too (was previously skipped).
+        detail::secure_erase(I.data(), I.size());
+        detail::secure_erase(IL.data(), IL.size());
+        detail::secure_erase(&il_scalar, sizeof(il_scalar));
+        return {ExtendedKey{}, false};
+    }
     // Also reject zero — use is_zero_ct() because il_scalar is HMAC-derived from
     // the private key on hardened paths (data = 0x00 || private_key || index).
     // is_zero() has a data-dependent branch; is_zero_ct() is branchless.
     // Probability of IL==0 is ~2^-256 but the CT discipline must be maintained.
-    if (il_scalar.is_zero_ct()) return {ExtendedKey{}, false};
+    if (il_scalar.is_zero_ct()) {
+        detail::secure_erase(I.data(), I.size());        // CT-02
+        detail::secure_erase(IL.data(), IL.size());
+        detail::secure_erase(&il_scalar, sizeof(il_scalar));
+        return {ExtendedKey{}, false};
+    }
 
     ExtendedKey child{};
     child.chain_code = IR;
@@ -393,6 +406,7 @@ std::pair<ExtendedKey, bool> ExtendedKey::derive_child(uint32_t index) const {
     if (depth == 0xFFu) {
         detail::secure_erase(I.data(), I.size());
         detail::secure_erase(IL.data(), IL.size());
+        detail::secure_erase(&il_scalar, sizeof(il_scalar));   // CT-02
         return {ExtendedKey{}, false};
     }
     child.depth = static_cast<uint8_t>(depth + 1);
@@ -406,6 +420,7 @@ std::pair<ExtendedKey, bool> ExtendedKey::derive_child(uint32_t index) const {
         if (!Scalar::parse_bytes_strict_nonzero(key, parent_scalar)) {
             detail::secure_erase(I.data(), I.size());
             detail::secure_erase(IL.data(), IL.size());
+            detail::secure_erase(&il_scalar, sizeof(il_scalar));   // CT-02
             detail::secure_erase(&parent_scalar, sizeof(parent_scalar));
             return {ExtendedKey{}, false};
         }
@@ -420,6 +435,7 @@ std::pair<ExtendedKey, bool> ExtendedKey::derive_child(uint32_t index) const {
             detail::secure_erase(&child_scalar, sizeof(child_scalar));
             detail::secure_erase(I.data(), I.size());
             detail::secure_erase(IL.data(), IL.size());
+            detail::secure_erase(&il_scalar, sizeof(il_scalar));   // CT-02
             return {ExtendedKey{}, false};
         }
         child.key = child_scalar.to_bytes();
@@ -435,6 +451,7 @@ std::pair<ExtendedKey, bool> ExtendedKey::derive_child(uint32_t index) const {
         if (child_point.is_infinity()) {
             detail::secure_erase(I.data(), I.size());
             detail::secure_erase(IL.data(), IL.size());
+            detail::secure_erase(&il_scalar, sizeof(il_scalar));   // CT-02
             return {ExtendedKey{}, false};
         }
         auto compressed = child_point.to_compressed();
@@ -445,6 +462,7 @@ std::pair<ExtendedKey, bool> ExtendedKey::derive_child(uint32_t index) const {
 
     detail::secure_erase(I.data(), I.size());
     detail::secure_erase(IL.data(), IL.size());
+    detail::secure_erase(&il_scalar, sizeof(il_scalar));   // CT-02
 
     return {child, true};
 }
