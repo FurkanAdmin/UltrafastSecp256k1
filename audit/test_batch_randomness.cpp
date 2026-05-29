@@ -331,10 +331,11 @@ void test_batch_verify_correctness() {
     bool single_ok = secp256k1::schnorr_batch_verify(single);
     check(single_ok, "single sig batch passes");
 
-    // Empty batch must pass
+    // Empty batch must FAIL closed (SEC-NEW-005, cd5e14b6): internal C++ batch
+    // verify returns false for n==0, not the old vacuous-truth `true`.
     const bool empty_ok = secp256k1::schnorr_batch_verify(
         static_cast<const secp256k1::SchnorrBatchEntry*>(nullptr), 0);
-    check(empty_ok, "empty batch passes");
+    check(!empty_ok, "empty batch returns false (fail-closed, SEC-NEW-005)");
 }
 
 } // anonymous namespace
