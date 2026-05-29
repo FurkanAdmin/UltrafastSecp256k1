@@ -757,6 +757,54 @@ def check_audit_verdict_requires_evidence() -> None:
         fail(tag, str(exc))
 
 
+def check_secret_path_changes_fail_closed() -> None:
+    """CAAS-09 regression for CAAS-06: the secret-path gate must FAIL CLOSED when
+    `git diff <ref>..HEAD` errors (unreachable ref / shallow clone). Before the
+    2026-05-28 fix the returncode was ignored, so a failed diff produced an empty
+    change set and the gate PASSED — fail-open, even if a secret-bearing file was
+    modified. This monkeypatches subprocess.run to simulate the diff failure and
+    asserts get_changed_files raises (does not silently return an empty list)."""
+    tag = "CAAS-06:secret_path_fail_closed"
+    path = SCRIPT_DIR / "check_secret_path_changes.py"
+    try:
+        spec = importlib.util.spec_from_file_location("secret_path_selftest", str(path))
+        if spec is None or spec.loader is None:
+            fail(tag, "could not load check_secret_path_changes.py module spec")
+            return
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        original_run = module.subprocess.run
+
+        def failing_git(argv, capture_output=False, text=False, cwd=None, check=False):
+            # Simulate `git diff <bad-ref>..HEAD` failing (rc=128 = bad revision).
+            return subprocess.CompletedProcess(
+                argv, 128, stdout="", stderr="fatal: bad revision 'bad-ref..HEAD'"
+            )
+
+        module.subprocess.run = failing_git
+        raised = False
+        result = None
+        try:
+            result = module.get_changed_files(base="this-ref-does-not-exist-xyz")
+        except SystemExit:
+            raised = True
+        except Exception:
+            # Any hard error also counts as fail-closed (the gate did not pass silently).
+            raised = True
+        finally:
+            module.subprocess.run = original_run
+
+        if raised:
+            ok(tag, "git-diff failure raises (fail-closed), not a silent empty-pass")
+        elif not result:
+            fail(tag, "git-diff failure returned an empty change set — FAIL-OPEN (CAAS-06 regression)")
+        else:
+            fail(tag, f"git-diff failure neither raised nor empty: {result!r}")
+    except Exception as exc:
+        fail(tag, str(exc))
+
+
 def main() -> int:
     quick = "--quick" in sys.argv
 
@@ -808,6 +856,7 @@ def main() -> int:
         check_preflight_ctest_registry_classification()
         check_validate_assurance_smoke()
         check_export_assurance_smoke()
+        check_secret_path_changes_fail_closed()
 
     # Summary
     print(f"\n{BOLD}{'='*60}{RESET}")
