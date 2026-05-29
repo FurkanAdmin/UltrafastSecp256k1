@@ -884,15 +884,13 @@ ufsecp_error_t ufsecp_schnorr_sign_msg(
     if (SECP256K1_UNLIKELY(!aux_rand32)) return UFSECP_ERR_NULL_ARG;
     ctx_clear_err(ctx);
 
-    // Hash the message with BIP-340 tagged hash "BIP0340/msg"
-    static const uint8_t tag_data[] = "BIP0340/msg";
+    // Hash the message with BIP-340 tagged hash "BIP0340/msg".
+    // PERF-NEW-05: reuse the precomputed g_msg_midstate instead of re-hashing
+    // SHA256(tag) twice per call. Byte-identical: the midstate already encodes
+    // SHA256(tag)||SHA256(tag); the conditional msg update matches the prior code.
     uint8_t msg_hash[32];
     {
-        // tagged_hash("BIP0340/msg", msg) = SHA256(SHA256(tag)||SHA256(tag)||msg)
-        auto tag_hash = secp256k1::SHA256::hash(tag_data, sizeof(tag_data) - 1);
-        secp256k1::SHA256 h;
-        h.update(tag_hash.data(), 32);
-        h.update(tag_hash.data(), 32);
+        secp256k1::SHA256 h = secp256k1::detail::g_msg_midstate;
         if (msg && msg_len > 0) h.update(msg, msg_len);
         auto digest = h.finalize();
         std::memcpy(msg_hash, digest.data(), 32);
@@ -913,13 +911,11 @@ ufsecp_error_t ufsecp_schnorr_verify_msg(
     if (SECP256K1_UNLIKELY(!msg && msg_len > 0)) return UFSECP_ERR_NULL_ARG;
     ctx_clear_err(ctx);
 
-    static const uint8_t tag_data[] = "BIP0340/msg";
+    // PERF-NEW-05: reuse g_msg_midstate (byte-identical to re-deriving the
+    // "BIP0340/msg" tag prefix; conditional msg update matches the prior code).
     uint8_t msg_hash[32];
     {
-        auto tag_hash = secp256k1::SHA256::hash(tag_data, sizeof(tag_data) - 1);
-        secp256k1::SHA256 h;
-        h.update(tag_hash.data(), 32);
-        h.update(tag_hash.data(), 32);
+        secp256k1::SHA256 h = secp256k1::detail::g_msg_midstate;
         if (msg && msg_len > 0) h.update(msg, msg_len);
         auto digest = h.finalize();
         std::memcpy(msg_hash, digest.data(), 32);

@@ -1,5 +1,41 @@
 # Audit Changelog
 
+## 2026-05-29 — Follow-up review fixes: shim secret-erase sweep, RT-04 test, CAAS/doc gates, byte-identical tagged-hash perf
+
+### Round 1 (pushed `ef5506fd`)
+- **RT-04**: `test_regression_shim_divergence_fixes.cpp` SDF-3 asserted `parse_der(r=0)==1`,
+  but the shim rejects r=0/s=0 at parse (the `02 01 00` minimal-encoding rule). Flipped to
+  `==0`, corrected the runner module text, added `SKIP_RETURN_CODE 77`. Now consistent with
+  `test_shim_der_zero_r.cpp`.
+- **CT-04 / RT-05 + sweep**: `secure_erase` of parsed/derived private-key residue on every
+  return path in `keypair_xonly_tweak_add`, `shim_seckey.cpp` ×4, `keypair_create`,
+  `ec_pubkey_create`, `musig_partial_sign`. New gate `ci/check_secret_erase_coverage.py`
+  (cast-tolerant, self-validates 7 critical paths incl. `ecdsa_sign_recoverable`); extended
+  `test_regression_shim_seckey_erase.cpp` (49/49).
+- **CAAS-08** (`caas-freshness-check.yml`): `fetch-depth` 10→0, nested SLA threshold read
+  (`slos.max_stale_evidence_days.threshold`=30, was silently 7), parse `AUDIT_DASHBOARD.md`
+  `_Generated_` header.
+- **Docs/gates**: `ABI_VERSIONING.md` real 153-fn surface + `ci/check_abi_count.py` (REL-04);
+  `AUDIT_COVERAGE.md` CT triggers = `workflow_dispatch` + `ci/check_workflow_trigger_claims.py`
+  (CLAIM-07); `BACKEND_EVIDENCE.md` ratios (BENCH-01); `PR_BLOCKERS.md` LTO-qualified (PRR-N1);
+  KB `IS-ZERO-CT` corrected (CT-07).
+
+### Round 2
+- **PERF-03 / PERF-NEW-05** (`schnorr.cpp` varlen challenge, `ufsecp_coins.cpp` `_msg` helpers,
+  `tagged_hash.hpp`): reuse the precomputed `g_challenge_midstate` / new `g_msg_midstate`
+  instead of re-deriving the BIP-340 tag prefix per call. **Byte-identical** — proven by
+  `TAGEXT-6` in `test_exploit_tagged_hash_ext.cpp`. Diagnostic single-binary A/B microbench
+  (core-pinned, 5 runs, turbo NOT locked): **~95–102 ns saved per tagged-hash call (43–67%)**;
+  <1% of a full sign/verify (EC-dominated), so a free correctness-neutral cleanup, NOT a
+  headline speedup. `canonical_numbers.json` unchanged (release-grade turbo-locked bench
+  deferred to the owner).
+- **TEST-05** (`test_regression_musig2_zero_psig.cpp`, `test_exploit_musig2_nonce_erasure_le32_ecdh.cpp`):
+  converted 11 silent `SKIP`-on-setup paths to counted `ASSERT_TRUE` failures — CPU-only
+  MuSig2 setup never legitimately skips, so a setup failure is a regression, not a skip.
+- **CAAS-09** (`ci/test_audit_scripts.py`): added `check_secret_path_changes_fail_closed`
+  regression for CAAS-06 — the secret-path gate must fail-closed when `git diff <ref>..HEAD`
+  errors, not silently treat the change set as empty and pass.
+
 ## 2026-05-28 — Fix + test: shim/bip32 secret-key erasure + strict-DER (CT-01/SHIM-01/02/CT-02/RT-02)
 
 - **CT-01 (shim_ecdsa.cpp, shim_recovery.cpp)**: `secp256k1_ecdsa_sign` and

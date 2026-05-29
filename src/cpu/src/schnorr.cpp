@@ -192,7 +192,10 @@ static inline Scalar schnorr_challenge_scalar(const uint8_t* r32,
 
 // Variable-length variant for arbitrary-length messages (BIP-340 extension,
 // matches libsecp256k1 secp256k1_schnorrsig_verify which accepts any msglen).
-// Uses generic tagged_hash (no midstate optimization) since input size varies.
+// PERF-03: reuse the precomputed g_challenge_midstate (same as the fixed-32 path)
+// instead of re-deriving the "BIP0340/challenge" tag prefix on every call. The
+// midstate already encodes SHA256(tag)||SHA256(tag), so the result is byte-identical
+// to tagged_hash("BIP0340/challenge", input, len) for any input length.
 static Scalar schnorr_challenge_scalar_varlen(const uint8_t* r32,
                                               const uint8_t* pubkey_x32,
                                               const uint8_t* msg,
@@ -211,8 +214,8 @@ static Scalar schnorr_challenge_scalar_varlen(const uint8_t* r32,
     std::memcpy(input +  0, r32,        32);
     std::memcpy(input + 32, pubkey_x32, 32);
     if (msglen > 0) std::memcpy(input + 64, msg, msglen);
-    return Scalar::from_bytes(secp256k1::tagged_hash("BIP0340/challenge",
-                                                      input, 64 + msglen));
+    return Scalar::from_bytes(detail::cached_tagged_hash(detail::g_challenge_midstate,
+                                                         input, 64 + msglen));
 }
 
 #if !defined(SECP256K1_PLATFORM_ESP32) && !defined(SECP256K1_PLATFORM_STM32)

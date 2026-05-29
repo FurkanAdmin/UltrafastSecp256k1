@@ -59,6 +59,7 @@ public:
 SECP256K1_MIDSTATE(g_aux_midstate,                  "BIP0340/aux")
 SECP256K1_MIDSTATE(g_nonce_midstate,                "BIP0340/nonce")
 SECP256K1_MIDSTATE(g_challenge_midstate,            "BIP0340/challenge")
+SECP256K1_MIDSTATE(g_msg_midstate,                  "BIP0340/msg")
 SECP256K1_MIDSTATE(g_taptweak_midstate,             "TapTweak")
 SECP256K1_MIDSTATE(g_tapbranch_midstate,            "TapBranch")
 SECP256K1_MIDSTATE(g_tapleaf_midstate,              "TapLeaf")

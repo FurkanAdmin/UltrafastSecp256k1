@@ -39,6 +39,7 @@
 #include "secp256k1/detail/secure_erase.hpp"
 #include "secp256k1/detail/arith64.hpp"
 #include "secp256k1/sha256.hpp"
+#include "secp256k1/tagged_hash.hpp"   // PERF-NEW-05: g_msg_midstate / cached_tagged_hash
 #include "secp256k1/address.hpp"
 #include "secp256k1/bip32.hpp"
 #include "secp256k1/taproot.hpp"
