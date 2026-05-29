@@ -78,7 +78,10 @@ struct MuSig2State {
 // MZP-1: partial_sign with valid inputs must succeed.
 static void test_mzp_partial_sign_succeeds() {
     MuSig2State s;
-    if (!s.ok) { std::printf("SKIP MZP-1: setup failed\n"); return; }
+    // TEST-05: CPU-only 2-of-2 setup never legitimately skips — a failure here is
+    // a regression, not an environment skip. Count it instead of silently passing.
+    ASSERT_TRUE(s.ok, "MZP-1: musig2 2-of-2 setup must succeed");
+    if (!s.ok) return;
 
     uint8_t psig[32] = {};
     ufsecp_error_t rc = ufsecp_musig2_partial_sign_v2(s.ctx, s.secnonce1, s.sk1, s.pubkeys, s.keyagg, s.session, 0, psig);
@@ -93,7 +96,8 @@ static void test_mzp_partial_sign_succeeds() {
 // MZP-3: partial_sign with signer_index out of range returns error (not zero psig).
 static void test_mzp_oob_signer_rejected() {
     MuSig2State s;
-    if (!s.ok) { std::printf("SKIP MZP-3: setup failed\n"); return; }
+    ASSERT_TRUE(s.ok, "MZP-3: musig2 2-of-2 setup must succeed");
+    if (!s.ok) return;
 
     uint8_t psig[32];
     std::memset(psig, 0xCC, 32);  // sentinel
@@ -109,7 +113,8 @@ static void test_mzp_oob_signer_rejected() {
 // MZP-4: full 2-of-2 MuSig2 round-trip produces a valid Schnorr signature.
 static void test_mzp_full_round_trip() {
     MuSig2State s;
-    if (!s.ok) { std::printf("SKIP MZP-4: setup failed\n"); return; }
+    ASSERT_TRUE(s.ok, "MZP-4: musig2 2-of-2 setup must succeed");
+    if (!s.ok) return;
 
     uint8_t psig1[32] = {}, psig2[32] = {};
     if (ufsecp_musig2_partial_sign_v2(s.ctx, s.secnonce1, s.sk1, s.pubkeys, s.keyagg, s.session, 0, psig1) != UFSECP_OK) {
@@ -136,7 +141,8 @@ static void test_mzp_full_round_trip() {
 // MZP-5: null args return UFSECP_ERR_NULL_ARG (not segfault).
 static void test_mzp_null_args_rejected() {
     MuSig2State s;
-    if (!s.ok) { std::printf("SKIP MZP-5: setup failed\n"); return; }
+    ASSERT_TRUE(s.ok, "MZP-5: musig2 2-of-2 setup must succeed");
+    if (!s.ok) return;
     uint8_t psig[32] = {};
     ufsecp_error_t rc = ufsecp_musig2_partial_sign_v2(s.ctx, nullptr, s.sk1, s.pubkeys, s.keyagg, s.session, 0, psig);
     ASSERT_FALSE(rc == UFSECP_OK, "MZP-5: null secnonce must be rejected");
@@ -145,7 +151,8 @@ static void test_mzp_null_args_rejected() {
 // MZP-6: secnonce is consumed (zeroed) even when ufsecp_musig2_partial_sign succeeds.
 static void test_mzp_secnonce_consumed() {
     MuSig2State s;
-    if (!s.ok) { std::printf("SKIP MZP-6: setup failed\n"); return; }
+    ASSERT_TRUE(s.ok, "MZP-6: musig2 2-of-2 setup must succeed");
+    if (!s.ok) return;
     // Make a copy of secnonce2 to sign with
     uint8_t sn_copy[UFSECP_MUSIG2_SECNONCE_LEN];
     std::memcpy(sn_copy, s.secnonce2, UFSECP_MUSIG2_SECNONCE_LEN);
