@@ -105,13 +105,13 @@ jobs:
 
       - name: Build shared library (needed by CAAS P0 harnesses)
         run: |
-          cmake -S . -B build-audit -G Ninja \
+          cmake -S . -B out/ci-preflight-audit -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CXX_COMPILER=g++-14 \
             -DBUILD_TESTING=OFF \
             -DSECP256K1_BUILD_PROTOCOL_TESTS=OFF \
             -DSECP256K1_BUILD_FUZZ_TESTS=OFF
-          cmake --build build-audit --target ufsecp_shared -j $(nproc)
+          cmake --build out/ci-preflight-audit --target ufsecp_shared -j $(nproc)
 
       - name: CAAS Stage 0 — Exploit Wiring Parity (hard-fail)
         # Enforces the Conversion Standard: every audit/test_exploit_*.cpp file
@@ -134,20 +134,20 @@ jobs:
         # CAAS stages ran. Separate build dir so BUILD_TESTING=ON does not
         # pollute the ufsecp_shared build used by P0 harnesses.
         run: |
-          cmake -S . -B build-runner -G Ninja \
+          cmake -S . -B out/ci-preflight-runner -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CXX_COMPILER=g++-14 \
             -DBUILD_TESTING=ON \
             -DSECP256K1_BUILD_FUZZ_TESTS=OFF \
             -DSECP256K1_BUILD_PROTOCOL_TESTS=OFF
-          cmake --build build-runner --target unified_audit_runner -j $(nproc)
+          cmake --build out/ci-preflight-runner --target unified_audit_runner -j $(nproc)
 
       - name: CAAS Stage 0b — exploit_poc section smoke (hard-fail)
         # Runs only the exploit_poc section so we catch PoC-level regressions
         # in preflight without the full 327-module run (which belongs to ci.yml
         # caas-full). Fails if any mandatory module fails.
         run: |
-          ./build-runner/audit/unified_audit_runner \
+          ./out/ci-preflight-runner/audit/unified_audit_runner \
             --section exploit_poc \
             --json-only \
             --report-dir .
@@ -170,7 +170,7 @@ jobs:
         # deduplicate the previously-inline three-workflow wrapper that
         # SonarCloud Quality Gate flagged at 9.1% duplication).
         env:
-          UFSECP_BUILD_DIR: ${{ github.workspace }}/build-runner
+          UFSECP_BUILD_DIR: ${{ github.workspace }}/out/ci-preflight-runner
         run: bash ci/rule16_enforce.sh
 
       - name: CAAS Stage 1 — Static Analysis (hard-fail on HIGH findings)

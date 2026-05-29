@@ -84,7 +84,9 @@ echo "  Using build dir: ${BUILD}"
 FAILED=0
 CHECKED=0
 MISSING=0
+CRASHED=0
 FAILED_IDS=()
+CRASHED_IDS=()
 
 # Run each advisory binary's standalone variant; check exit code.
 while IFS= read -r mod_id; do
@@ -116,10 +118,13 @@ while IFS= read -r mod_id; do
             FAILED_IDS+=("${mod_id}")
             ;;
         *)
-            # Non-77 non-zero is treated as a real failure (assertion fired,
-            # crash, timeout, etc.) — out of scope for the advisory-skip gate
-            # but worth surfacing so it does not hide behind silence.
-            echo "  WARN ${mod_id} returned ${rc} (real failure surface, not Rule-16 violation)"
+            # CAAS-05 fix: non-77 non-zero means the advisory binary crashed, timed
+            # out (124), or fired an assertion. Previously this only printed WARN and
+            # let the gate pass (fail-open) — a crashing advisory binary could hide
+            # behind a green gate. Track it in a separate CRASHED counter and fail.
+            echo "  FAIL ${mod_id} returned ${rc} (crash/assert/timeout — advisory binary must exit 0 or 77)"
+            CRASHED=$((CRASHED + 1))
+            CRASHED_IDS+=("${mod_id}")
             ;;
     esac
 done <<< "${ADVISORY_IDS}"
@@ -152,6 +157,13 @@ fi
 
 if [ "${FAILED}" -gt 0 ]; then
     echo "  ${FAILED} advisory module(s) violated Rule 16: ${FAILED_IDS[*]}"
+    exit 1
+fi
+
+# CAAS-05: a crashed/errored advisory binary is a real failure, fail-closed.
+if [ "${CRASHED}" -gt 0 ]; then
+    echo "  ${CRASHED} advisory module(s) crashed/errored (non-0, non-77): ${CRASHED_IDS[*]}"
+    echo "  An advisory binary must exit 0 (pass) or 77 (skip) — a crash/assert/timeout is a real defect."
     exit 1
 fi
 

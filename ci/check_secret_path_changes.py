@@ -68,6 +68,19 @@ def get_changed_files(base: str | None = None, before_sha: str | None = None) ->
         result = subprocess.run(
             cmd, capture_output=True, text=True, cwd=str(LIB_ROOT), check=False
         )
+        if result.returncode != 0:
+            # CAAS-06 fix: previously the returncode was ignored. A failed `git diff`
+            # (unresolvable ref, shallow clone, missing before-sha) produced empty
+            # stdout, so the gate saw "no files changed" and PASSED — fail-open, even
+            # if a secret-bearing file was modified. Fail closed: when the change set
+            # cannot be determined, the secret-path gate must NOT silently pass.
+            sys.stderr.write(
+                f"::error::check_secret_path_changes: 'git diff {ref}..HEAD' failed "
+                f"(rc={result.returncode}): {result.stderr.strip()}\n"
+                "Cannot determine changed files — failing closed. Ensure the base / "
+                "before-sha ref is fetched (actions/checkout fetch-depth: 0).\n"
+            )
+            raise SystemExit(2)
         for line in result.stdout.splitlines():
             line = line.strip()
             if line:

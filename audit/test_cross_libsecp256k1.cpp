@@ -266,49 +266,52 @@ static void test_schnorr_cross(const secp256k1_context* ctx) {
 
 static void test_ecdsa_sig_match(const secp256k1_context* ctx) {
     const int N = SCALED(200, 20) * g_multiplier;
-    std::printf("[5] ECDSA: Signature Byte-Exact Match (RFC 6979) (%d rounds)\n", N);
+    std::printf("[5] ECDSA: RFC 6979 determinism + cross-library byte-match probe (%d rounds)\n", N);
 
-    // Both libraries implement RFC 6979 deterministic nonce generation.
-    // For the same (secret_key, hash), the signatures MUST be identical.
-
+    // TEST-01 fix: the previous version compared UF vs libsecp256k1 compact bytes
+    // and incremented g_pass on a match but did NOTHING (only a NOTE) on a mismatch
+    // — a false-green that could "pass" while checking nothing. A cross-library
+    // byte-exact match is NOT a guaranteed invariant: UF's default RFC 6979 nonce
+    // differs from libsecp256k1's (libsecp mixes an "ECDSA" algo16 tag into the
+    // HMAC; UF matches it only under SECP256K1_SHIM_RFC6979_COMPAT). Semantic
+    // correctness is already asserted by the hard cross-VERIFY tests [2] and [3].
+    //
+    // What IS a hard invariant — and what we now assert (so this section fails on a
+    // real regression): each library's RFC 6979 signing is DETERMINISTIC, i.e.
+    // signing the same (sk, msg) twice yields byte-identical output. The
+    // cross-library match is reported as informational only.
+    int cross_byte_matches = 0;
     for (int i = 0; i < N; ++i) {
         auto sk_bytes = random_seckey(ctx);
         auto msg = random_bytes32(rng);
 
-        // Both libraries take a pre-hashed 32-byte message digest.
-        // Pass the same 32 bytes (msg) directly to both.
+        // --- libsecp256k1 determinism (same input twice → identical bytes) ---
+        secp256k1_ecdsa_signature ref_sig, ref_sig2;
+        secp256k1_ecdsa_sign(ctx, &ref_sig,  msg.data(), sk_bytes.data(), nullptr, nullptr);
+        secp256k1_ecdsa_sign(ctx, &ref_sig2, msg.data(), sk_bytes.data(), nullptr, nullptr);
+        secp256k1_ecdsa_signature_normalize(ctx, &ref_sig,  &ref_sig);
+        secp256k1_ecdsa_signature_normalize(ctx, &ref_sig2, &ref_sig2);
+        uint8_t ref_compact[64], ref_compact2[64];
+        secp256k1_ecdsa_signature_serialize_compact(ctx, ref_compact,  &ref_sig);
+        secp256k1_ecdsa_signature_serialize_compact(ctx, ref_compact2, &ref_sig2);
+        CHECK(std::memcmp(ref_compact, ref_compact2, 64) == 0,
+              "libsecp256k1 RFC6979 signing is deterministic (same input → same bytes)");
 
-        // --- Reference: sign ---
-        secp256k1_ecdsa_signature ref_sig;
-        secp256k1_ecdsa_sign(ctx, &ref_sig, msg.data(),
-                             sk_bytes.data(), nullptr, nullptr);
-        secp256k1_ecdsa_signature_normalize(ctx, &ref_sig, &ref_sig);
-        uint8_t ref_compact[64];
-        secp256k1_ecdsa_signature_serialize_compact(ctx, ref_compact, &ref_sig);
-
-        // --- UF: sign ---
+        // --- UF determinism (same input twice → identical bytes) ---
         auto uf_sk = scalar_from_bytes32(sk_bytes.data());
-        auto uf_sig = secp256k1::ecdsa_sign(msg, uf_sk);
-        auto uf_compact = uf_sig.to_compact();
+        auto uf_sig  = secp256k1::ecdsa_sign(msg, uf_sk);
+        auto uf_sig2 = secp256k1::ecdsa_sign(msg, uf_sk);
+        auto uf_compact  = uf_sig.to_compact();
+        auto uf_compact2 = uf_sig2.to_compact();
+        CHECK(std::memcmp(uf_compact.data(), uf_compact2.data(), 64) == 0,
+              "UF RFC6979 signing is deterministic (same input → same bytes)");
 
-        // --- Compare compact (r||s) ---
-        // Note: this checks that RFC 6979 nonce generation matches exactly.
-        // If it doesn't, cross-verify still passes but this will fail.
-        // That's expected if UF's internal hashing differs (e.g., pre-hashing).
-        // We still CHECK cross-verification as the primary correctness test.
-        if (std::memcmp(ref_compact, uf_compact.data(), 64) == 0) {
-            ++g_pass;
-        } else {
-            // Not necessarily a bug -- might be different hash preprocessing.
-            // But log it for investigation.
-            static int warn_count = 0;
-            if (warn_count < 3) {
-                std::printf("    NOTE: sig bytes differ at round %d "
-                            "(cross-verify may still pass)\n", i);
-                ++warn_count;
-            }
-        }
+        // --- Informational only: cross-library byte match (NOT asserted) ---
+        if (std::memcmp(ref_compact, uf_compact.data(), 64) == 0) ++cross_byte_matches;
     }
+    std::printf("    cross-library byte-exact RFC6979 match: %d/%d (informational; "
+                "non-zero requires SECP256K1_SHIM_RFC6979_COMPAT semantics)\n",
+                cross_byte_matches, N);
     std::printf("    %d checks OK\n\n", g_pass);
 }
 

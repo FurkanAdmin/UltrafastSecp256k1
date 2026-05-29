@@ -9,15 +9,15 @@ on:
         type: boolean
         default: false
       build_dir:
-        description: Build directory used for full package generation
+        description: Build directory used for full package generation (must be under out/ — BUILD-DIR-001)
         required: false
         type: string
-        default: build-audit
+        default: out/auditor
       traceability_build:
-        description: Build directory passed to generate_traceability.sh
+        description: Build directory passed to generate_traceability.sh (must be under out/ — BUILD-DIR-001)
         required: false
         type: string
-        default: build
+        default: out/build
 
 permissions:
   contents: read
@@ -88,6 +88,11 @@ jobs:
             PASS=$(python3 -c "import json,sys; d=json.load(open('external-audit-artifacts/exploit_wiring_state.json')); sys.exit(0 if d.get('pass', d.get('passed', False)) else 1)" 2>/dev/null)
             if [ $? -ne 0 ]; then
               echo "::error::Exploit wiring check FAILED — audit bundle contains unwired tests"
+              # CAAS-04: fail-closed. Previously this only emitted ::error:: and let the
+              # job pass — relying solely on the upstream Embed step. Make the surface
+              # step enforce too (defense-in-depth; an unwired exploit PoC must never
+              # ship in an audit bundle).
+              exit 1
             else
               echo "::notice::Exploit wiring check passed"
             fi

@@ -93,22 +93,32 @@ jobs:
                   print(f"::error::{label} not found — evidence missing")
                   failed = True
                   return
-              try:
-                  data = json.loads(p.read_text())
-              except Exception as e:
-                  print(f"::error::{label} parse error: {e}")
-                  failed = True
-                  return
-
               now = datetime.now(timezone.utc)
 
-              # Prefer the JSON content's own generated_at timestamp — it reflects
-              # when the bundle was actually *produced*, not when it was committed.
-              # Git commit date drifts when content is stable (no-op commits skipped).
-              ts_str = _parse_generated_at(data)
-              date_source = "json:generated_at"
+              # CAAS-01 fix: only JSON evidence carries an embedded generated_at
+              # timestamp. Markdown (and any non-.json) evidence does not, so calling
+              # json.loads() on it raised and marked the WHOLE gate failed — leaving
+              # this scheduled check permanently red and masking real staleness of the
+              # JSON bundles. Parse JSON only for .json files; for everything else fall
+              # straight through to the git commit date.
+              ts_str = None
+              date_source = ""
+              if p.suffix == ".json":
+                  try:
+                      data = json.loads(p.read_text())
+                  except Exception as e:
+                      print(f"::error::{label} parse error: {e}")
+                      failed = True
+                      return
+                  # Prefer the JSON content's own generated_at timestamp — it reflects
+                  # when the bundle was actually *produced*, not when it was committed.
+                  # Git commit date drifts when content is stable (no-op commits skipped).
+                  ts_str = _parse_generated_at(data)
+                  date_source = "json:generated_at"
+
               if not ts_str:
-                  # Fall back to git commit date only when the document has no timestamp.
+                  # Markdown evidence, or JSON without an embedded timestamp: use the
+                  # git commit date.
                   result = subprocess.run(
                       ["git", "log", "-1", "--format=%cI", "--", path_str],
                       capture_output=True, text=True, timeout=30,
