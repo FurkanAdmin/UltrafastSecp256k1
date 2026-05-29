@@ -170,9 +170,9 @@ static void test_schnorr_batch_verify() {
     CHECK(invalid.size() == 1 && invalid[0] == 2,
           "Schnorr batch identify: correctly finds sig #2");
 
-    // Empty batch
-        CHECK(schnorr_batch_verify(static_cast<const SchnorrBatchEntry*>(nullptr), 0),
-            "Schnorr batch: empty = true");
+    // Empty batch — fail-CLOSED (SEC-NEW-005, cd5e14b6): n==0 returns false.
+    CHECK(!schnorr_batch_verify(static_cast<const SchnorrBatchEntry*>(nullptr), 0),
+            "Schnorr batch: empty = false (fail-closed, SEC-NEW-005)");
 
     // Single entry
     std::vector<SchnorrBatchEntry> const single = {entries[0]};

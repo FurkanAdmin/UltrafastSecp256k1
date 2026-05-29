@@ -143,10 +143,13 @@ static void test_schnorr_batch_verify() {
               "identify_invalid finds corrupted index");
     }
 
-    // Empty batch
+    // Empty batch — internal C++ batch verify is fail-CLOSED (SEC-NEW-005, cd5e14b6):
+    // secp256k1::schnorr_batch_verify({}) returns false. (Note: the C ABI
+    // ufsecp_schnorr_batch_verify returns UFSECP_OK for n=0 by design — a separate,
+    // intentional divergence; this checks the internal C++ API.)
     {
         std::vector<secp256k1::SchnorrBatchEntry> const empty;
-        CHECK(secp256k1::schnorr_batch_verify(empty), "empty batch -> true");
+        CHECK(!secp256k1::schnorr_batch_verify(empty), "empty batch -> false (fail-closed, SEC-NEW-005)");
     }
 
     // Single entry

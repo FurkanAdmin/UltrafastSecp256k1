@@ -2447,11 +2447,13 @@ static void test_batch_verify() {
     bad_schnorr[1].message[0] ^= 0xFF;
     CHECK(!secp256k1::schnorr_batch_verify(bad_schnorr), "Schnorr batch detects invalid");
     
-    // 32.6: Empty batch
-    CHECK(secp256k1::ecdsa_batch_verify(std::vector<secp256k1::ECDSABatchEntry>{}),
-          "ECDSA empty batch verify");
-    CHECK(secp256k1::schnorr_batch_verify(std::vector<secp256k1::SchnorrBatchEntry>{}),
-          "Schnorr empty batch verify");
+    // 32.6: Empty batch — fail-CLOSED (SEC-NEW-005, cd5e14b6): internal C++ batch
+    // verify returns false for n==0 (not vacuously true). An empty signature set
+    // must never report as verified.
+    CHECK(!secp256k1::ecdsa_batch_verify(std::vector<secp256k1::ECDSABatchEntry>{}),
+          "ECDSA empty batch verify returns false (fail-closed)");
+    CHECK(!secp256k1::schnorr_batch_verify(std::vector<secp256k1::SchnorrBatchEntry>{}),
+          "Schnorr empty batch verify returns false (fail-closed)");
 }
 
 // ============================================================================
