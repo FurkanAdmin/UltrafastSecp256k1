@@ -281,3 +281,19 @@ verifies it through a GPU controller and a CPU controller, failing on any per-ro
 verdict mismatch. In our local GPU CI (`gpu-selfhosted.yml`) the same target runs
 as a `ctest` gate (`lbtc_consensus_diff`); it is local-only because GPU hardware
 is not available on GitHub-hosted runners.
+
+### Measured throughput (RTX 5060 Ti, 2026-05-30)
+
+Measured with `bench_lbtc_batch` (batch = 1 048 576 rows, best-of-10, turbo-locked,
+`taskset -c 0 nice -20`); artifact:
+`benchmarks/gpu/cuda/rtx-50xx/lbtc_batch_verify_rtx5060ti_20260530.txt`.
+
+| Batch verify | GPU (CUDA) | CPU bridge fallback | GPU speedup |
+|--------------|-----------:|--------------------:|------------:|
+| ECDSA   | **3.56 M sig/s** (281 ns/sig) | 0.02 M sig/s | ~177× |
+| Schnorr | **4.53 M sig/s** (221 ns/sig) | 0.04 M sig/s | ~104× |
+
+libsecp256k1 has no GPU batch-verify path, so the CPU column is the bridge's own
+fallback (the consensus reference). The GPU verdict matches that reference
+bit-for-bit (`test_lbtc_consensus_diff`), so this is throughput, not a new
+correctness claim. OpenCL/Metal throughput: not yet measured — benchmark required.

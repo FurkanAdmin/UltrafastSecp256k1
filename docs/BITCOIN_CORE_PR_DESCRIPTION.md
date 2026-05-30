@@ -45,7 +45,7 @@ RelWithDebInfo will show a small (~0.5–1.0%) ConnectBlock slowdown due to
 larger code footprint (~1.3 MB vs libsecp's ~400 KB → i-cache pressure).
 
 Full benchmark data and methodology: `docs/BITCOIN_CORE_BENCH_RESULTS.json`
-and `docs/bench_unified_2026-05-23_gcc14_x86-64.json`.
+and `docs/bench_unified_2026-05-30_gcc14_x86-64.json`.
 
 ## Security properties
 
@@ -86,16 +86,16 @@ library in production for Silent Payments (BIP-352) GPU scanning.
 
 ### CT signing throughput (GCC 14.2.0 — CT-vs-CT, production-equivalent)
 
-All numbers from `docs/bench_unified_2026-05-23_gcc14_x86-64.json`
+All numbers from `docs/bench_unified_2026-05-30_gcc14_x86-64.json`
 (Intel i5-14400F, turbo lock CONFIRMED, core pinned, 500 warmup, 11 passes, IQR trimming):
 
 | Compiler | CT ECDSA sign | CT Schnorr sign | Notes |
 |---|---|---|---|
-| **GCC 14.2.0 + LTO** | **+32% vs libsecp (1.32×)** | **+27% vs libsecp (1.27×)** | CT-vs-CT, canonical controlled run |
+| **GCC 14.2.0 + LTO** | **+33% vs libsecp (1.33×)** | **+26% vs libsecp (1.26×)** | CT-vs-CT, canonical controlled run |
 | Clang 19 (archived, 2026-03-24) | +33% vs libsecp | ~+9% vs libsecp | Archived; not a current controlled run |
 
 Bitcoin Core Linux CI uses GCC; the GCC 14 row is the relevant metric.
-Full raw data: `docs/bench_unified_2026-05-23_gcc14_x86-64.json`.
+Full raw data: `docs/bench_unified_2026-05-30_gcc14_x86-64.json`.
 
 ### ConnectBlock Schnorr: −17% regression (native C++ API, unique pubkeys)
 
@@ -145,7 +145,7 @@ The ABI layer is the production-safe surface.
 
 CT signing results were collected with: turbo off, taskset -c 0, nice -20, 500
 warmup/op, 11 passes, IQR outlier removal. Compiler: GCC 14.2.0, Release + LTO.
-Canonical data: `docs/bench_unified_2026-05-23_gcc14_x86-64.json`. ConnectBlock
+Canonical data: `docs/bench_unified_2026-05-30_gcc14_x86-64.json`. ConnectBlock
 integration data (hard turbo lock confirmed, intel_pstate/no_turbo=1,
 governor=performance, taskset -c 0, nice -20, 2026-05-12):
 `docs/BITCOIN_CORE_BENCH_RESULTS.json`.

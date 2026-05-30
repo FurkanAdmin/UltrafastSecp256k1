@@ -52,7 +52,16 @@ inline __attribute__((always_inline)) void DoNotOptimize(T const& value) {
 
 template <typename T>
 inline __attribute__((always_inline)) void DoNotOptimize(T& value) {
+#if defined(__clang__)
     asm volatile("" : "+r,m"(value) : : "memory");
+#else
+    // GCC: list the memory alternative first. With "+r,m" GCC may try the
+    // register alternative for a payload that does not fit in a register and
+    // then abort LTO ltrans with "impossible constraint in 'asm'". "+m,r" makes
+    // GCC prefer memory (always valid); register-sized scalar/pointer payloads
+    // still get a register, so the measured codegen is unchanged.
+    asm volatile("" : "+m,r"(value) : : "memory");
+#endif
 }
 
 inline __attribute__((always_inline)) void ClobberMemory() {

@@ -188,20 +188,20 @@ Full data: `docs/BITCOIN_CORE_BENCH_RESULTS.json` (commit `48e7c02f`, 2026-05-12
 ### CT Signing — Compiler Results (Material Disclosure)
 
 CT signing performance on GCC 14.2.0 (Linux default for Bitcoin Core CI),
-from `docs/bench_unified_2026-05-23_gcc14_x86-64.json`
+from `docs/bench_unified_2026-05-30_gcc14_x86-64.json`
 (Intel i5-14400F, turbo lock CONFIRMED: intel_pstate/no_turbo=1, governor=performance,
 core pinned (taskset -c 0 nice -20), 500 warmup, 11 passes, IQR trimming):
 
 | Compiler | CT ECDSA sign | CT Schnorr sign | Canonical artifact |
 |----------|:---:|:---:|---|
-| **GCC 14.2.0** (Linux default) | **1.32× faster** (+32%) | **1.27× faster** (+27%) | `docs/bench_unified_2026-05-23_gcc14_x86-64.json` |
+| **GCC 14.2.0** (Linux default) | **1.33× faster** (+33%) | **1.26× faster** (+26%) | `docs/bench_unified_2026-05-30_gcc14_x86-64.json` |
 | Clang 19 (archived, 2026-03-24) | 1.33× faster (+33%) | ~1.09× faster | `docs/BENCHMARKS.md §archived` — not a current controlled run |
 
 > **Two benchmark sets, two different measurements:**
-> - `bench_unified` CT-vs-CT rows (above): isolate the raw CT signing primitive (RFC6979 + CT generator mul + CT scalar inverse). GCC 14.2.0: **1.32× ECDSA / 1.27× Schnorr** faster (turbo lock CONFIRMED, intel_pstate/no_turbo=1; `canonical_numbers.json` `ct_signing_gcc`, 2026-05-23 artifact).
+> - `bench_unified` CT-vs-CT rows (above): isolate the raw CT signing primitive (RFC6979 + CT generator mul + CT scalar inverse). GCC 14.2.0: **1.33× ECDSA / 1.26× Schnorr** faster (turbo lock CONFIRMED, intel_pstate/no_turbo=1; `canonical_numbers.json` `ct_signing_gcc`, 2026-05-30 artifact).
 > - `bench_bitcoin SignTransaction*` rows: cover the full Bitcoin Core transaction-signing path including context-blinding cache and pre-computed generator tables. GCC 14.2.0: **~1.10× faster** (SignTransactionECDSA 1.10×, SignTransactionSchnorr 1.10×; SignSchnorrWithMerkleRoot 1.35×; `canonical_numbers.json` `taproot_signing` / `docs/BITCOIN_CORE_BENCH_RESULTS.json`).
 >
-> Both are correct — they measure different scopes. The full-path `SignTransaction*` numbers (~1.10×) are the Bitcoin Core-relevant ones; the CT-primitive numbers (1.27–1.32×) confirm no scalar-inverse regression on GCC 14.
+> Both are correct — they measure different scopes. The full-path `SignTransaction*` numbers (~1.10×) are the Bitcoin Core-relevant ones; the CT-primitive numbers (1.26–1.33×) confirm no scalar-inverse regression on GCC 14.
 
 ### Without-LTO gap — root causes and residual size delta
 
