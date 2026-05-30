@@ -115,6 +115,29 @@ if(SECP256K1_USE_ULTRAFAST)
     message(STATUS "secp256k1-fast: ✅ SECP256K1_USE_ULTRAFAST=ON — Bitcoin Core secondary backend mode activated")
 endif()
 
+# -- libbitcoin single-flag entry point -----------------------------------------
+# Minimal node profile for libbitcoin (and any node that wants GPU/CPU batch
+# signature offload). Activates the drop-in libsecp256k1 shim + the libsecp
+# contract (CT enforced, strict ABI), compiles the GPU/CPU batch script-signature
+# bridge + BIP-352 scan into the central C ABI library, and turns OFF everything
+# a node integration does not need. One flag is all libbitcoin sets.
+option(SECP256K1_BUILD_LIBBITCOIN
+       "[libbitcoin] Minimal node profile: shim + GPU/CPU batch script-sig bridge + BIP-352; extras off" OFF)
+if(SECP256K1_BUILD_LIBBITCOIN)
+    # libsecp256k1-compatible contract.
+    set(SECP256K1_BUILD_SHIM   ON)
+    set(SECP256K1_REQUIRE_CT   ON)
+    set(UFSECP_BITCOIN_STRICT  ON)
+    add_compile_definitions(SECP256K1_CORE_BACKEND_MODE=1)
+    # Minimal surface — drop everything not needed by a node.
+    set(SECP256K1_BUILD_TESTS    OFF)
+    set(SECP256K1_BUILD_BENCH    OFF)
+    set(SECP256K1_BUILD_EXAMPLES OFF)
+    set(SECP256K1_BUILD_JAVA     OFF)
+    set(SECP256K1_BUILD_ETHEREUM OFF)
+    message(STATUS "secp256k1-fast: ✅ libbitcoin profile — shim + batch script-sig bridge + BIP-352 (minimal surface)")
+endif()
+
 # x86-64 -march override: use "x86-64-v3" in CI with ccache to avoid SIGILL
 # when cached objects from a different runner CPU are reused.  Empty = native.
 set(SECP256K1_MARCH "" CACHE STRING "x86-64 -march override (empty = auto-detect)")

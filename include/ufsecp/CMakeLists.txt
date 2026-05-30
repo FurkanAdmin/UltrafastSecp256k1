@@ -55,6 +55,15 @@ if(TARGET secp256k1_gpu_host)
     set(UFSECP_GPU_IMPL_SRC "${ULTRAFAST_ROOT}/src/cpu/src/ufsecp_gpu_impl.cpp")
 endif()
 
+# libbitcoin acceleration bridge — compiled INTO this C ABI library (central
+# source, not a separate lib) under the libbitcoin profile. Provides the
+# ufsecp_lbtc_* batch script-signature verify + BIP-352 scan entry points,
+# dispatching to GPU (when the host layer is present) with CPU fallback.
+set(UFSECP_LBTC_SRC "")
+if(SECP256K1_BUILD_LIBBITCOIN)
+    set(UFSECP_LBTC_SRC "${ULTRAFAST_ROOT}/compat/libbitcoin_bridge/src/ufsecp_libbitcoin.cpp")
+endif()
+
 # Helper: configure a target with the right includes/definitions
 function(ufsecp_configure tgt)
     target_include_directories(${tgt}
@@ -97,11 +106,23 @@ function(ufsecp_configure tgt)
             ${ULTRAFAST_ROOT}/src/gpu/include
         )
     endif()
+
+    # libbitcoin bridge: expose its header (PUBLIC so consumers can include it)
+    # and enable GPU dispatch only when the GPU host layer is in the build.
+    if(SECP256K1_BUILD_LIBBITCOIN)
+        target_include_directories(${tgt} PUBLIC
+            $<BUILD_INTERFACE:${ULTRAFAST_ROOT}/compat/libbitcoin_bridge/include>
+            $<INSTALL_INTERFACE:include>
+        )
+        if(TARGET secp256k1_gpu_host)
+            target_compile_definitions(${tgt} PRIVATE UFSECP_LBTC_WITH_GPU)
+        endif()
+    endif()
 endfunction()
 
 # Shared library
 if(UFSECP_BUILD_SHARED)
-    add_library(ufsecp_shared SHARED ${UFSECP_IMPL_SRC} ${UFSECP_GPU_IMPL_SRC})
+    add_library(ufsecp_shared SHARED ${UFSECP_IMPL_SRC} ${UFSECP_GPU_IMPL_SRC} ${UFSECP_LBTC_SRC})
     set_target_properties(ufsecp_shared PROPERTIES OUTPUT_NAME ufsecp)
     ufsecp_configure(ufsecp_shared)
     # VER-008: Explicit SOVERSION/VERSION ensures Linux ldconfig symlinks work
@@ -134,7 +155,7 @@ endif()
 
 # Static library (always useful for embedding)
 if(UFSECP_BUILD_STATIC)
-    add_library(ufsecp_static STATIC ${UFSECP_IMPL_SRC} ${UFSECP_GPU_IMPL_SRC})
+    add_library(ufsecp_static STATIC ${UFSECP_IMPL_SRC} ${UFSECP_GPU_IMPL_SRC} ${UFSECP_LBTC_SRC})
     # On Windows avoid output collision with shared import lib
     if(WIN32 AND UFSECP_BUILD_SHARED)
         set_target_properties(ufsecp_static PROPERTIES OUTPUT_NAME ufsecp_s)
