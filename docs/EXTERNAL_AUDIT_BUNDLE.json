@@ -200,7 +200,7 @@
           {
             "findings": [
               {
-                "message": "1 files modified/deleted since graph build (2026-05-30T08:40:25)",
+                "message": "1 files modified/deleted since graph build (2026-05-30T09:32:31)",
                 "severity": "WARN"
               },
               {
@@ -376,7 +376,7 @@
           {
             "findings": [
               {
-                "message": "3 changed files have matching docs",
+                "message": "1 changed files have matching docs",
                 "severity": "PASS"
               }
             ],
@@ -592,15 +592,15 @@
                 "severity": "PASS"
               },
               {
-                "message": "5 src/cpu/*.cpp file(s) newer than source graph DB (rebuild recommended): ['src/cpu/src/ufsecp_impl.cpp', 'src/cpu/src/schnorr.cpp', 'src/cpu/tests/test_comprehensive.cpp']",
-                "severity": "WARN"
+                "message": "Source graph DB is up-to-date relative to src/cpu/ sources",
+                "severity": "PASS"
               },
               {
                 "message": "Source graph tables: ai_handlers, ai_tasks, analysis_scores, audit_coverage, backend_map, call_edges, classes, config_files, config_keys, constants\u2026",
                 "severity": "INFO"
               },
               {
-                "message": "Source graph \"files\" has 1324 rows (threshold: 200)",
+                "message": "Source graph \"files\" has 1330 rows (threshold: 200)",
                 "severity": "PASS"
               }
             ],
@@ -614,11 +614,11 @@
           "value": {
             "dirty": true,
             "ref": "dev",
-            "sha": "97a1790374bdd47bf95d3f0e9ad6dffd0d7467bb",
-            "short": "97a1790374"
+            "sha": "8f051df5a34d03ca9d37960490627d9df07fe414",
+            "short": "8f051df5a3"
           }
         },
-        "generated_at": "2026-05-30T08:42:07.313001+00:00",
+        "generated_at": "2026-05-30T09:43:06.972594+00:00",
         "platform": "Linux",
         "provenance": {
           "build_flags": {
@@ -635,12 +635,12 @@
             },
             "flags_hash": "f6054a07e934d755"
           },
-          "collected_at": "2026-05-30T08:42:07.312965+00:00",
+          "collected_at": "2026-05-30T09:43:06.972536+00:00",
           "git": {
             "dirty": true,
             "ref": "dev",
-            "sha": "97a1790374bdd47bf95d3f0e9ad6dffd0d7467bb",
-            "short": "97a1790374"
+            "sha": "8f051df5a34d03ca9d37960490627d9df07fe414",
+            "short": "8f051df5a3"
           },
           "platform": {
             "machine": "x86_64",
@@ -661,7 +661,7 @@
           },
           "version": "4.1.0"
         },
-        "run_id": "audit_gate-97a1790374-20260530T084207",
+        "run_id": "audit_gate-8f051df5a3-20260530T094306",
         "runner": "audit_gate",
         "schema_version": "1.0.0",
         "sections": [
@@ -816,7 +816,7 @@
               {
                 "check_id": "p6__graph_freshness",
                 "severity": "advisory:medium",
-                "title": "1 files modified/deleted since graph build (2026-05-30T08:40:25)"
+                "title": "1 files modified/deleted since graph build (2026-05-30T09:32:31)"
               },
               {
                 "check_id": "p6__graph_freshness",
@@ -1030,7 +1030,7 @@
               {
                 "check_id": "p10__doc-code_pairing",
                 "severity": "pass",
-                "title": "3 changed files have matching docs"
+                "title": "1 changed files have matching docs"
               }
             ],
             "name": "P10: Doc-Code Pairing",
@@ -1284,8 +1284,8 @@
               },
               {
                 "check_id": "g-12__source_graph_quality",
-                "severity": "advisory:medium",
-                "title": "5 src/cpu/*.cpp file(s) newer than source graph DB (rebuild recommended): ['src/cpu/src/ufsecp_impl.cpp', 'src/cpu/src/schnorr.cpp', 'src/cpu/tests/test_comprehensive.cpp']"
+                "severity": "pass",
+                "title": "Source graph DB is up-to-date relative to src/cpu/ sources"
               },
               {
                 "check_id": "g-12__source_graph_quality",
@@ -1295,29 +1295,29 @@
               {
                 "check_id": "g-12__source_graph_quality",
                 "severity": "pass",
-                "title": "Source graph \"files\" has 1324 rows (threshold: 200)"
+                "title": "Source graph \"files\" has 1330 rows (threshold: 200)"
               }
             ],
             "name": "G-12: Source Graph Quality",
-            "verdict": "PASS with advisory"
+            "verdict": "PASS"
           }
         ],
         "summary": {
-          "advisory": 50,
+          "advisory": 49,
           "blocking": 0,
           "info": 43,
           "sections": 26,
           "skipped_sections": 0,
           "total_findings": 96,
-          "warnings": 7
+          "warnings": 6
         },
         "verdict": "PASS with advisory"
       },
       "passing": true,
       "required": true,
       "returncode": 0,
-      "stderr_sha256": "e6a771e8d681cfd460a8b9433d4ff6cc5f715466b23ccce7a5ea5758c8fe2ee0",
-      "stdout_sha256": "db16611198ad1005d72ccb32103222b13550e4a86068abb160ca3f30f54cd11b"
+      "stderr_sha256": "3ada8193e0408068d7394898e7c8a1c16ab375cf51e0fe8e40b161e1df54b584",
+      "stdout_sha256": "066d11e1f4c45f81bb6c803ed912f41c4065b81759cb90eaee9b266196f64922"
     },
     {
       "name": "audit_gap_report_strict",
@@ -1619,13 +1619,13 @@
         "gates_skipped": 0,
         "gates_total": 8,
         "overall_pass": true,
-        "timestamp": "2026-05-30T08:42:09.988150+00:00"
+        "timestamp": "2026-05-30T09:43:09.712221+00:00"
       },
       "passing": true,
       "required": true,
       "returncode": 0,
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stdout_sha256": "9da7aeb2e9008759a47793ae69ed1189a8bdf24c02649aae890bf7ed1b620be6"
+      "stdout_sha256": "2c78338a07af50d59b8a345fe29f9b35c2aa687049ee286d2993eaf8013e461e"
     },
     {
       "name": "supply_chain_gate",
@@ -1671,19 +1671,19 @@
         "checks_total": 5,
         "failing_checks": [],
         "overall_pass": true,
-        "timestamp": "2026-05-30T08:42:10.023402+00:00"
+        "timestamp": "2026-05-30T09:43:09.748498+00:00"
       },
       "passing": true,
       "required": true,
       "returncode": 0,
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stdout_sha256": "0e5c94d29727dfc953ed03f2742dcc1ed43b9c4c6eb1756d1f7f685bc0f7b32a"
+      "stdout_sha256": "f97b6aff104ff20d18eee8d6b691225dc402290a86b8a63b1dfe581715c59b1f"
     }
   ],
-  "generated_at": "2026-05-30T08:42:10.035072+00:00",
+  "generated_at": "2026-05-30T09:43:09.763439+00:00",
   "git": {
     "branch": "dev",
-    "commit": "97a1790374bdd47bf95d3f0e9ad6dffd0d7467bb",
+    "commit": "8f051df5a34d03ca9d37960490627d9df07fe414",
     "dirty": true
   },
   "repo_root": "/home/shrek/Secp256k1/Secp256K1fast/libs/UltrafastSecp256k1",
