@@ -1,5 +1,26 @@
 # Audit Changelog
 
+## 2026-05-30 — GPU batch-verify consensus differential (libbitcoin bridge), local-only CAAS gate
+
+- **CONSENSUS-GPU-01** (`compat/libbitcoin_bridge/tests/test_lbtc_consensus_diff.cpp`): new
+  GPU-vs-CPU consensus differential for the libbitcoin batch script-signature verification
+  bridge. Builds one mixed corpus (valid + 6 rejection classes: corrupted sig, tampered
+  message, high-bit/zero `r`/`R.x`, `s = 0xff..ff ≥ n`, flipped pubkey) and verifies it
+  through a GPU controller and a CPU controller, asserting the per-row accept/reject verdict
+  matches **bit-for-bit** (ECDSA + Schnorr, 20 000 rows each). The CPU path is itself gated
+  against libsecp256k1 (`cross_libsecp256k1` + reverse bridge), so GPU==CPU here means
+  GPU==libsecp transitively. The GPU path for block validation is consensus-bearing — any
+  divergence is a consensus bug, so this gate is `advisory=false` where a GPU is present and
+  advisory-skips (exit 77) where it is not.
+- **Wiring (local-CI only)**: registered as a `ctest` (`lbtc_consensus_diff`, labels
+  `gpu;local-ci;consensus`, `SKIP_RETURN_CODE 77`) behind `SECP256K1_BUILD_LIBBITCOIN` +
+  `SECP256K1_BUILD_LIBBITCOIN_TESTS`, and run as a dedicated step in `gpu-selfhosted.yml`
+  (self-hosted RTX 5060 Ti). GPU is local-only, so this never runs on GitHub-hosted CI.
+- **Standalone**: the same target is a standalone runnable (`STANDALONE_TEST` main) built
+  from the central source, so integrators can independently reproduce the GPU==CPU proof.
+- Verified locally (RTX 5060 Ti, CUDA): ECDSA + Schnorr both `GPU==CPU bit-for-bit on 20000
+  rows`, identical reject counts. No `src/cpu/src` / shim change → security-fix-test gate N/A.
+
 ## 2026-05-29 — Follow-up review fixes: shim secret-erase sweep, RT-04 test, CAAS/doc gates, byte-identical tagged-hash perf
 
 ### Round 1 (pushed `ef5506fd`)

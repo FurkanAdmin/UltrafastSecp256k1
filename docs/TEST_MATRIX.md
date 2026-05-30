@@ -115,6 +115,7 @@ lags behind the generated validation surfaces, prefer the generated counts.
 | `metal/app/bench_metal.mm` | Metal | `secp256k1_metal_bench_full`: comprehensive Metal benchmark |
 | `compat/libsecp256k1_shim/tests/shim_test.cpp` | CPU | `secp256k1_shim_test`: libsecp256k1 API compatibility shim |
 | `compat/libbitcoin_bridge/tests/test_lbtc_bridge.cpp` | CPU | `lbtc_bridge`: libbitcoin batch script-sig verify (ECDSA/Schnorr) + opaque-key correlation, CPU reference path |
+| `compat/libbitcoin_bridge/tests/test_lbtc_consensus_diff.cpp` | GPU (local-only) | `lbtc_consensus_diff`: GPU-vs-CPU consensus differential — every script-sig verdict must match bit-for-bit (ECDSA/Schnorr, mixed corpus). `SKIP_RETURN_CODE 77` (no GPU); runs in `gpu-selfhosted.yml` only |
 | `audit/test_gpu_abi_gate.cpp` | GPU (all) | `gpu_abi_gate`: GPU C ABI surface test -- discovery, lifecycle, NULL safety, error strings, generator_mul equivalence |
 | `audit/test_gpu_ops_equivalence.cpp` | GPU (all) | `gpu_ops_equivalence`: GPU vs CPU reference for all 6 first-wave ops (skips UNSUPPORTED) |
 | `audit/test_gpu_host_api_negative.cpp` | GPU (all) | `gpu_host_api_negative`: NULL ptrs, count=0 no-ops, invalid backend/device, error strings |

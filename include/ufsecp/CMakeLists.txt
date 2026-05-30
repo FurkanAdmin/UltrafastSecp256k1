@@ -207,6 +207,37 @@ if(SECP256K1_BUILD_LIBBITCOIN AND SECP256K1_BUILD_LIBBITCOIN_BENCH)
     message(STATUS "  libbitcoin batch bench: ON (bench_lbtc_batch, central source)")
 endif()
 
+# libbitcoin GPU-vs-CPU consensus differential — a standalone runnable that lets
+# integrators (and our local-only GPU CI) prove the GPU verdict matches the CPU
+# reference bit-for-bit. GPU is local-only, so this never runs in GitHub CI; it
+# advisory-skips (exit 77) when no GPU backend is present. Built from the central
+# source exactly like the bench (no separate ufsecp library involved).
+option(SECP256K1_BUILD_LIBBITCOIN_TESTS
+       "Build the libbitcoin GPU/CPU consensus differential (test_lbtc_consensus_diff)" OFF)
+if(SECP256K1_BUILD_LIBBITCOIN AND SECP256K1_BUILD_LIBBITCOIN_TESTS)
+    add_executable(test_lbtc_consensus_diff
+        "${ULTRAFAST_ROOT}/compat/libbitcoin_bridge/tests/test_lbtc_consensus_diff.cpp"
+        ${UFSECP_IMPL_SRC} ${UFSECP_GPU_IMPL_SRC} ${UFSECP_LBTC_SRC})
+    target_compile_definitions(test_lbtc_consensus_diff
+        PRIVATE UFSECP_BUILDING UFSECP_STATIC_LIB STANDALONE_TEST)
+    target_include_directories(test_lbtc_consensus_diff PRIVATE
+        ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CPU_INCLUDE_DIR} ${SHARED_INCLUDE_DIR}
+        "${ULTRAFAST_ROOT}/compat/libbitcoin_bridge/include")
+    target_link_libraries(test_lbtc_consensus_diff PRIVATE fastsecp256k1)
+    if(TARGET secp256k1_gpu_host)
+        target_link_libraries(test_lbtc_consensus_diff PRIVATE secp256k1_gpu_host)
+        target_include_directories(test_lbtc_consensus_diff PRIVATE ${ULTRAFAST_ROOT}/src/gpu/include)
+        target_compile_definitions(test_lbtc_consensus_diff PRIVATE UFSECP_LBTC_WITH_GPU)
+    endif()
+    # Registered as a CTest so local CI (which has a GPU) gates on it. A 77 exit
+    # (no GPU) is treated as "skipped", not a failure.
+    include(CTest)
+    add_test(NAME lbtc_consensus_diff COMMAND test_lbtc_consensus_diff)
+    set_tests_properties(lbtc_consensus_diff PROPERTIES SKIP_RETURN_CODE 77 LABELS "gpu;local-ci;consensus")
+    message(STATUS "  libbitcoin consensus diff: ON (test_lbtc_consensus_diff, central source)")
+endif()
+
 # -- Install (standalone only -- skip when used as sub-project) --------------
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)

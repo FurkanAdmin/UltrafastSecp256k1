@@ -256,3 +256,28 @@ cmake --preset cpu-release -DSECP256K1_BUILD_CUDA=ON \
 # Verified (RTX 5060 Ti): all eight OFF builds; every optional kernel stripped;
 # ECDSA + Schnorr batch verify still pass.
 ```
+
+## Verifying GPU == CPU consensus (batch sig verify)
+
+The GPU batch verification path is consensus-bearing: for block validation the
+GPU verdict on every script signature must match the CPU reference bit-for-bit
+(the CPU path is itself gated against libsecp256k1). A standalone differential is
+provided so an integrator can reproduce that proof on their own hardware:
+
+```bash
+# Build the consensus differential from the central source (CUDA shown; the
+# libbitcoin object-mode profile compiles the bridge + GPU host layer in-tree).
+cmake -S . -B out/lbtc-consensus -G Ninja -DCMAKE_BUILD_TYPE=Release \
+    -DSECP256K1_BUILD_LIBBITCOIN=ON -DSECP256K1_BUILD_LIBBITCOIN_TESTS=ON \
+    -DSECP256K1_BUILD_CUDA=ON
+cmake --build out/lbtc-consensus --target test_lbtc_consensus_diff -j"$(nproc)"
+
+# Run it. Exit 0 = GPU==CPU bit-for-bit; exit 77 = no GPU (skipped).
+./out/lbtc-consensus/include/ufsecp/test_lbtc_consensus_diff
+```
+
+It builds one mixed corpus (valid signatures plus six rejection classes) and
+verifies it through a GPU controller and a CPU controller, failing on any per-row
+verdict mismatch. In our local GPU CI (`gpu-selfhosted.yml`) the same target runs
+as a `ctest` gate (`lbtc_consensus_diff`); it is local-only because GPU hardware
+is not available on GitHub-hosted runners.

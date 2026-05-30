@@ -128,6 +128,30 @@ jobs:
           -E "^(ct_sidechannel|gpu_)" \
           2>&1 | tee -a /tmp/gpu-ci-artifacts/cpu_ctest_output.txt
 
+    # -- libbitcoin GPU/CPU consensus differential (local-only gate) ----------
+    # Consensus-bearing: for block validation the GPU verdict on every script
+    # signature MUST match the CPU reference bit-for-bit (the CPU path is itself
+    # gated against libsecp256k1, so GPU==CPU here means GPU==libsecp). Built
+    # from the libbitcoin object-mode profile — the exact surface integrators
+    # link — in an isolated build dir so the main gpu-ci targets are untouched.
+    # Self-hosted GPU only; never runs on GitHub-hosted CI. Exit 77 = no GPU =
+    # ctest "skipped" (SKIP_RETURN_CODE), not a failure. A verdict divergence
+    # fails the job.
+    - name: libbitcoin GPU/CPU consensus differential
+      run: |
+        cmake -S . -B out/lbtc-consensus \
+          -G Ninja \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DSECP256K1_BUILD_LIBBITCOIN=ON \
+          -DSECP256K1_BUILD_LIBBITCOIN_TESTS=ON \
+          -DSECP256K1_BUILD_CUDA=ON \
+          -DCMAKE_CUDA_ARCHITECTURES="89"
+        cmake --build out/lbtc-consensus --target test_lbtc_consensus_diff -j$(nproc)
+        ctest --test-dir out/lbtc-consensus/include/ufsecp \
+          -R "^lbtc_consensus_diff$" \
+          --output-on-failure \
+          2>&1 | tee /tmp/gpu-ci-artifacts/lbtc_consensus_diff.txt
+
     # -- P1 #4: Unified audit ------------------------------------------------
     - name: Unified audit
       if: >-
@@ -208,6 +232,7 @@ jobs:
             "gpu_environment.json",
             "gpu_ctest_output.txt",
             "cpu_ctest_output.txt",
+            "lbtc_consensus_diff.txt",
             "audit_report.json",
             "audit_report.txt",
             "benchmark_raw.txt",
