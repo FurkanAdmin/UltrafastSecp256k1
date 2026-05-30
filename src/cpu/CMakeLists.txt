@@ -33,7 +33,6 @@ set(SECP256K1_SOURCES
     src/ecdsa.cpp          # ECDSA sign/verify + RFC 6979
     src/schnorr.cpp        # Schnorr BIP-340 sign/verify
     src/multiscalar.cpp    # Multi-scalar multiplication (Strauss/Shamir)
-    src/batch_verify.cpp   # Batch ECDSA/Schnorr verification
     src/ecdh.cpp           # ECDH key exchange
     src/recovery.cpp       # ECDSA public key recovery
     # Bitcoin consensus layer (always needed for any Bitcoin-family backend)
@@ -169,6 +168,7 @@ if(SECP256K1_BUILD_PIPPENGER)
         src/pippenger.cpp        # Pippenger bucket method MSM (n > 128)
         src/ecmult_gen_comb.cpp  # Lim-Lee comb method for fast k*G
         src/batch_add_affine.cpp # Affine batch addition for sequential ECC search
+        src/batch_verify.cpp     # Batch ECDSA/Schnorr verify — calls msm() at N>=96
     )
     message(STATUS "Secp256k1: Pippenger/MSM module: ON")
 else()
@@ -433,9 +433,19 @@ if(SECP256K1_BUILD_SHIM)
             ${_SHIM_ROOT}/src/shim_ecdh.cpp
             ${_SHIM_ROOT}/src/shim_tagged_hash.cpp
             ${_SHIM_ROOT}/src/shim_ellswift.cpp
-            ${_SHIM_ROOT}/src/shim_batch_verify.cpp
-            ${_SHIM_ROOT}/src/shim_musig.cpp
         )
+        # Module-gated shim wrappers: only compile the shim ABI for modules that
+        # are actually built. Otherwise the unity TU references stripped symbols
+        # (secp256k1::msm, secp256k1::musig2_*) and the no-LTO link fails because
+        # there is no dead-code-elimination across the single translation unit.
+        if(SECP256K1_BUILD_PIPPENGER)
+            list(APPEND SECP256K1_SOURCES
+                ${_SHIM_ROOT}/src/shim_batch_verify.cpp)  # needs batch_verify.cpp -> msm()
+        endif()
+        if(SECP256K1_BUILD_MUSIG2)
+            list(APPEND SECP256K1_SOURCES
+                ${_SHIM_ROOT}/src/shim_musig.cpp)         # needs musig2.cpp
+        endif()
         message(STATUS "Secp256k1: Shim integrated into engine (libsecp256k1 parity mode)")
     else()
         message(WARNING "SECP256K1_BUILD_SHIM=ON but shim source not found at ${_SHIM_ROOT}")

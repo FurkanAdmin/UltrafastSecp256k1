@@ -1,5 +1,27 @@
 # Audit Changelog
 
+## 2026-05-30 — ECDSA pubkey-parse decompression cache + module-gated shim sources
+
+- **PARSE-CACHE** (`compat/libsecp256k1_shim/tests/test_shim_security_edge_cases.cpp`,
+  `test_pubkey_parse_decompression_cache`): `secp256k1_ec_pubkey_parse` decompresses a
+  compressed pubkey via `y = sqrt(x³+7)` — a full field exponentiation re-run on every
+  `CPubKey::Verify`. perf showed it as the dominant ECDSA-verify overhead vs libsecp on
+  reused-key workloads, while the Schnorr x-only path already caches its lift_x. Added a
+  thread-local `ShimPubkeyParseCache` (256 slots, FNV-1a over input bytes) in
+  `shim_pubkey.cpp` that returns the stored 64-byte decompressed data on a repeat parse and
+  skips the sqrt. Public data only — no secret material, no CT concern. New test asserts
+  cache hit==miss==create-reference, no cross-key collision/corruption, compressed/uncompressed
+  agreement, and that invalid input is never served from the cache as valid. Controlled
+  no-LTO/LTO A/B: VerifyScriptP2WPKH and ConnectBlockAllEcdsa flipped from a ~+3-5% no-LTO
+  gap to ultra-faster (key-reuse-amplified; see `docs/BITCOIN_CORE_BENCH_RESULTS.json`
+  `results_2026_05_30_parse_cache_samesession` for the caveat).
+- **Module-gated shim sources** (`src/cpu/CMakeLists.txt`): `shim_musig.cpp` is now gated on
+  `SECP256K1_BUILD_MUSIG2`, `shim_batch_verify.cpp` + `batch_verify.cpp` on
+  `SECP256K1_BUILD_PIPPENGER`, so a stripped Core-only profile no longer references
+  `secp256k1::msm` / `musig2_*` from the unity TU (was a no-LTO link failure). MuSig2 +
+  Pippenger remain ON for Bitcoin Core (its `key.cpp` uses `secp256k1_musig_*`, and
+  `musig2_key_agg` calls `msm`).
+
 ## 2026-05-30 — segwit P2WPKH hash160 decoupled from BIP-352 (no-LTO link fix)
 
 - **SHD-1..3** (`audit/test_regression_segwit_hash160_decouple.cpp`): `src/cpu/src/segwit.cpp`

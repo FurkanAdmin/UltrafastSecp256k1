@@ -24,6 +24,62 @@ using namespace secp256k1::fast;
 using secp256k1_shim_internal::point_to_pubkey_data;
 using secp256k1_shim_internal::pubkey_data_to_point;
 
+// -- Thread-local pubkey-parse (decompression) cache --------------------------
+// PERF: parsing a COMPRESSED pubkey computes y = sqrt(x^3 + 7) — a full field
+// square root that dominates the parse cost (~5% of a P2WPKH ECDSA verify, perf
+// 2026-05-30). Bitcoin Core re-parses the same pubkey on every CPubKey::Verify,
+// so reused-key workloads (wallets, ConnectBlock with few distinct keys) pay the
+// sqrt repeatedly. This cache stores the decompressed 64-byte pubkey->data keyed
+// on the raw input bytes; a repeat parse returns the bytes and skips the sqrt.
+//
+// Public data only — pubkeys are public, no secret material, no constant-time
+// concern (mirrors the verify-side ShimSchnorrCache in shim_schnorr.cpp). Only
+// SUCCESSFUL parses are cached; invalid inputs fall through and re-validate.
+// Unique-pubkey workloads pay only a ~64-byte slot write per miss (negligible
+// vs the sqrt saved on hits) — never a regression. The Schnorr x-only path
+// already caches its lift_x; this brings the ECDSA path to the same footing.
+namespace {
+struct ShimPubkeyParseCache {
+    static constexpr std::size_t SLOTS = 256;  // power of two for mask indexing
+    struct Slot {
+        std::uint64_t fp{0};
+        std::uint8_t  in[65]{};        // raw input bytes (33 compressed or 65 uncompressed)
+        std::uint8_t  inlen{0};
+        std::uint8_t  data[64]{};      // decompressed pubkey->data
+        bool          valid{false};
+    };
+    Slot slots[SLOTS]{};
+
+    // FNV-1a over (input bytes, length). Public data → no per-thread salt needed:
+    // a slot collision only forces a cache miss (re-validate), never a leak.
+    static std::uint64_t hash(const unsigned char* in, std::size_t n, std::size_t& idx) noexcept {
+        std::uint64_t h = 14695981039346656037ULL;
+        for (std::size_t i = 0; i < n; ++i) h = (h ^ in[i]) * 1099511628211ULL;
+        h = (h ^ n) * 1099511628211ULL;
+        idx = static_cast<std::size_t>(h & (SLOTS - 1));
+        return h | 1ULL;  // nonzero fingerprint
+    }
+    const std::uint8_t* get(const unsigned char* in, std::size_t n,
+                            std::size_t& idx, std::uint64_t& fp) const noexcept {
+        fp = hash(in, n, idx);
+        const Slot& s = slots[idx];
+        if (s.valid && s.fp == fp && s.inlen == n && std::memcmp(s.in, in, n) == 0)
+            return s.data;
+        return nullptr;
+    }
+    void put(const unsigned char* in, std::size_t n, std::size_t idx,
+             std::uint64_t fp, const std::uint8_t data[64]) noexcept {
+        Slot& s = slots[idx];
+        s.fp = fp;
+        s.inlen = static_cast<std::uint8_t>(n);
+        std::memcpy(s.in, in, n);
+        std::memcpy(s.data, data, 64);
+        s.valid = true;
+    }
+};
+thread_local ShimPubkeyParseCache s_pubkey_parse_cache;
+} // namespace
+
 extern "C" {
 
 int secp256k1_ec_pubkey_parse(
@@ -38,6 +94,19 @@ int secp256k1_ec_pubkey_parse(
     if (!input) {
         secp256k1_shim_call_illegal_cb(ctx, "secp256k1_ec_pubkey_parse: input is NULL");
         return 0;
+    }
+
+    // Decompression cache: on a repeated pubkey, return the stored 64-byte data
+    // and skip the parse (compressed path's sqrt is the hot cost). Computes the
+    // slot index / fingerprint once; reused by put() on a miss.
+    std::size_t cidx = 0;
+    std::uint64_t cfp = 0;
+    if (inputlen == 33 || inputlen == 65) {
+        if (const std::uint8_t* hit =
+                s_pubkey_parse_cache.get(input, inputlen, cidx, cfp)) {
+            std::memcpy(pubkey->data, hit, 64);
+            return 1;
+        }
     }
 
     if (inputlen == 33) {
@@ -61,6 +130,7 @@ int secp256k1_ec_pubkey_parse(
 
         auto pt = Point::from_affine(x, y);
         point_to_pubkey_data(pt, pubkey->data);
+        s_pubkey_parse_cache.put(input, inputlen, cidx, cfp, pubkey->data);
         return 1;
 
     } else if (inputlen == 65) {
@@ -83,6 +153,7 @@ int secp256k1_ec_pubkey_parse(
         }
         auto pt = Point::from_affine(x, y);
         point_to_pubkey_data(pt, pubkey->data);
+        s_pubkey_parse_cache.put(input, inputlen, cidx, cfp, pubkey->data);
         return 1;
     }
 

@@ -476,6 +476,79 @@ static void test_perf003_small_batch_schnorr_verify_correctness() {
 }
 
 // ---------------------------------------------------------------------------
+// PARSE-CACHE: secp256k1_ec_pubkey_parse caches the compressed-pubkey
+// decompression (y = sqrt(x^3+7)) keyed on the raw input bytes (shim_pubkey.cpp,
+// ShimPubkeyParseCache). Verify the cache returns identical, correct results on
+// repeat (hit == miss == create-reference), does not corrupt across distinct
+// keys, agrees with the uncompressed form, and still rejects invalid input
+// (invalid is never served from the cache as valid).
+// ---------------------------------------------------------------------------
+static void test_pubkey_parse_decompression_cache() {
+    printf("  [PARSE-CACHE] ec_pubkey_parse decompression cache correctness\n");
+    secp256k1_context* ctx = make_ctx_with_counting_cb();
+
+    const int N = 8;
+    uint8_t comp[N][33];
+    uint8_t uncomp[N][65];
+    secp256k1_pubkey ref[N];
+    for (int i = 0; i < N; ++i) {
+        uint8_t sk[32] = {};
+        sk[31] = (uint8_t)(i + 1);  // sk = 1..N (valid, distinct)
+        CHECK_TRUE(secp256k1_ec_pubkey_create(ctx, &ref[i], sk), "create ref pubkey");
+        size_t clen = 33, ulen = 65;
+        CHECK_TRUE(secp256k1_ec_pubkey_serialize(ctx, comp[i], &clen, &ref[i],
+                   SECP256K1_EC_COMPRESSED), "serialize compressed");
+        CHECK_TRUE(secp256k1_ec_pubkey_serialize(ctx, uncomp[i], &ulen, &ref[i],
+                   SECP256K1_EC_UNCOMPRESSED), "serialize uncompressed");
+        CHECK_EQ((int)clen, 33, "compressed length");
+        CHECK_EQ((int)ulen, 65, "uncompressed length");
+    }
+
+    // (1) Parse each compressed key twice: miss then hit. Both succeed and are
+    //     byte-identical, and equal the create() reference (cache is transparent).
+    for (int i = 0; i < N; ++i) {
+        secp256k1_pubkey a{}, b{};
+        CHECK_EQ(secp256k1_ec_pubkey_parse(ctx, &a, comp[i], 33), 1, "parse compressed (miss)");
+        CHECK_EQ(secp256k1_ec_pubkey_parse(ctx, &b, comp[i], 33), 1, "parse compressed (hit)");
+        CHECK_EQ(memcmp(a.data, b.data, 64), 0, "cache hit == miss (identical data)");
+        CHECK_EQ(memcmp(a.data, ref[i].data, 64), 0, "parsed == created reference");
+    }
+
+    // (2) Distinct keys must not collide/corrupt: all parsed results pairwise differ.
+    secp256k1_pubkey p[N];
+    for (int i = 0; i < N; ++i)
+        CHECK_EQ(secp256k1_ec_pubkey_parse(ctx, &p[i], comp[i], 33), 1, "re-parse compressed");
+    for (int i = 0; i < N; ++i)
+        for (int j = i + 1; j < N; ++j)
+            CHECK_TRUE(memcmp(p[i].data, p[j].data, 64) != 0,
+                       "distinct keys yield distinct data (no cache collision)");
+
+    // (3) Uncompressed form of the same key decompresses to the same point.
+    for (int i = 0; i < N; ++i) {
+        secp256k1_pubkey u{};
+        CHECK_EQ(secp256k1_ec_pubkey_parse(ctx, &u, uncomp[i], 65), 1, "parse uncompressed");
+        CHECK_EQ(memcmp(u.data, ref[i].data, 64), 0, "uncompressed == compressed point");
+    }
+
+    // (4) Invalid input (bad prefix) is rejected on first AND repeated parse — only
+    //     SUCCESSFUL parses are cached, so an invalid key is never served as valid.
+    uint8_t badprefix[33];
+    memcpy(badprefix, comp[0], 33);
+    badprefix[0] = 0x05;  // not 0x02/0x03 → invalid compressed prefix
+    secp256k1_pubkey bp{};
+    CHECK_EQ(secp256k1_ec_pubkey_parse(ctx, &bp, badprefix, 33), 0, "invalid prefix rejected");
+    CHECK_EQ(secp256k1_ec_pubkey_parse(ctx, &bp, badprefix, 33), 0,
+             "invalid prefix rejected on repeat (not cached as valid)");
+
+    // (5) After churn, the first key still parses correctly (cache integrity).
+    secp256k1_pubkey again{};
+    CHECK_EQ(secp256k1_ec_pubkey_parse(ctx, &again, comp[0], 33), 1, "first key still parses");
+    CHECK_EQ(memcmp(again.data, ref[0].data, 64), 0, "first key data unchanged after churn");
+
+    secp256k1_context_destroy(ctx);
+}
+
+// ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
 int test_shim_security_edge_cases_run() {
@@ -494,6 +567,7 @@ int test_shim_security_edge_cases_run() {
     test_schnorrsig_verify_batch_varlen();
     test_shim008_ellswift_xdh_null_hashfp_fires_callback();
     test_perf003_small_batch_schnorr_verify_correctness();
+    test_pubkey_parse_decompression_cache();
 
     printf("\n  pass=%d  fail=%d\n", g_pass, g_fail);
     return (g_fail == 0) ? 0 : 1;
