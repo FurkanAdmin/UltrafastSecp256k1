@@ -585,6 +585,9 @@ public:
         if (!z_i32 || !D_i33 || !E_i33 || !Y_i33 ||
             !rho_i32 || !lambda_ie32 || !negate_R || !negate_key || !out_results)
             return set_error(GpuError::NullArg, "NULL buffer");
+#if !SECP256K1_GPU_HAS_FROST
+        return set_error(GpuError::Unsupported, "GPU FROST module disabled at build time");
+#endif
 
         auto err = ensure_frost_kernel();
         if (err != GpuError::Ok) return err;
@@ -998,6 +1001,9 @@ public:
         if (count == 0) { clear_error(); return GpuError::Ok; }
         if (!msg_hashes32 || !pubkeys33 || !sigs64 || !out_flat)
             return set_error(GpuError::NullArg, "NULL buffer");
+#if !SECP256K1_GPU_HAS_ZK
+        return set_error(GpuError::Unsupported, "GPU ZK module disabled at build time");
+#endif
 
         auto err = ensure_extended_kernels();
         if (err != GpuError::Ok) return err;
@@ -1101,6 +1107,9 @@ public:
         if (count == 0) { clear_error(); return GpuError::Ok; }
         if (!msgs32 || !pubkeys_x32 || !sigs64 || !out_flat)
             return set_error(GpuError::NullArg, "NULL buffer");
+#if !SECP256K1_GPU_HAS_ZK
+        return set_error(GpuError::Unsupported, "GPU ZK module disabled at build time");
+#endif
 
         auto err = ensure_extended_kernels();
         if (err != GpuError::Ok) return err;
@@ -1179,6 +1188,9 @@ public:
         if (count == 0) { clear_error(); return GpuError::Ok; }
         if (!proofs64 || !pubkeys65 || !messages32 || !out_results)
             return set_error(GpuError::NullArg, "NULL buffer");
+#if !SECP256K1_GPU_HAS_ZK
+        return set_error(GpuError::Unsupported, "GPU ZK module disabled at build time");
+#endif
 
         auto err = ensure_zk_kernels();
         if (err != GpuError::Ok) return err;
@@ -1286,6 +1298,9 @@ public:
         if (count == 0) { clear_error(); return GpuError::Ok; }
         if (!proofs64 || !G_pts65 || !H_pts65 || !P_pts65 || !Q_pts65 || !out_results)
             return set_error(GpuError::NullArg, "NULL buffer");
+#if !SECP256K1_GPU_HAS_ZK
+        return set_error(GpuError::Unsupported, "GPU ZK module disabled at build time");
+#endif
 
         auto err = ensure_zk_kernels();
         if (err != GpuError::Ok) return err;
@@ -1409,6 +1424,9 @@ public:
         if (count == 0) { clear_error(); return GpuError::Ok; }
         if (!proofs324 || !commitments65 || !H_generator65 || !out_results)
             return set_error(GpuError::NullArg, "NULL buffer");
+#if !SECP256K1_GPU_HAS_ZK
+        return set_error(GpuError::Unsupported, "GPU ZK module disabled at build time");
+#endif
 
         auto err = ensure_zk_kernels();
         if (err != GpuError::Ok) return err;
@@ -1512,6 +1530,9 @@ public:
         if (count == 0) { clear_error(); return GpuError::Ok; }
         if (!keys32 || !nonces12 || !plaintexts || !sizes || !wire_out)
             return set_error(GpuError::NullArg, "NULL buffer");
+#if !SECP256K1_GPU_HAS_BIP324
+        return set_error(GpuError::Unsupported, "GPU BIP-324 module disabled at build time");
+#endif
 
         auto err = ensure_bip324_kernels();
         if (err != GpuError::Ok) return err;
@@ -1605,6 +1626,9 @@ public:
         if (count == 0) { clear_error(); return GpuError::Ok; }
         if (!keys32 || !nonces12 || !wire_in || !sizes || !plaintext_out || !out_valid)
             return set_error(GpuError::NullArg, "NULL buffer");
+#if !SECP256K1_GPU_HAS_BIP324
+        return set_error(GpuError::Unsupported, "GPU BIP-324 module disabled at build time");
+#endif
 
         auto err = ensure_bip324_kernels();
         if (err != GpuError::Ok) return err;
@@ -1768,6 +1792,9 @@ static void bip352_glv_wnaf5(const uint8_t* scalar_be32, int8_t wnaf[130]) {
         if (n_tweaks == 0) { clear_error(); return GpuError::Ok; }
         if (!scan_privkey32 || !spend_pubkey33 || !tweak_pubkeys33 || !prefix64_out)
             return set_error(GpuError::NullArg, "NULL buffer");
+#if !SECP256K1_GPU_HAS_BIP352
+        return set_error(GpuError::Unsupported, "GPU BIP-352 module disabled at build time");
+#endif
 
         auto err = ensure_bip352_kernel();
         if (err != GpuError::Ok) return err;
