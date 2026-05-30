@@ -142,9 +142,15 @@ if(TARGET fastsecp256k1)
     target_include_directories(gpu_audit_runner PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/../cpu/include
     )
-    target_link_libraries(gpu_audit_runner PRIVATE
-        $<TARGET_FILE:fastsecp256k1>
-    )
+    # OBJECT-library mode has no TARGET_FILE — splice the objects in directly
+    # (same effect: raw objects, no INTERFACE compile-flag propagation to nvcc).
+    if(SECP256K1_BUILD_AS_OBJECT)
+        target_sources(gpu_audit_runner PRIVATE $<TARGET_OBJECTS:fastsecp256k1>)
+    else()
+        target_link_libraries(gpu_audit_runner PRIVATE
+            $<TARGET_FILE:fastsecp256k1>
+        )
+    endif()
     target_compile_definitions(gpu_audit_runner PRIVATE HAVE_CPU_LIB=1)
     set_target_properties(gpu_audit_runner PROPERTIES INTERPROCEDURAL_OPTIMIZATION FALSE)
     target_link_options(gpu_audit_runner PRIVATE -fno-lto)

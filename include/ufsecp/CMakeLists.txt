@@ -180,6 +180,33 @@ elseif(TARGET ufsecp_shared)
     add_library(ufsecp::ufsecp ALIAS ufsecp_shared)
 endif()
 
+# libbitcoin batch sig-verify benchmark — built as part of the central source
+# (static link to ufsecp_static, which already pulls in fastsecp256k1 + the GPU
+# host layer + the ufsecp_lbtc batch bridge). OFF in the minimal ship profile.
+option(SECP256K1_BUILD_LIBBITCOIN_BENCH
+       "Build the libbitcoin batch sig-verify benchmark (bench_lbtc_batch)" OFF)
+if(SECP256K1_BUILD_LIBBITCOIN AND SECP256K1_BUILD_LIBBITCOIN_BENCH)
+    # Built straight from the central source: the C ABI, GPU C ABI and the
+    # ufsecp_lbtc bridge are compiled into the benchmark target itself, which
+    # links the in-tree engine targets (fastsecp256k1 [+ GPU host layer]). No
+    # separate ufsecp static/shared library is involved.
+    add_executable(bench_lbtc_batch
+        "${ULTRAFAST_ROOT}/compat/libbitcoin_bridge/bench/bench_lbtc_batch.cpp"
+        ${UFSECP_IMPL_SRC} ${UFSECP_GPU_IMPL_SRC} ${UFSECP_LBTC_SRC})
+    target_compile_definitions(bench_lbtc_batch PRIVATE UFSECP_BUILDING UFSECP_STATIC_LIB)
+    target_include_directories(bench_lbtc_batch PRIVATE
+        ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CPU_INCLUDE_DIR} ${SHARED_INCLUDE_DIR}
+        "${ULTRAFAST_ROOT}/compat/libbitcoin_bridge/include")
+    target_link_libraries(bench_lbtc_batch PRIVATE fastsecp256k1)
+    if(TARGET secp256k1_gpu_host)
+        target_link_libraries(bench_lbtc_batch PRIVATE secp256k1_gpu_host)
+        target_include_directories(bench_lbtc_batch PRIVATE ${ULTRAFAST_ROOT}/src/gpu/include)
+        target_compile_definitions(bench_lbtc_batch PRIVATE UFSECP_LBTC_WITH_GPU)
+    endif()
+    message(STATUS "  libbitcoin batch bench: ON (bench_lbtc_batch, central source)")
+endif()
+
 # -- Install (standalone only -- skip when used as sub-project) --------------
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)

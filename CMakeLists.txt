@@ -128,7 +128,11 @@ if(SECP256K1_BUILD_LIBBITCOIN)
     set(SECP256K1_BUILD_SHIM   ON)
     set(SECP256K1_REQUIRE_CT   ON)
     set(UFSECP_BITCOIN_STRICT  ON)
-    add_compile_definitions(SECP256K1_CORE_BACKEND_MODE=1)
+    # Central-source build: compile the engine as an OBJECT library so its
+    # object files splice directly into the consumer's link step — a
+    # continuation of the node's own source, NOT a static/shared library
+    # boundary. Applies identically to the CPU and CUDA backends.
+    set(SECP256K1_BUILD_AS_OBJECT ON)
     # Minimal surface — drop everything not needed by a node.
     set(SECP256K1_BUILD_TESTS    OFF)
     set(SECP256K1_BUILD_BENCH    OFF)
