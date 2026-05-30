@@ -277,6 +277,7 @@ void ecdsa_recover_batch_kernel(
 // FROST Partial Signature Verification batch kernel
 // ============================================================================
 #ifndef SECP256K1_CUDA_LIMBS_32
+#if SECP256K1_GPU_HAS_FROST
 __global__ __launch_bounds__(128, 2)
 void frost_verify_partial_batch_kernel(
     const uint8_t* __restrict__ z_i_bytes,
@@ -302,6 +303,7 @@ void frost_verify_partial_batch_kernel(
         negate_R [idx],
         negate_key[idx]);
 }
+#endif  // SECP256K1_GPU_HAS_FROST
 
 // ============================================================================
 // Batch Jacobian -> Compressed (33-byte SEC1) batch kernel

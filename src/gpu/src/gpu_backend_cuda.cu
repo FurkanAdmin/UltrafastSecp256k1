@@ -790,6 +790,7 @@ gmb_cleanup:
             !negate_R || !negate_key || !out_results)
             return set_error(GpuError::NullArg, "NULL buffer");
 
+#if SECP256K1_GPU_HAS_FROST
         uint8_t *d_z = nullptr, *d_D = nullptr, *d_E = nullptr, *d_Y = nullptr;
         uint8_t *d_rho = nullptr, *d_lie = nullptr;
         uint8_t *d_nR = nullptr, *d_nK = nullptr, *d_res = nullptr;
@@ -829,6 +830,9 @@ gmb_cleanup:
         cudaFree(d_Y);   cudaFree(d_E);   cudaFree(d_D);   cudaFree(d_z);
         clear_error();
         return GpuError::Ok;
+#else
+        return set_error(GpuError::Unsupported, "GPU FROST module disabled at build time");
+#endif
     }
 
     GpuError ecrecover_batch(
