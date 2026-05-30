@@ -1514,11 +1514,20 @@ int main() {
         NUM_THREADS, subchunk_ns, 1e9/subchunk_ns/1e6, naive_ns/subchunk_ns);
     printf("  [L] Fused   %2dT: %8.1f ns/op   %6.2f M/s   (%.2fx vs naive)\n",
         NUM_THREADS, fused_ns, 1e9/fused_ns/1e6, naive_ns/fused_ns);
-    printf("  GPU+LUT (ref):      91.3 ns/op   10.96 M/s   (1 GPU)\n");
-    printf("  GPU PreSer (ref):   17.8 ns/op   56.18 M/s   (1 GPU, Stage 2 only)\n");
+    // GPU throughput is measured and validated by the GPU benchmarks
+    // (cuda/src/bench_bip352.cu, opencl/benchmarks/bench_bip352_opencl.cpp),
+    // which actually run + cross-check the kernels. This is a CPU-only
+    // benchmark: it deliberately prints NO GPU numbers, because a hardcoded
+    // "GPU ref" line is an unverified benchmark number (the previous
+    // 10.96 / 56.18 M/s lines were literals that never measured anything).
 
-    bool valid = (prefixes[BENCH_N - 1] == prefixes[BENCH_N - 1]);
-    printf("  Validation: %s\n", valid ? "[OK]" : "[FAIL]");
+    // Real cross-mode sanity: the final (most-optimized) mode must reproduce the
+    // naive mode-A reference — not compare a value to itself (the old
+    // `prefixes[N-1] == prefixes[N-1]` was a tautology that validated nothing).
+    // Rigorous correctness is covered by the BIP-352 KAT audit test.
+    const bool valid = (prefixes[BENCH_N - 1] == naive_validation);
+    printf("  Validation (final mode == naive reference): %s\n",
+           valid ? "[OK]" : "[FAIL]");
 
     return 0;
 }
