@@ -2600,6 +2600,18 @@ target_compile_definitions(test_regression_bip324_session_standalone PRIVATE STA
 add_test(NAME regression_bip324_session COMMAND test_regression_bip324_session_standalone)
 set_tests_properties(regression_bip324_session PROPERTIES TIMEOUT 30 LABELS "audit;regression;bip324;secure-erase")
 
+add_executable(test_regression_segwit_hash160_decouple_standalone
+    test_regression_segwit_hash160_decouple.cpp)
+audit_target_defaults(test_regression_segwit_hash160_decouple_standalone)
+target_include_directories(test_regression_segwit_hash160_decouple_standalone PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/cpu/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_BINARY_DIR}/include
+)
+target_compile_definitions(test_regression_segwit_hash160_decouple_standalone PRIVATE STANDALONE_TEST)
+add_test(NAME regression_segwit_hash160_decouple COMMAND test_regression_segwit_hash160_decouple_standalone)
+set_tests_properties(regression_segwit_hash160_decouple PROPERTIES TIMEOUT 30 LABELS "audit;regression;segwit;build")
+
 # -- Exception-path sk/ek/entropy leakage regression (EPE-RAII + EPE-1..12) — 2026-04-23 --
 # NOTE: This test is built into unified_audit_runner and run as a module.
 # A standalone executable target is not feasible because the test uses C ABI functions
@@ -3884,6 +3896,8 @@ add_executable(unified_audit_runner
     test_regression_bip324_session.cpp
     # -- Exception-path sk/ek/entropy leakage regression (EPE-RAII + EPE-1..12) — 2026-04-23 --
     test_regression_exception_erase.cpp
+    # -- P2WPKH validate hash160 decoupled from BIP-352 (no-LTO link) (SHD-1..3) — 2026-05-30 --
+    test_regression_segwit_hash160_decouple.cpp
     # -- Quality audit fixes (2026-04-27 Comprehensive Report) --
     # C-1: C ABI recovery signing CT path (RCTX-1..8)
     test_exploit_recoverable_sign_ct.cpp

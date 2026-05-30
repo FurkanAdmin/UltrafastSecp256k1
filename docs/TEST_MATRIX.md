@@ -104,13 +104,13 @@ lags behind the generated validation surfaces, prefer the generated counts.
 |------|---------|-------|
 | `opencl/tests/test_opencl.cpp` | OpenCL | Kernel correctness |
 | `opencl/tests/opencl_extended_test.cpp` | OpenCL | Extended operations |
-| `opencl/src/opencl_audit_runner.cpp` | OpenCL | Unified GPU audit ( 418 modules, 8 sections) |
+| `opencl/src/opencl_audit_runner.cpp` | OpenCL | Unified GPU audit ( 419 modules, 8 sections) |
 | `metal/tests/test_metal_host.cpp` | Metal | Metal shader correctness |
-| `metal/src/metal_audit_runner.mm` | Metal | `secp256k1_metal_audit`: unified GPU audit ( 418 modules, 8 sections) |
+| `metal/src/metal_audit_runner.mm` | Metal | `secp256k1_metal_audit`: unified GPU audit ( 419 modules, 8 sections) |
 | `src/cuda/src/test_ct_smoke.cu` | CUDA | CT smoke tests incl. ZK knowledge + DLEQ prove/verify (9 tests) |
 | `src/cuda/src/gpu_ct_leakage_probe.cu` | CUDA | Fixed-vs-random device-cycle Welch t-test for CT generator/signing kernels with JSON evidence output |
 | `src/cuda/src/test_suite.cu` | CUDA | `cuda_selftest`: kernel correctness, field + scalar + point ops |
-| `src/cuda/src/gpu_audit_runner.cu` | CUDA | `gpu_audit`: unified GPU audit ( 418 modules, 8 sections) |
+| `src/cuda/src/gpu_audit_runner.cu` | CUDA | `gpu_audit`: unified GPU audit ( 419 modules, 8 sections) |
 | `metal/app/metal_test.mm` | Metal | `secp256k1_metal_test`: shader correctness, compute pipeline |
 | `metal/app/bench_metal.mm` | Metal | `secp256k1_metal_bench_full`: comprehensive Metal benchmark |
 | `compat/libsecp256k1_shim/tests/shim_test.cpp` | CPU | `secp256k1_shim_test`: libsecp256k1 API compatibility shim |
@@ -863,6 +863,7 @@ ctest --test-dir build-audit -R "exploit" --output-on-failure
 | `exploit_thread_unsafe_lazy_init` | `audit/test_exploit_thread_unsafe_lazy_init.cpp` | Lazy initialisation race — table build must be thread-safe |
 | `exploit_wallet_sign_ct` | `audit/test_exploit_wallet_sign_ct.cpp` | Wallet ECDSA/Schnorr signing CT path on secret key |
 | `regression_bip324_session` | `audit/test_regression_bip324_session.cpp` | BIP-324 transport session key agreement regression |
+| `regression_segwit_hash160_decouple` | `audit/test_regression_segwit_hash160_decouple.cpp` | P2WPKH validate hash160 decoupled from BIP-352 (no-LTO link regression) |
 | `regression_cuda_pool_cap` | `audit/test_regression_cuda_pool_cap.cpp` | CUDA memory pool capacity regression (RTX-series OOM) |
 | `regression_musig2_verify` | `audit/test_regression_musig2_verify.cpp` | MuSig2 partial signature verification regression |
 | `regression_z_fe_nonzero` | `audit/test_regression_z_fe_nonzero.cpp` | Jacobian Z-coordinate non-zero invariant regression |

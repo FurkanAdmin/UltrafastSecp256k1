@@ -4,6 +4,7 @@
 
 #include "secp256k1/segwit.hpp"
 #include "secp256k1/sha256.hpp"
+#include "secp256k1/hash_accel.hpp"
 #include "secp256k1/address.hpp"
 #include <cstring>
 
@@ -19,8 +20,12 @@ static std::array<std::uint8_t, 20> local_hash160(
     // But since the library has hash160 in address.cpp, we use SHA256 only
     // for witness_script_hash and do hash160 externally.
     // For validate_p2wpkh_witness, we need it, so include the RIPEMD160 path.
-
-    return hash160(data, len);
+    // Use hash::hash160 (hash_accel.cpp, always compiled) rather than the
+    // top-level hash160 in address.cpp: the latter is gated behind
+    // SECP256K1_BUILD_BIP352, so a BIP352-off profile (e.g. the bitcoin-core
+    // backend) leaves it undefined and breaks the no-LTO link. hash::hash160
+    // is part of the always-on hash module and is bit-identical.
+    return hash::hash160(data, len);
 }
 
 // -- scriptPubKey construction ------------------------------------------------

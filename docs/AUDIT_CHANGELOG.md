@@ -1,5 +1,18 @@
 # Audit Changelog
 
+## 2026-05-30 — segwit P2WPKH hash160 decoupled from BIP-352 (no-LTO link fix)
+
+- **SHD-1..3** (`audit/test_regression_segwit_hash160_decouple.cpp`): `src/cpu/src/segwit.cpp`
+  `local_hash160` called the top-level `secp256k1::hash160`, which lives in `address.cpp`
+  behind `SECP256K1_BUILD_BIP352`. In a BIP-352-off profile (e.g. the Bitcoin Core backend)
+  `address.cpp` is not compiled, so `validate_p2wpkh_witness → hash160` was an unresolved
+  symbol and the **no-LTO link failed** (LTO hid it via dead-code elimination of the unused
+  path). Fixed by calling `secp256k1::hash::hash160` (`hash_accel.cpp`, always-on hash module),
+  which is bit-identical. New regression test exercises `validate_p2wpkh_witness` so the symbol
+  is link-required in every profile, and asserts the hash160 program match + rejection paths.
+  Wired into `unified_audit_runner` (`regression_segwit_hash160_decouple`, `math_invariants`)
+  + standalone CTest. Found while building the minimal no-LTO bitcoin-core backend profile.
+
 ## 2026-05-30 — GPU batch-verify consensus differential (libbitcoin bridge), local-only CAAS gate
 
 - **CONSENSUS-GPU-01** (`compat/libbitcoin_bridge/tests/test_lbtc_consensus_diff.cpp`): new

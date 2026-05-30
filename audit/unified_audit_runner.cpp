@@ -221,7 +221,8 @@ int test_regression_ct_scalar_inverse_zero_run();   // SEC-001: CT scalar_invers
 int test_regression_ct_ops_run();                   // SEC-002/007/008/010, CT-004/005: CT ops regressions (2026-05-21)
 int test_regression_ct_ops_v2_run();                // SEC-002/007/008/010, CT-004/005: source-scan guards + extended checks (2026-05-21 orphan fixed 2026-05-22)
 int test_regression_bip324_privkey_lifetime_run();  // SEC-006: Bip324Session privkey_ lifetime documentation (2026-05-21)
-int test_regression_ct_secret_is_zero_run();        // SIZ-1..4: adaptor CT nonce + taproot is_zero_ct fixes (2026-05-21)
+int test_regression_ct_secret_is_zero_run();        // SIZ-1..4: adaptor CT nonce + taproot is_
+int test_regression_segwit_hash160_decouple_run();             // SHD-1..3: P2WPKH hash160 decoupled from BIP-352 (no-LTO link)zero_ct fixes (2026-05-21)
 int test_regression_rfc6979_ct_loop_run();          // RFC6979-CT: fixed 2-iteration CT nonce loop (2026-05-21)
 int test_shim_recovery_and_noncefp_run();           // PASS3-001/002: recovery parse compat + noncefp callback (2026-05-21)
 int test_regression_shim_security_v9_run();         // SHIM-NEW-012/015: serialize + seckey NULL arg callbacks (2026-05-22)
@@ -1190,6 +1191,7 @@ static const AuditModule ALL_MODULES[] = {
     { "regression_musig2_verify",          "musig2_partial_verify OOB + infinity-nonce regression (MVV-1..6)",                                      "math_invariants", test_regression_musig2_verify_run, false },
     { "regression_bip324_session",         "Bip324Session sk-leak + destructor secure-erase regression (BPS-1..8)",                                   "memory_safety",  test_regression_bip324_session_run, false },
     { "regression_exception_erase",        "Exception-path sk/ek/entropy leakage in C ABI layer (EPE-RAII+EPE-1..12)",                               "memory_safety",  test_regression_exception_erase_run, false },
+    { "regression_segwit_hash160_decouple","P2WPKH validate hash160 decoupled from BIP-352 — no-LTO link regression (SHD-1..3)",                     "math_invariants", test_regression_segwit_hash160_decouple_run, false },
     // ===================================================================
     // Section 11: Quality Audit Fixes (2026-04-27 Comprehensive Report)
     // ===================================================================
