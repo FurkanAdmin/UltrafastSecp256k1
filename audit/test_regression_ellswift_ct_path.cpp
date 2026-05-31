@@ -161,6 +161,44 @@ static void test_ellswift_xdh_general_path() {
     secp256k1_context_destroy(ctx);
 }
 
+// ── ECP-7: encode->decode round-trip recovers the x-coordinate ────────────
+// Directly exercises the forward decode map (xswiftec_fwd / xswiftec_fwd_point)
+// after its `t` parameter was changed to const-reference: the decode must still
+// recover the encoded x-coordinate (the refactor is behavior-preserving). Parity
+// is shim-chosen on decode, so only the 32-byte x-coordinate is compared.
+static void test_ellswift_encode_decode_roundtrip() {
+    secp256k1_context* ctx = secp256k1_context_create(SECP256K1_CONTEXT_SIGN);
+
+    unsigned char sk[32] = {};
+    sk[31] = 9;
+    secp256k1_pubkey pub;
+    check(secp256k1_ec_pubkey_create(ctx, &pub, sk) == 1, "[ECP-7a] pubkey_create");
+
+    unsigned char ser[33]; size_t serlen = sizeof(ser);
+    check(secp256k1_ec_pubkey_serialize(ctx, ser, &serlen, &pub,
+          SECP256K1_EC_COMPRESSED) == 1, "[ECP-7b] serialize original");
+
+    static const unsigned char rnd[32] = {
+        0x11,0x22,0x33,0x44,0x55,0x66,0x77,0x88,
+        0x99,0xaa,0xbb,0xcc,0xdd,0xee,0xff,0x00,
+        0x11,0x22,0x33,0x44,0x55,0x66,0x77,0x88,
+        0x99,0xaa,0xbb,0xcc,0xdd,0xee,0xff,0x00
+    };
+    unsigned char enc[64];
+    check(secp256k1_ellswift_encode(ctx, enc, &pub, rnd) == 1, "[ECP-7c] encode pubkey");
+
+    secp256k1_pubkey decoded;
+    check(secp256k1_ellswift_decode(ctx, &decoded, enc) == 1, "[ECP-7d] decode encoding");
+
+    unsigned char ser2[33]; size_t ser2len = sizeof(ser2);
+    check(secp256k1_ec_pubkey_serialize(ctx, ser2, &ser2len, &decoded,
+          SECP256K1_EC_COMPRESSED) == 1, "[ECP-7e] serialize decoded");
+    check(memcmp(ser + 1, ser2 + 1, 32) == 0,
+          "[ECP-7f] encode->decode round-trip recovers the x-coordinate (fwd map)");
+
+    secp256k1_context_destroy(ctx);
+}
+
 // ── _run() ─────────────────────────────────────────────────────────────────
 int test_regression_ellswift_ct_path_run() {
     g_pass = 0; g_fail = 0;
@@ -172,6 +210,7 @@ int test_regression_ellswift_ct_path_run() {
     test_ellswift_null_seckey();
     test_ellswift_zero_key();
     test_ellswift_xdh_general_path();
+    test_ellswift_encode_decode_roundtrip();
 
     std::printf("  pass=%d  fail=%d\n", g_pass, g_fail);
     return (g_fail == 0) ? 0 : 1;

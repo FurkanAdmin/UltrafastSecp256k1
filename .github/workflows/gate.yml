@@ -12,7 +12,9 @@ on:
 
 permissions:
   contents: read
-  security-events: write
+  # No SARIF/code-scanning upload happens in this workflow, so security-events
+  # write is not granted (Scorecard TokenPermissions). Static-analysis SARIF is
+  # uploaded by the dedicated infer.yml / clang-sa.yml workflows.
 
 concurrency:
   group: gate-${{ github.ref }}

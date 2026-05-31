@@ -197,7 +197,7 @@ xswiftec_frac(const FieldElement& u_in, const FieldElement& t) noexcept {
 //   Try x3 = (3*s*u^3-(g+s)^2)/(3*s*u^2). If on curve, return.
 //   Try x2 = u*(c1*s+c2*g)/(g+s). If on curve, return.
 //   Return x1 = -(x2+u).
-FieldElement xswiftec_fwd(FieldElement u, FieldElement t) noexcept {
+FieldElement xswiftec_fwd(FieldElement u, const FieldElement& t) noexcept {
     // Field constants + XSWIFTEC_C1 / XSWIFTEC_C2 live at file scope above.
     const FieldElement& C1 = XSWIFTEC_C1;
     const FieldElement& C2 = XSWIFTEC_C2;
@@ -237,7 +237,7 @@ FieldElement xswiftec_fwd(FieldElement u, FieldElement t) noexcept {
 // Optimized variant: same as xswiftec_fwd but also returns the even-Y coordinate.
 // Avoids the extra sqrt that callers (ECDH) would need to reconstruct the full point.
 // Saves ~1-2 field exponentiations vs decode+lift separately.
-static std::pair<FieldElement, FieldElement> xswiftec_fwd_point(FieldElement u, FieldElement t) noexcept {
+static std::pair<FieldElement, FieldElement> xswiftec_fwd_point(FieldElement u, const FieldElement& t) noexcept {
     // Field constants + XSWIFTEC_C1 / XSWIFTEC_C2 live at file scope above.
     const FieldElement& C1 = XSWIFTEC_C1;
     const FieldElement& C2 = XSWIFTEC_C2;
