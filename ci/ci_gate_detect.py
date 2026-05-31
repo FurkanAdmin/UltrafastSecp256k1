@@ -241,6 +241,17 @@ def detect_gate_level(files: list[str], force_release: bool = False) -> dict:
     light_only = bool(profiles) and not hard_profiles and not ct_sensitive_files
     gate = "release" if force_release else ("light" if light_only or docs_only or not files else "hard")
 
+    # CAAS-003 (defense-in-depth): a matched HARD profile must never be
+    # downclassed to a light/docs-only gate. This invariant already holds by
+    # construction — docs_only requires profiles ⊆ {docs-only, examples}, and the
+    # gate above is "hard" whenever hard_profiles is non-empty — but we assert it
+    # explicitly so a future refactor of the classification lines above cannot
+    # silently let a security-evidence change (e.g. a commit touching both
+    # docs/EXPLOIT_TEST_CATALOG.md and an unrelated doc) skip the caas-security job.
+    if hard_profiles and not force_release:
+        gate = "hard"
+        docs_only = False
+
     run_core = gate in {"hard", "release"} or any(p in profiles for p in ("core-engine", "bitcoin-core-backend"))
     # "audit" profile is explicitly listed here so that commits touching only
     # audit/**  (new exploit PoC, unified_audit_runner.cpp changes, etc.) always

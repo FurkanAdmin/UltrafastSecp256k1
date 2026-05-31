@@ -279,6 +279,41 @@ def test_hmac_key_env_override():
 
 
 # ============================================================================
+# CAAS-003: ci_gate_detect hard-profile classification precedence
+# ============================================================================
+
+def test_ci_gate_detect_hard_profile_precedence():
+    """CAAS-003: a matched HARD profile must never be downclassed to a
+    docs-only / light gate. A commit touching a security-evidence file — even
+    one that also matches the broad docs/** docs-only glob — must classify as
+    gate=hard, docs_only=False, run_caas=True so caas-security always runs."""
+    detect_path = LIB_ROOT / "ci" / "ci_gate_detect.py"
+    mod = load_module(detect_path)
+    if mod is None or not hasattr(mod, "detect_gate_level"):
+        check(False, "CAAS-003: ci_gate_detect.detect_gate_level loads")
+        return
+    dgl = mod.detect_gate_level
+
+    # security-evidence catalog alongside an unrelated docs-only file
+    r = dgl(["docs/EXPLOIT_TEST_CATALOG.md", "docs/SOME_GUIDE.md"])
+    check(r["gate"] == "hard" and not r["docs_only"] and r["run_caas"],
+          "CAAS-003: security-evidence + docs-only -> gate=hard, docs_only=False, run_caas=True",
+          f"got gate={r['gate']} docs_only={r['docs_only']} run_caas={r['run_caas']}")
+
+    # benchmark/evidence file (security-evidence under docs/) on its own
+    r = dgl(["docs/BENCHMARKS.md"])
+    check(r["gate"] == "hard" and not r["docs_only"] and r["run_caas"],
+          "CAAS-003: BENCHMARKS.md (security-evidence) -> gate=hard, run_caas=True",
+          f"got gate={r['gate']} docs_only={r['docs_only']} run_caas={r['run_caas']}")
+
+    # control: a genuine docs-only change must NOT be over-escalated
+    r = dgl(["docs/RANDOM_GUIDE.md", "CONTRIBUTING.md"])
+    check(r["gate"] == "light" and r["docs_only"] and not r["run_caas"],
+          "CAAS-003 control: pure docs-only stays light (no over-escalation)",
+          f"got gate={r['gate']} docs_only={r['docs_only']} run_caas={r['run_caas']}")
+
+
+# ============================================================================
 # Main
 # ============================================================================
 
@@ -294,6 +329,7 @@ def main():
     test_supply_chain_gate_no_stunt_double()
     test_evidence_governance_hmac_reason()
     test_hmac_key_env_override()
+    test_ci_gate_detect_hard_profile_precedence()
 
     total = g_pass + g_fail
     if not use_json:

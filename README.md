@@ -242,7 +242,7 @@ This project: `code → test → execution → evidence → continuous verificat
 We do not rely on trust. We provide reproducible evidence.
 
 - Every exploit attempt becomes a permanent regression test
-- Every commit runs ~1,000,000+ assertions (aggregate estimate) across 146 non-exploit audit modules and 273 exploit PoCs ( 419 modules total; count via `python3 ci/sync_module_count.py`; canonical data: `docs/canonical_numbers.json`)
+- Every commit runs ~1,000,000+ assertions (aggregate estimate) across 146 non-exploit audit modules and 273 exploit PoCs ( 419 modules total; count via `python3 ci/sync_module_count.py`; canonical data: `docs/canonical_data.json`)
 - Every claim maps to a test in [docs/AUDIT_TRACEABILITY.md](docs/AUDIT_TRACEABILITY.md)
 - Every performance number has pinned compiler/driver/toolkit versions and raw logs
 
@@ -903,7 +903,7 @@ Full signature support across CPU and GPU:
 | Key Generation (fast) | 5.5 us | 182,000 op/s |
 | ECDH | 23.9 us | 41,800 op/s |
 
-*All rows above are the FAST (variable-time) path — NOT the production CT signing path. Schnorr sign is ~25% faster than ECDSA sign due to simpler nonce derivation. Measured single-core, pinned, Clang 19, 2026-02-21. Current GCC 14.2.0 canonical data: [docs/bench_unified_2026-05-30_gcc14_x86-64.json](docs/bench_unified_2026-05-30_gcc14_x86-64.json).*
+*All rows above are the FAST (variable-time) path — NOT the production CT signing path. Schnorr sign is ~25% faster than ECDSA sign due to simpler nonce derivation. Measured single-core, pinned, Clang 19 — **archived 2026-02-21, NOT comparable to the current GCC 14.2.0 canonical data** below: [docs/bench_unified_2026-05-30_gcc14_x86-64.json](docs/bench_unified_2026-05-30_gcc14_x86-64.json).*
 
 ---
 
