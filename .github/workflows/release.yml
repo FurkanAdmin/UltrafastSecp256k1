@@ -249,6 +249,18 @@ jobs:
             name: win-x64
             ext: zip
             generator: Ninja
+            msvc_arch: amd64
+
+          # Windows ARM64 cross-build. field_asm_arm64.cpp is GNU inline asm that
+          # MSVC cannot compile, so use the portable field path (ASM OFF). Tests
+          # cannot run (arm64 exe on x64 host), so the test step is skipped.
+          - os: windows-latest
+            name: win-arm64
+            ext: zip
+            generator: Ninja
+            msvc_arch: amd64_arm64
+            extra_cmake: -DSECP256K1_USE_ASM=OFF
+            no_test: true
 
     runs-on: ${{ matrix.os }}
     steps:
@@ -273,7 +285,7 @@ jobs:
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1
         with:
-          arch: x64
+          arch: ${{ matrix.msvc_arch }}
 
       # -- macOS: install Ninja --
       - name: Install Ninja (macOS)
@@ -304,9 +316,12 @@ jobs:
         run: |
           cmake -S . -B build -G "${{ matrix.generator }}" \
             -DCMAKE_BUILD_TYPE=${{ env.CMAKE_BUILD_TYPE }} \
-            -DSECP256K1_BUILD_TESTS=ON \
+            -DSECP256K1_BUILD_TESTS=${{ matrix.no_test && 'OFF' || 'ON' }} \
             -DSECP256K1_BUILD_BENCH=OFF \
             -DSECP256K1_BUILD_EXAMPLES=OFF \
+            -DSECP256K1_BUILD_SHIM=ON \
+            -DSECP256K1_SHIM_BUILD_SHARED=ON \
+            ${{ matrix.extra_cmake || '' }} \
             ${{ matrix.cc && format('-DCMAKE_C_COMPILER={0} -DCMAKE_CXX_COMPILER={1}', matrix.cc, matrix.cxx) || '' }}
         shell: bash
 
@@ -314,8 +329,9 @@ jobs:
       - name: Build
         run: cmake --build build -j
 
-      # -- Test --
+      # -- Test (skipped for cross-built arm64: cannot run on the x64 host) --
       - name: Test
+        if: ${{ ! matrix.no_test }}
         env:
           PYTHONUTF8: '1'
         run: ctest --test-dir build --output-on-failure -j4 -E "^ct_sidechannel"
@@ -324,37 +340,85 @@ jobs:
       - name: Install
         run: cmake --install build --prefix staging
 
-      # -- Collect ufsecp artifacts --
+      # -- Collect artifacts: BOTH static and shared (DLL) builds of BOTH the
+      #    ufsecp C ABI and the libsecp256k1-compatible secp256k1 ABI, into
+      #    lib/static/ + lib/shared/. --
       - name: Collect release artifacts
         shell: bash
         run: |
           PKG_NAME="UltrafastSecp256k1-${{ env.RELEASE_TAG }}-${{ matrix.name }}"
-          mkdir -p "${PKG_NAME}/lib" "${PKG_NAME}/include/ufsecp" "${PKG_NAME}/include/secp256k1"
+          mkdir -p "${PKG_NAME}/lib/static" "${PKG_NAME}/lib/shared" \
+                   "${PKG_NAME}/include/ufsecp" "${PKG_NAME}/include/secp256k1"
 
-          # ufsecp headers
-          cp include/ufsecp/ufsecp.h       "${PKG_NAME}/include/ufsecp/"
-          cp include/ufsecp/ufsecp_version.h "${PKG_NAME}/include/ufsecp/"
-          cp include/ufsecp/ufsecp_error.h   "${PKG_NAME}/include/ufsecp/"
+          # -- Headers --
+          # ufsecp C ABI
+          cp include/ufsecp/ufsecp.h include/ufsecp/ufsecp_version.h \
+             include/ufsecp/ufsecp_error.h "${PKG_NAME}/include/ufsecp/" 2>/dev/null || true
+          # libsecp256k1 ABI headers (flat) — for the secp256k1 static/shared lib
+          cp compat/libsecp256k1_shim/include/secp256k1*.h "${PKG_NAME}/include/" 2>/dev/null || true
+          # C++ engine headers + generated features.h: secp256k1.h pulls these
+          # under __cplusplus (inlined secp256k1_pubkey_precomp).
+          cp -r src/cpu/include/secp256k1/. "${PKG_NAME}/include/secp256k1/" 2>/dev/null || true
+          [ -d build/include/secp256k1 ] && \
+            cp build/include/secp256k1/*.h "${PKG_NAME}/include/secp256k1/" 2>/dev/null || true
 
-          # C++ public headers (from staging)
-          if [ -d "staging/include/secp256k1" ]; then
-            cp -r staging/include/secp256k1/* "${PKG_NAME}/include/secp256k1/"
-          fi
-
-          # Libraries (platform-specific extensions)
-          find build staging -maxdepth 4 \( \
-            -name "*.dll" -o -name "*.lib" -o -name "*.so" -o -name "*.so.*" \
-            -o -name "*.dylib" -o -name "*.a" \) \
-            ! -path "*/CMakeFiles/*" 2>/dev/null | while read f; do
-            cp "$f" "${PKG_NAME}/lib/" 2>/dev/null || true
+          # -- Libraries: split static vs shared. On Windows a .lib is an import
+          #    lib iff a same-stem .dll exists; otherwise it is a static archive. --
+          # Exclude CMake internals, language bindings (e.g. the JNI .so), and the
+          # mode-B shim STUB archive (libsecp256k1_shim.* — empty; fastsecp256k1 is
+          # the real static secp256k1 lib).
+          mapfile -t ALLLIBS < <(find build staging -maxdepth 5 \( \
+            -name '*.dll' -o -name '*.so' -o -name '*.so.*' -o -name '*.dylib' \
+            -o -name '*.lib' -o -name '*.a' \) \
+            ! -path '*/CMakeFiles/*' ! -path '*/bindings/*' \
+            ! -name 'libsecp256k1_shim.*' ! -name 'secp256k1_shim.lib' 2>/dev/null)
+          declare -A DLLSTEM
+          for f in "${ALLLIBS[@]}"; do
+            [ "${f##*.}" = "dll" ] && DLLSTEM["$(basename "$f" .dll)"]=1
+          done
+          for f in "${ALLLIBS[@]}"; do
+            case "$f" in
+              *.dll|*.dylib|*.so|*.so.*) cp -P "$f" "${PKG_NAME}/lib/shared/" 2>/dev/null || true ;;
+              *.a) cp "$f" "${PKG_NAME}/lib/static/" 2>/dev/null || true ;;
+              *.lib)
+                stem="$(basename "$f" .lib)"
+                if [ -n "${DLLSTEM[$stem]:-}" ]; then
+                  cp "$f" "${PKG_NAME}/lib/shared/" 2>/dev/null || true   # DLL import lib
+                else
+                  cp "$f" "${PKG_NAME}/lib/static/" 2>/dev/null || true   # static archive
+                fi ;;
+            esac
           done
 
-          # Docs
+          # fastsecp256k1 IS the self-contained static libsecp256k1-ABI archive
+          # (the shim is compiled into the engine) — name it secp256k1 for users.
+          for d in lib/static; do
+            [ -f "${PKG_NAME}/${d}/fastsecp256k1.lib" ]    && mv "${PKG_NAME}/${d}/fastsecp256k1.lib"    "${PKG_NAME}/${d}/secp256k1.lib"
+            [ -f "${PKG_NAME}/${d}/libfastsecp256k1.a" ]   && mv "${PKG_NAME}/${d}/libfastsecp256k1.a"   "${PKG_NAME}/${d}/libsecp256k1.a"
+          done || true
+
+          # -- Layout manifest --
+          cat > "${PKG_NAME}/lib/LIBRARIES.md" <<'EOF'
+          # Library layout
+
+          | dir      | library            | ABI                         | notes |
+          |----------|--------------------|-----------------------------|-------|
+          | static/  | secp256k1.*        | libsecp256k1 C ABI          | self-contained static archive (engine + shim) |
+          | static/  | ufsecp_s.lib / libufsecp.a | ufsecp stable C ABI | static archive |
+          | shared/  | secp256k1.dll/.so  | libsecp256k1 C ABI          | + import .lib on Windows |
+          | shared/  | ufsecp.dll/.so     | ufsecp stable C ABI         | + import .lib on Windows |
+
+          The `secp256k1` libraries are a drop-in for libsecp256k1 (same headers).
+          `Linkage-secp256k1`-style static vs shared is your choice of subdir.
+          EOF
+
+          # -- Docs --
           cp LICENSE      "${PKG_NAME}/" 2>/dev/null || true
           cp README.md    "${PKG_NAME}/" 2>/dev/null || true
           cp CHANGELOG.md "${PKG_NAME}/" 2>/dev/null || true
           cp include/ufsecp/SUPPORTED_GUARANTEES.md "${PKG_NAME}/" 2>/dev/null || true
 
+          echo "=== package tree ==="; find "${PKG_NAME}" -type f | sort
           echo "PKG_NAME=${PKG_NAME}" >> "$GITHUB_ENV"
 
       # -- Archive --
