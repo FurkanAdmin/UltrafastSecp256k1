@@ -33,13 +33,13 @@
     {
       "exists": true,
       "path": "docs/TEST_MATRIX.md",
-      "sha256": "165805fc3b5f149d5bc87993c83c586fad5787b2a67f3e76ed91453231e60af3",
-      "size": 62502
+      "sha256": "463b0cf66a4b6f936b230d3436aa1fbb62f82a2504dc9b099304e54882de5214",
+      "size": 62583
     },
     {
       "exists": true,
       "path": "docs/CT_VERIFICATION.md",
-      "sha256": "680429a4d6fc081db2c9af7fdf28467d704379e114b44537f387684b9e931be3",
+      "sha256": "90a12cdb2ce8ee20a4976614f34aabe853caa7a6c51f5bf842ac60b1206d618b",
       "size": 48223
     },
     {
@@ -126,7 +126,7 @@
           {
             "findings": [
               {
-                "message": "No changed secret-bearing paths detected",
+                "message": "No uncommitted changes to evaluate",
                 "severity": "PASS"
               }
             ],
@@ -156,7 +156,7 @@
           {
             "findings": [
               {
-                "message": "Audit test-quality findings: files=419, critical=0, high=0, medium=0, low=0",
+                "message": "Audit test-quality findings: files=421, critical=0, high=0, medium=0, low=0",
                 "severity": "INFO"
               },
               {
@@ -172,6 +172,10 @@
               {
                 "message": "All 735 security patterns preserved",
                 "severity": "PASS"
+              },
+              {
+                "message": "NEW src/cpu/src/impl/ufsecp_zk.cpp: secure_erase 8->11 (+3, rebuild graph)",
+                "severity": "INFO"
               }
             ],
             "name": "P3: Security Patterns",
@@ -200,7 +204,7 @@
           {
             "findings": [
               {
-                "message": "35 files modified/deleted since graph build (2026-06-01T09:01:25)",
+                "message": "27 files modified/deleted since graph build (2026-06-01T14:21:34)",
                 "severity": "WARN"
               },
               {
@@ -392,8 +396,8 @@
           {
             "findings": [
               {
-                "message": "CMakeLists.txt changed but docs/BUILDING.md not updated",
-                "severity": "WARN"
+                "message": "No uncommitted changes",
+                "severity": "PASS"
               }
             ],
             "name": "P10: Doc-Code Pairing",
@@ -402,11 +406,11 @@
           {
             "findings": [
               {
-                "message": "Mutation report age: 48.2 days (threshold: 14)",
+                "message": "Mutation report age: 48.5 days (threshold: 14)",
                 "severity": "INFO"
               },
               {
-                "message": "Mutation report is stale (48.2 > 14 days) \u2014 rerun recommended",
+                "message": "Mutation report is stale (48.5 > 14 days) \u2014 rerun recommended",
                 "severity": "WARN"
               }
             ],
@@ -608,15 +612,15 @@
                 "severity": "PASS"
               },
               {
-                "message": "Source graph DB is up-to-date relative to src/cpu/ sources",
-                "severity": "PASS"
+                "message": "4 src/cpu/*.cpp file(s) newer than source graph DB (rebuild recommended): ['src/cpu/src/recovery.cpp', 'src/cpu/src/ct_point.cpp', 'src/cpu/bench/bench_unified.cpp']",
+                "severity": "WARN"
               },
               {
                 "message": "Source graph tables: ai_handlers, ai_tasks, analysis_scores, audit_coverage, backend_map, call_edges, classes, config_files, config_keys, constants\u2026",
                 "severity": "INFO"
               },
               {
-                "message": "Source graph \"files\" has 1341 rows (threshold: 200)",
+                "message": "Source graph \"files\" has 1338 rows (threshold: 200)",
                 "severity": "PASS"
               }
             ],
@@ -628,13 +632,13 @@
           "reason": null,
           "status": "available",
           "value": {
-            "dirty": true,
+            "dirty": false,
             "ref": "dev",
-            "sha": "debd6202f49f2e2634b9a4c48fac758b8c75e5e9",
-            "short": "debd6202f4"
+            "sha": "353037afbac67271d044d21c5a8c4ab79f9d55e7",
+            "short": "353037afba"
           }
         },
-        "generated_at": "2026-06-01T11:36:22.055357+00:00",
+        "generated_at": "2026-06-01T19:56:07.267652+00:00",
         "platform": "Linux",
         "provenance": {
           "build_flags": {
@@ -651,12 +655,12 @@
             },
             "flags_hash": "f6054a07e934d755"
           },
-          "collected_at": "2026-06-01T11:36:22.055271+00:00",
+          "collected_at": "2026-06-01T19:56:07.267567+00:00",
           "git": {
-            "dirty": true,
+            "dirty": false,
             "ref": "dev",
-            "sha": "debd6202f49f2e2634b9a4c48fac758b8c75e5e9",
-            "short": "debd6202f4"
+            "sha": "353037afbac67271d044d21c5a8c4ab79f9d55e7",
+            "short": "353037afba"
           },
           "platform": {
             "machine": "x86_64",
@@ -677,7 +681,7 @@
           },
           "version": "4.1.0"
         },
-        "run_id": "audit_gate-debd6202f4-20260601T113622",
+        "run_id": "audit_gate-353037afba-20260601T195607",
         "runner": "audit_gate",
         "schema_version": "1.0.0",
         "sections": [
@@ -750,7 +754,7 @@
               {
                 "check_id": "p0__secret-path_change_gate",
                 "severity": "pass",
-                "title": "No changed secret-bearing paths detected"
+                "title": "No uncommitted changes to evaluate"
               }
             ],
             "name": "P0: Secret-Path Change Gate",
@@ -783,7 +787,7 @@
               {
                 "check_id": "p2__audit_test_quality",
                 "severity": "info",
-                "title": "Audit test-quality findings: files=419, critical=0, high=0, medium=0, low=0"
+                "title": "Audit test-quality findings: files=421, critical=0, high=0, medium=0, low=0"
               },
               {
                 "check_id": "p2__audit_test_quality",
@@ -800,6 +804,11 @@
                 "check_id": "p3__security_patterns",
                 "severity": "pass",
                 "title": "All 735 security patterns preserved"
+              },
+              {
+                "check_id": "p3__security_patterns",
+                "severity": "info",
+                "title": "NEW src/cpu/src/impl/ufsecp_zk.cpp: secure_erase 8->11 (+3, rebuild graph)"
               }
             ],
             "name": "P3: Security Patterns",
@@ -832,7 +841,7 @@
               {
                 "check_id": "p6__graph_freshness",
                 "severity": "advisory:medium",
-                "title": "35 files modified/deleted since graph build (2026-06-01T09:01:25)"
+                "title": "27 files modified/deleted since graph build (2026-06-01T14:21:34)"
               },
               {
                 "check_id": "p6__graph_freshness",
@@ -1065,24 +1074,24 @@
             "findings": [
               {
                 "check_id": "p10__doc-code_pairing",
-                "severity": "advisory:medium",
-                "title": "CMakeLists.txt changed but docs/BUILDING.md not updated"
+                "severity": "pass",
+                "title": "No uncommitted changes"
               }
             ],
             "name": "P10: Doc-Code Pairing",
-            "verdict": "PASS with advisory"
+            "verdict": "PASS"
           },
           {
             "findings": [
               {
                 "check_id": "p2__mutation_evidence_freshness",
                 "severity": "info",
-                "title": "Mutation report age: 48.2 days (threshold: 14)"
+                "title": "Mutation report age: 48.5 days (threshold: 14)"
               },
               {
                 "check_id": "p2__mutation_evidence_freshness",
                 "severity": "advisory:medium",
-                "title": "Mutation report is stale (48.2 > 14 days) \u2014 rerun recommended"
+                "title": "Mutation report is stale (48.5 > 14 days) \u2014 rerun recommended"
               }
             ],
             "name": "P2: Mutation Evidence Freshness",
@@ -1320,8 +1329,8 @@
               },
               {
                 "check_id": "g-12__source_graph_quality",
-                "severity": "pass",
-                "title": "Source graph DB is up-to-date relative to src/cpu/ sources"
+                "severity": "advisory:medium",
+                "title": "4 src/cpu/*.cpp file(s) newer than source graph DB (rebuild recommended): ['src/cpu/src/recovery.cpp', 'src/cpu/src/ct_point.cpp', 'src/cpu/bench/bench_unified.cpp']"
               },
               {
                 "check_id": "g-12__source_graph_quality",
@@ -1331,20 +1340,20 @@
               {
                 "check_id": "g-12__source_graph_quality",
                 "severity": "pass",
-                "title": "Source graph \"files\" has 1341 rows (threshold: 200)"
+                "title": "Source graph \"files\" has 1338 rows (threshold: 200)"
               }
             ],
             "name": "G-12: Source Graph Quality",
-            "verdict": "PASS"
+            "verdict": "PASS with advisory"
           }
         ],
         "summary": {
-          "advisory": 54,
+          "advisory": 55,
           "blocking": 0,
-          "info": 47,
+          "info": 48,
           "sections": 26,
           "skipped_sections": 0,
-          "total_findings": 100,
+          "total_findings": 101,
           "warnings": 7
         },
         "verdict": "PASS with advisory"
@@ -1352,8 +1361,8 @@
       "passing": true,
       "required": true,
       "returncode": 0,
-      "stderr_sha256": "99edfafd8ade96caf81673ec31980319dc821c5d6b2d477bb637df78e426d13d",
-      "stdout_sha256": "2e2ae8ffcc451dc0617659c1077a16b3bc6071e4ef258ebc02d56ce6ab947908"
+      "stderr_sha256": "b3c68c6ad3611369af7dfb9947d8826ac69b4d530c75e34827f73aa71a7e7374",
+      "stdout_sha256": "8f6449669130c3474564621d4b85d95586533ff2d4b41bebc61d592061cc83bc"
     },
     {
       "name": "audit_gap_report_strict",
@@ -1655,13 +1664,13 @@
         "gates_skipped": 0,
         "gates_total": 8,
         "overall_pass": true,
-        "timestamp": "2026-06-01T11:36:26.597789+00:00"
+        "timestamp": "2026-06-01T19:56:11.976450+00:00"
       },
       "passing": true,
       "required": true,
       "returncode": 0,
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stdout_sha256": "c138cf30f324478ba53decb3841d4fecf397f0b9c2ce3cf104cc9f9f0dee6cda"
+      "stdout_sha256": "837c4f16a7a912dabb8a7de00c9ca19376484473a84bff0bd7a8f89dc5f4e6c2"
     },
     {
       "name": "supply_chain_gate",
@@ -1707,19 +1716,19 @@
         "checks_total": 5,
         "failing_checks": [],
         "overall_pass": true,
-        "timestamp": "2026-06-01T11:36:26.662133+00:00"
+        "timestamp": "2026-06-01T19:56:12.040913+00:00"
       },
       "passing": true,
       "required": true,
       "returncode": 0,
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stdout_sha256": "72b901bffa80bed8f974cf5c691bb54307f41297d14db73696b9b749a1deab68"
+      "stdout_sha256": "3220cd2084b326d8dff92c520ad546536a22e52dbff849dd5a3be4e84f8d70ca"
     }
   ],
-  "generated_at": "2026-06-01T11:36:26.686485+00:00",
+  "generated_at": "2026-06-01T19:56:12.063116+00:00",
   "git": {
     "branch": "dev",
-    "commit": "debd6202f49f2e2634b9a4c48fac758b8c75e5e9",
+    "commit": "353037afbac67271d044d21c5a8c4ab79f9d55e7",
     "dirty": true
   },
   "repo_root": "/home/shrek/Secp256k1/Secp256K1fast/libs/UltrafastSecp256k1",
