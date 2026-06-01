@@ -16,6 +16,7 @@
 
 #include "secp256k1.h"
 #include "secp256k1_musig.h"
+#include "secp256k1_schnorrsig.h"  // secp256k1_schnorrsig_verify (MNG final-sig check)
 #include <cstdio>
 #include <cstring>
 #include <array>
@@ -62,7 +63,7 @@ static void test_nonce_gen_with_seckey() {
     const secp256k1_pubkey* pks[2] = {&pk1, &pk2};
     secp256k1_musig_keyagg_cache cache;
     secp256k1_xonly_pubkey agg_pk;
-    CHECK(secp256k1_musig_pubkey_agg(sctx(), nullptr, &agg_pk, &cache, pks, 2) == 1,
+    CHECK(secp256k1_musig_pubkey_agg(sctx(), &agg_pk, &cache, pks, 2) == 1,
           "MNG-1: pubkey_agg ok");
 
     secp256k1_musig_secnonce secnonce;
@@ -126,7 +127,7 @@ static void test_nonce_gen_full_flow() {
 
     secp256k1_musig_keyagg_cache cache;
     secp256k1_xonly_pubkey agg_pk;
-    CHECK(secp256k1_musig_pubkey_agg(sctx(), nullptr, &agg_pk, &cache, pks, 2) == 1,
+    CHECK(secp256k1_musig_pubkey_agg(sctx(), &agg_pk, &cache, pks, 2) == 1,
           "MNG-4: pubkey_agg");
 
     unsigned char sid1[32] = {0xAA}, sid2[32] = {0xBB};

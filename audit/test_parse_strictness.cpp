@@ -56,6 +56,15 @@
 static int g_pass = 0, g_fail = 0;
 #include "audit_check.hpp"
 
+// Shim C-ABI header for the PS-EC-01..03 ShimEcdsaCache checks below.
+// Guarded so the module still builds when the shim is not on the include path
+// (the matching #if __has_include block in test_parse_strictness_run() then
+// takes its advisory-skip #else branch). Must be at file scope: secp256k1.h is
+// wrapped in extern "C" { ... }, which is ill-formed inside a function body.
+#if __has_include("secp256k1.h")
+#include "secp256k1.h"
+#endif
+
 // Macro: CHECK that an error code is in a set of acceptable failure codes.
 // A "strict" parse that returns any failure is correct; we only care that it
 // is NOT UFSECP_OK (i.e. it does not silently accept garbage).

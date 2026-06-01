@@ -57,13 +57,13 @@ static void test_nonce_gen_nonzero() {
     unsigned char pk1_comp[33]; size_t pk1_len = 33;
     check(secp256k1_ec_pubkey_serialize(ctx, pk1_comp, &pk1_len, &pk1, SECP256K1_EC_COMPRESSED) == 1, "[MNS-1e] serialize pk1");
 
-    unsigned char pk32[32];
-    std::memcpy(pk32, pk1_comp + 1, 32);
-
     const unsigned char msg[32] = {0xAA};
+    // session_id32 is ARG_NONNULL — use the serialized aggregate x-coord as a
+    // deterministic 32-byte session identifier for this regression test.
+    const unsigned char* session_id = agg_pk32;
     secp256k1_musig_secnonce secnonce;
     secp256k1_musig_pubnonce pubnonce;
-    check(secp256k1_musig_nonce_gen(ctx, &secnonce, &pubnonce, nullptr, kSk1, pk32, agg_pk32, msg, nullptr) == 1,
+    check(secp256k1_musig_nonce_gen(ctx, &secnonce, &pubnonce, session_id, kSk1, &pk1, msg, &ka, nullptr) == 1,
           "[MNS-1f] nonce_gen succeeds");
 
     // R1 and R2 must not be all-zero (degenerate nonce)
@@ -92,17 +92,17 @@ static void test_nonce_gen_distinct() {
 
     unsigned char agg_pk32[32];
     secp256k1_xonly_pubkey_serialize(ctx, agg_pk32, &agg_pk);
-    unsigned char pk_comp[33]; size_t plen = 33;
-    secp256k1_ec_pubkey_serialize(ctx, pk_comp, &plen, &pk, SECP256K1_EC_COMPRESSED);
-    unsigned char pk32[32]; std::memcpy(pk32, pk_comp + 1, 32);
     const unsigned char msg[32] = {0xBB};
+    // session_id32 is ARG_NONNULL — reuse the aggregate x-coord as a fixed
+    // session id so the only varying input across the two calls is extra_input32.
+    const unsigned char* session_id = agg_pk32;
 
     secp256k1_musig_secnonce sn1, sn2;
     secp256k1_musig_pubnonce pn1, pn2;
     // Use different extra_input to guarantee distinct nonces
     unsigned char extra1[32] = {1}, extra2[32] = {2};
-    check(secp256k1_musig_nonce_gen(ctx, &sn1, &pn1, nullptr, kSk2, pk32, agg_pk32, msg, extra1) == 1, "[MNS-2e] nonce1");
-    check(secp256k1_musig_nonce_gen(ctx, &sn2, &pn2, nullptr, kSk2, pk32, agg_pk32, msg, extra2) == 1, "[MNS-2f] nonce2");
+    check(secp256k1_musig_nonce_gen(ctx, &sn1, &pn1, session_id, kSk2, &pk, msg, &ka1, extra1) == 1, "[MNS-2e] nonce1");
+    check(secp256k1_musig_nonce_gen(ctx, &sn2, &pn2, session_id, kSk2, &pk, msg, &ka2, extra2) == 1, "[MNS-2f] nonce2");
     check(std::memcmp(pn1.data, pn2.data, 66) != 0, "[MNS-2g] distinct extra_input → distinct nonces");
 
     secp256k1_context_destroy(ctx);

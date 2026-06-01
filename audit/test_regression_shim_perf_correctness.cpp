@@ -57,13 +57,13 @@ static void test_shim_recovery_roundtrip() {
         auto pk_c = pk.to_compressed();
 
         auto msg = make_msg(i);
-        auto rsig = secp256k1::ct::ecdsa_sign_recoverable(sk, msg.data());
+        auto rsig = secp256k1::ct::ecdsa_sign_recoverable(msg, sk);
 
-        auto recovered = secp256k1::ecdsa_recover(rsig, msg.data());
-        CHECK(recovered.has_value(), "ecdsa_recover must succeed");
-        if (!recovered.has_value()) continue;
+        auto [recovered, rec_ok] = secp256k1::ecdsa_recover(msg, rsig.sig, rsig.recid);
+        CHECK(rec_ok, "ecdsa_recover must succeed");
+        if (!rec_ok) continue;
 
-        auto rec_c = recovered->to_compressed();
+        auto rec_c = recovered.to_compressed();
         bool match = (std::memcmp(pk_c.data(), rec_c.data(), 33) == 0);
         CHECK(match, "recovered pubkey must match original");
     }
@@ -78,14 +78,14 @@ static void test_shim_ecdsa_verify_correctness() {
         auto sk = make_sk(i);
         auto pk = secp256k1::ct::generator_mul(sk);
         auto msg = make_msg(i);
-        auto sig = secp256k1::ct::ecdsa_sign(sk, msg.data());
+        auto sig = secp256k1::ct::ecdsa_sign(msg, sk);
 
-        bool ok = secp256k1::ecdsa_verify(sig, msg.data(), pk);
+        bool ok = secp256k1::ecdsa_verify(msg.data(), pk, sig);
         CHECK(ok, "valid ECDSA signature must verify");
 
         // Wrong key: sign with sk, verify with different pk
         auto wrong_pk = secp256k1::ct::generator_mul(make_sk(i + 100));
-        bool bad = secp256k1::ecdsa_verify(sig, msg.data(), wrong_pk);
+        bool bad = secp256k1::ecdsa_verify(msg.data(), wrong_pk, sig);
         CHECK(!bad, "ECDSA verify with wrong key must fail");
     }
     printf("[shim_perf] SPC-2: %d/%d\n", g_pass, g_pass + g_fail);
@@ -100,11 +100,12 @@ static void test_shim_schnorrsig_verify_correctness() {
         auto msg = make_msg(i);
         // Schnorr: use aux_rand = zero bytes
         std::array<uint8_t, 32> aux{};
-        auto sig = secp256k1::ct::schnorr_sign(sk, msg.data(), aux.data());
+        auto kp  = secp256k1::ct::schnorr_keypair_create(sk);
+        auto sig = secp256k1::ct::schnorr_sign(kp, msg, aux);
         auto pk  = secp256k1::ct::generator_mul(sk);
 
         // schnorr_verify takes xonly pubkey (x coordinate only)
-        auto px = pk.to_xonly_bytes();
+        auto px = pk.x_only_bytes();
         bool ok = secp256k1::schnorr_verify(px.data(), msg.data(), sig);
         CHECK(ok, "valid Schnorr signature must verify");
 
@@ -124,14 +125,14 @@ static void test_shim_recovery_recid() {
     for (uint8_t i = 1; i <= 40; ++i) {
         auto sk = make_sk(i);
         auto msg = make_msg(i);
-        auto rsig = secp256k1::ct::ecdsa_sign_recoverable(sk, msg.data());
-        auto recovered = secp256k1::ecdsa_recover(rsig, msg.data());
+        auto rsig = secp256k1::ct::ecdsa_sign_recoverable(msg, sk);
+        auto [recovered, rec_ok] = secp256k1::ecdsa_recover(msg, rsig.sig, rsig.recid);
 
         // Recovery must succeed for any valid signing key
-        if (recovered.has_value()) {
+        if (rec_ok) {
             auto pk = secp256k1::ct::generator_mul(sk);
             auto pk_c = pk.to_compressed();
-            auto rec_c = recovered->to_compressed();
+            auto rec_c = recovered.to_compressed();
             if (std::memcmp(pk_c.data(), rec_c.data(), 33) == 0) ++succeeded;
         }
     }
@@ -150,9 +151,10 @@ static void test_t11_glv_cached_verify_correctness() {
         auto sk  = make_sk(i);
         auto msg = make_msg(i);
         std::array<uint8_t, 32> aux{};
-        auto sig = secp256k1::ct::schnorr_sign(sk, msg.data(), aux.data());
+        auto kp  = secp256k1::ct::schnorr_keypair_create(sk);
+        auto sig = secp256k1::ct::schnorr_sign(kp, msg, aux);
         auto pk  = secp256k1::ct::generator_mul(sk);
-        auto px  = pk.to_xonly_bytes();
+        auto px  = pk.x_only_bytes();
 
         // Parse into SchnorrXonlyPubkey (builds GLV tables).
         secp256k1::SchnorrXonlyPubkey xonly{};

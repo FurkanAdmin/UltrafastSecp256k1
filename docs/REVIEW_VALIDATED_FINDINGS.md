@@ -111,3 +111,50 @@ CT-001 re-confirmed false-positive; TQ-002 mostly false-positive (1 hardened-any
 | CAAS-FG-01 | 5 shim security PoCs run in no blocking job (advisory-only) | **REAL → fixed (deeper than reported)** | Confirmed: root `add_subdirectory(audit)` (L489) precedes `compat/libsecp256k1_shim` (L497), so the bare `if(TARGET secp256k1_shim)` guard around the `shim_exploit_test` registrations was always FALSE → the 5 standalones were never CTest targets (`ctest -N` empty). Registering them (guard → `OR SECP256K1_BUILD_SHIM`) exposed that **3 of the 5 no longer compile** against removed APIs: `legacy_capi_*` → removed `bindings/c_api/ultrafast_secp256k1.*`; `bchn_schnorr_strict` → removed BCH `secp256k1_schnorr_*`. **Resolution:** the macro guard is fixed (`OR SECP256K1_BUILD_SHIM`) so `exploit_context_flag_bypass` (9/9) + `exploit_musig_unknown_signer` (10/10) **register and pass** when the audit tests are built (verified locally with `SECP256K1_BUILD_TESTS=ON`); **retired** the 3 obsolete (properties covered by current-API strict-parse + BIP-340 lift_x tests); new guard `ci/check_advisory_has_blocking_test.py`. **CI-execution caveat (folded into the systemic item):** gate.yml's shim job builds with `SECP256K1_BUILD_TESTS=OFF`, so NO audit standalone CTest registers there — its existing `ctest -R "regression_shim|exploit_shim|test_shim"` step matches nothing and silently passes (the same vestigial pattern). A first attempt to add a `--no-tests=error` hard-gate step correctly failed (zero match under TESTS=OFF) and was reverted; making these (and the other shim standalones) actually execute as hard gates requires the gate-job to build with `TESTS=ON` and build the selected standalone targets — part of the systemic gate.yml refactor below. |
 | CAAS-FG-01-SYSTEMIC | (discovered) | **REAL — precisely characterized, scoped follow-up** | The bare-`if(TARGET secp256k1_shim)` registration anti-pattern appears in **31** audit-CMake blocks. Triage (compared bare-block `add_test(NAME …)` vs the live `ctest -N` set): **16 are GENUINELY DROPPED** (no other registration — `regression_shim_static_ctx`, `exploit_shim_recovery_null_arg`, `regression_shim_context_erase`, `regression_shim_keypair_null_cb`, `regression_shim_null_arg_cb`, `regression_shim_security_v8`, `regression_shim_pubkey_sort`, `regression_shim_per_context_blinding`, `regression_musig2_session_token`, `regression_shim_musig_null_ctx`, `regression_ellswift_ct_path`, `regression_musig2_nonce_strict`, `shim_der_zero_r`, `shim_null_ctx`, `regression_shim_rgrind_functional`, `regression_shim_preallocated_ctx`); the other **15 are DEAD DUPLICATES** (the same test is already registered + gated via an `OR SECP256K1_BUILD_SHIM`/unconditional block — the bare-if copy is inert, always-false). Blindly converting all guards to the OR pattern (or reordering root CMake) **breaks configure with duplicate-target errors** because some bare blocks register a dropped test AND a dead-duplicate test together, so the dup collides with its working registration. The correct fix is a careful per-block refactor: delete the 15 dead-duplicate bare blocks (split mixed blocks first), then convert the 16 genuinely-dropped guards and compile-triage them (most use the current shim API; any bit-rotted like the 3 retired get fixed or retired). The new guard WARNS the count so it cannot grow. **Deliberately not rushed** — a botched refactor would break the build (worse debt). Scoped as a dedicated pass. |
 | CORR-01 | non-x86-asm `scalar_mul` KAT divergence masked by `continue-on-error` | **STALE → resolved** | Could NOT reproduce on g++ (`-DSECP256K1_USE_ASM=OFF`) or clang-18, and — definitively — **not on clang-17 + ASan/UBSan + x86-64-v3 (the exact CI toolchain)**: `run_selftest` (which contains test_large_scalar_multiplication: fast-vs-generic kG, large scalars, KAT) passes 31/31 modules, smoke+stress, **zero UBSan runtime errors**. Two further discoveries: (1) there is **no standalone `test_large_scalar` CTest target** (the source is only compiled into run_selftest), so the advisory `ctest -R "^test_large_scalar"` matched nothing and **gated zero tests**; (2) the main sanitizer ctest step **excludes `selftest`**, so the scalar_mul large-vector paths had **no sanitizer coverage at all**. Fix: removed the stale `continue-on-error` advisory step + TODO, and added a **hard-gate step that runs the `run_selftest` binary under ASan/UBSan** — giving the scalar_mul paths real sanitizer coverage that previously did not exist. The divergence the TODO referenced (added 2026-05-20) was incidentally fixed by later changes. |
+
+## 2026-06-01 — CAAS-FG-01-SYSTEMIC: refactor COMPLETED (supersedes the "scoped follow-up" row above)
+
+The systemic bare-`if(TARGET secp256k1_shim)` refactor is **done**. All **31** bare registration
+guards were converted to `if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)`; the **2 genuine
+dead-duplicate** blocks (`regression_shim_security_v9`, `regression_musig_noncegen_extra_input` —
+each already registered unconditionally lower in the file, which also wires the .cpp into
+`unified_audit_runner`) were deleted; and `ci/check_advisory_has_blocking_test.py` was flipped from
+WARN to **ENFORCE** (0 bare registration guards may remain). The earlier "15 dead duplicates"
+estimate was wrong — only 2 caused real duplicate-target collisions (verified: reconfigure is clean
+after removing exactly those 2). Final state: **out/ci-shim builds all targets and `ctest` is
+415/415** (SHIM=ON, Release/gcc).
+
+**One guard MUST stay bare** (do not convert): the `unified_audit_runner` stubs/real **fork**
+(audit/CMakeLists.txt, `# Shim-dependent + internal-API tests: link real files when shim is
+available`). It is NOT a standalone registration — it is the runner's source fork. Because audit/
+is processed before compat/libsecp256k1_shim/, the bare guard is FALSE in the main build → the
+`else()` stubs branch (`shim_run_stubs_unified.cpp`) is taken so the runner links advisory-skip
+stubs while the **real** shim tests run as standalone CTest targets. Forcing it `OR
+SECP256K1_BUILD_SHIM` pulls real shim sources + `secp256k1_shim` into the runner, which
+multiply-defines `secp256k1_ecdsa_*` against the legacy `c_api` bindings AND drops the stubs that
+standalone-only shim tests depend on (undefined `_run()`). The blanket conversion hit it once; it
+was reverted with an inline warning. The ENFORCE guard does not flag it (it gates `target_sources`,
+not `add_test`/`add_executable`).
+
+Registering the previously-dropped tests exposed **19 bit-rotted tests** (dead so long they rotted).
+All were validated against the actual code + knowledge_base and **fixed as TEST bugs — zero were
+real shim defects** (the validate-before-fix rule prevented reverting two deliberate shim decisions):
+
+| Test | Failure | Verdict | Fix |
+|------|---------|---------|-----|
+| ecdsa_batch_curve_check | `ecdsa_sign` ptr arg + `to_affine_xy` removed | test | pass `d.msg` array; `pk.x()/y().to_bytes()` |
+| musig2_nonce_strict / _gen_seckey / musig_xonly_zero_tweak / session_token / p2_ct_shim_fixes | stale `musig_pubkey_agg`/`nonce_gen` arg order (removed scratch `nullptr`) | test | drop leading `nullptr` → current 5/9-arg sig; add missing `secp256k1_schnorrsig.h`/`_extrakeys.h` |
+| shim_security_v8, parse_strictness, p2_ct_shim_fixes | missing `secp256k1_batch.h` / `secp256k1_schnorrsig.h` / file-scope `secp256k1.h` | test | add the include (file scope — header is `extern "C"`-wrapped) |
+| shim_perf_correctness | 5 stale CT APIs (`ecdsa_sign_recoverable`/`ecdsa_sign`/`ecdsa_recover` optional→pair/`ecdsa_verify` arg order/`schnorr_sign` keypair + `x_only_bytes`) | test | restore `(msg, key)` order, `auto [pt,ok]=ecdsa_recover(msg,sig,recid)`, `schnorr_keypair_create` + `x_only_bytes()` |
+| pubkey_sort / musig_null_ctx / ellswift_ct_path / preallocated_ctx / recovery_null_arg / ecdh_xy64_erase / shim_null_ctx | illegal-callback `std::abort()` on intentionally-illegal arg / literal NULL ctx | test | install non-aborting counting illegal callback; for literal-NULL-ctx (unconditional abort, `SHIM_REQUIRE_CTX(NULL)`→default cb) rewrite to positive + NULL-non-ctx-arg + document (mirrors SHIM-004); fixed an assert()-under-NDEBUG setup bug in shim_null_ctx |
+| **SHIM-A10** (`xonly_pubkey_from_pubkey` off-curve) | shim "accepts" off-curve struct | **test — NOT shim bug** | superseded by **PERF-002-FIXED** (c67edc1c, trust-contract: curve checked once at parse). Test rewritten to the positive contract; re-adding the check would revert a deliberate perf decision + diverge from upstream. kb `SHIM-A10-TEST-TRUST-CONTRACT` |
+| **NEW-006** (keypair parity) | never finds odd-Y keypair | **test — NOT shim bug** | `keypair_create` BIP-340-normalizes to even-Y, so `keypair_xonly_pub` pk_parity is always 0 (matches libsecp). Test pins the normalization invariant. kb `NEW-006-KEYPAIR-NORMALIZE` |
+| **SXP-2** (`xonly_pubkey_parse` x-not-on-curve) | shim "accepts" x=1 | **test — NOT shim bug** | x=1 IS on-curve (1³+7=8 is a QR mod p; p≡7 mod 8 → 2 is a QR → 8 is a QR). Parse boundaries DO validate (PERF-002 only removed verify-path re-checks). Changed to x=5 (132 = non-QR). kb `SXP-2-TEST-LIFTABLE-X` |
+| **PAC-1** (`preallocated_size`) | `>= 256` over-assumption | test | the shim context struct is smaller; assert flag-independence + rely on PAC-2 for sufficiency |
+| shim_recovery_and_noncefp | link `undefined main` | build wiring | standalone CMake target was missing `target_compile_definitions(... STANDALONE_TEST)` (sibling pattern) — added |
+
+**MSan CI fix (run 26753960346):** the only MSan failure was the new B1 test
+`regression_negate_inplace_generator_flag` (15 full ECC `scalar_mul` ops) hitting its 60 s CTest
+timeout under MSan's ~10-20× overhead — added to the MSan `-E` exclusion (pure deterministic point
+math; fully covered by ASan+UBSan/Valgrind/normal), matching the established pattern for the other
+scalar-mul-heavy correctness tests.

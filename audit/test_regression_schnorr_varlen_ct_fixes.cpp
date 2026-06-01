@@ -49,35 +49,25 @@ static int g_fail = 0;
     if (!(cond)) { std::printf("  FAIL [%s:%d] %s\n", __FILE__, __LINE__, (msg)); ++g_fail; } \
 } while(0)
 
-#if defined(__APPLE__)
-#  define SHIM_WEAK __attribute__((weak_import))
+// Include the REAL shim public headers (strong extern-C prototypes) instead of
+// local WEAK declarations. The previous SHIM_WEAK __attribute__((weak)) decls
+// stayed null when the shim was compiled INTO the fastsecp256k1 / secp256k1_shim
+// static archive, because weak UNDEFINED references are NOT pulled from a .a —
+// so the runtime null-check self-skipped with code 77 ("SKIP VCS: shim not
+// linked"). Strong prototypes force archive resolution (the targets that compile
+// this file already link secp256k1_shim and add the shim include dir in
+// audit/CMakeLists.txt). Context flags come from the real header
+// (SECP256K1_CONTEXT_SIGN == 0x201, SECP256K1_CONTEXT_VERIFY == 0x101).
+#if __has_include("secp256k1.h")
+#include "secp256k1.h"
+#include "secp256k1_extrakeys.h"
+#include "secp256k1_schnorrsig.h"
+#define VARLEN_SHIM_AVAILABLE 1
 #else
-#  define SHIM_WEAK __attribute__((weak))
+#define VARLEN_SHIM_AVAILABLE 0
 #endif
 
-extern "C" {
-    typedef struct { unsigned char data[64]; } secp256k1_pubkey;
-    typedef struct { unsigned char data[96]; } secp256k1_keypair;
-    typedef struct secp256k1_context_struct secp256k1_context;
-    typedef struct { unsigned char data[64]; } secp256k1_xonly_pubkey;
-
-    // Real libsecp256k1 context flags (secp256k1.h): TYPE_CONTEXT(1<<0) |
-    // {VERIFY(1<<8), SIGN(1<<9)}. SIGN|VERIFY == 0x301. (The earlier 0x0101/0x0102
-    // were wrong — 0x0102 set the COMPRESSION type bit, so context_create fired the
-    // illegal callback and aborted before any varlen assertion ran.)
-    static constexpr unsigned int CTX_VERIFY = 0x0101u; // CONTEXT | VERIFY
-    static constexpr unsigned int CTX_SIGN   = 0x0201u; // CONTEXT | SIGN
-
-    SHIM_WEAK secp256k1_context* secp256k1_context_create(unsigned int flags);
-    SHIM_WEAK void secp256k1_context_destroy(secp256k1_context* ctx);
-    SHIM_WEAK int secp256k1_keypair_create(const secp256k1_context*, secp256k1_keypair*, const unsigned char*);
-    SHIM_WEAK int secp256k1_schnorrsig_sign_custom(const secp256k1_context*, unsigned char*, const unsigned char*, size_t, const secp256k1_keypair*, void*);
-    SHIM_WEAK int secp256k1_schnorrsig_sign32(const secp256k1_context*, unsigned char*, const unsigned char*, const secp256k1_keypair*, const unsigned char*);
-    SHIM_WEAK int secp256k1_keypair_xonly_pub(const secp256k1_context*, secp256k1_xonly_pubkey*, int*, const secp256k1_keypair*);
-    // schnorrsig_verify accepts any msglen (matches upstream libsecp256k1), so the
-    // varlen sign path is round-tripped directly through verify (VCS-7).
-    SHIM_WEAK int secp256k1_schnorrsig_verify(const secp256k1_context*, const unsigned char*, const unsigned char*, size_t, const secp256k1_xonly_pubkey*);
-}
+#if VARLEN_SHIM_AVAILABLE
 
 static const unsigned char kPrivkey[32] = {
     0x01,0x23,0x45,0x67,0x89,0xAB,0xCD,0xEF,
@@ -236,15 +226,8 @@ static void test_varlen_sign_verify_roundtrip(secp256k1_context* ctx) {
 int test_regression_schnorr_varlen_ct_fixes_run() {
     g_fail = 0;
 
-    if (!secp256k1_context_create || !secp256k1_context_destroy ||
-        !secp256k1_keypair_create || !secp256k1_schnorrsig_sign_custom ||
-        !secp256k1_schnorrsig_sign32 || !secp256k1_keypair_xonly_pub ||
-        !secp256k1_schnorrsig_verify) {
-        std::printf("  SKIP VCS: shim not linked\n");
-        return ADVISORY_SKIP_CODE;
-    }
-
-    secp256k1_context* ctx = secp256k1_context_create(CTX_SIGN | CTX_VERIFY);
+    secp256k1_context* ctx =
+        secp256k1_context_create(SECP256K1_CONTEXT_SIGN | SECP256K1_CONTEXT_VERIFY);
     if (!ctx) {
         std::printf("  SKIP VCS: context_create failed\n");
         return ADVISORY_SKIP_CODE;
@@ -266,6 +249,16 @@ int test_regression_schnorr_varlen_ct_fixes_run() {
         std::printf("  FAIL VCS: sign_custom varlen: %d failure(s)\n", g_fail);
     return g_fail;
 }
+#else  // !VARLEN_SHIM_AVAILABLE
+// Shim headers absent at compile time (non-shim build configuration). The
+// targets that exercise this regression always link secp256k1_shim and add the
+// shim include dir, so this branch only guards exotic configs. Self-skip with
+// the advisory sentinel rather than fail the build.
+int test_regression_schnorr_varlen_ct_fixes_run() {
+    std::printf("  SKIP VCS: shim headers not available at compile time\n");
+    return ADVISORY_SKIP_CODE;
+}
+#endif // VARLEN_SHIM_AVAILABLE
 
 #ifdef STANDALONE_TEST
 int main() { return test_regression_schnorr_varlen_ct_fixes_run(); }

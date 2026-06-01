@@ -49,7 +49,7 @@ static int setup_keyagg(secp256k1_context* ctx, secp256k1_musig_keyagg_cache* ca
     if (!secp256k1_ec_pubkey_create(ctx, &pk, kSk1)) return 0;
     const secp256k1_pubkey* pks[1] = {&pk};
     secp256k1_xonly_pubkey agg_pk;
-    return secp256k1_musig_pubkey_agg(ctx, nullptr, &agg_pk, cache, pks, 1);
+    return secp256k1_musig_pubkey_agg(ctx, &agg_pk, cache, pks, 1);
 }
 
 // ─── MXT-1: zero tweak must succeed ─────────────────────────────────────────

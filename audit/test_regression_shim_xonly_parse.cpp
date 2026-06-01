@@ -70,9 +70,13 @@ static void test_sxp1_valid_roundtrip() {
 static void test_sxp2_not_on_curve() {
     secp256k1_context* ctx = secp256k1_context_create(SECP256K1_CONTEXT_VERIFY);
 
-    // x=1 is not on secp256k1: 1³+7 = 8, sqrt(8) mod p does not exist.
+    // x=5 is NOT a valid x-only point: 5³+7 = 132 is a quadratic NON-residue mod p,
+    // so no y satisfies y²=x³+7 and lift_x fails. (The previous value x=1 was WRONG:
+    // 1³+7 = 8 IS a QR mod p — p ≡ 7 (mod 8) makes 2 a QR, hence 8 = 2·2² is a QR —
+    // so x=1 lifts to a valid point and parse correctly returns 1. Verified with
+    // Euler's criterion: (x³+7)^((p-1)/2) mod p == 1 for x=1, != 1 for x=5.)
     uint8_t bad_x[32]{};
-    bad_x[31] = 0x01;
+    bad_x[31] = 0x05;
 
     secp256k1_xonly_pubkey xonly{};
     int rc = secp256k1_xonly_pubkey_parse(ctx, &xonly, bad_x);

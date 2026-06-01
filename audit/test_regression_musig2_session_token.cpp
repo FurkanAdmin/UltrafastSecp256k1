@@ -25,6 +25,7 @@ static int g_pass = 0, g_fail = 0;
 #include "secp256k1.h"
 #include "secp256k1_musig.h"
 #include "secp256k1_extrakeys.h"
+#include "secp256k1_schnorrsig.h"  // secp256k1_schnorrsig_verify (MST-4 final-sig check)
 
 static const unsigned char kSk1[32] = {
     0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,
@@ -118,9 +119,6 @@ static void test_2of2_roundtrip() {
     secp256k1_xonly_pubkey agg_pk;
     check(secp256k1_musig_pubkey_agg(ctx, &agg_pk, &ka, pks, 2) == 1, "[MST-4c] pubkey_agg");
 
-    unsigned char agg_pk32[32];
-    secp256k1_xonly_pubkey_serialize(ctx, agg_pk32, &agg_pk);
-
     unsigned char pk1_comp[33], pk2_comp[33]; size_t plen = 33;
     secp256k1_ec_pubkey_serialize(ctx, pk1_comp, &plen, &pub1, SECP256K1_EC_COMPRESSED);
     secp256k1_ec_pubkey_serialize(ctx, pk2_comp, &plen, &pub2, SECP256K1_EC_COMPRESSED);
@@ -130,8 +128,8 @@ static void test_2of2_roundtrip() {
 
     secp256k1_musig_secnonce sn1, sn2;
     secp256k1_musig_pubnonce pn1, pn2;
-    check(secp256k1_musig_nonce_gen(ctx, &sn1, &pn1, nullptr, kSk1, pk1_comp+1, agg_pk32, msg, extra1) == 1, "[MST-4d] nonce1");
-    check(secp256k1_musig_nonce_gen(ctx, &sn2, &pn2, nullptr, kSk2, pk2_comp+1, agg_pk32, msg, extra2) == 1, "[MST-4e] nonce2");
+    check(secp256k1_musig_nonce_gen(ctx, &sn1, &pn1, pk1_comp+1, kSk1, &pub1, msg, &ka, extra1) == 1, "[MST-4d] nonce1");
+    check(secp256k1_musig_nonce_gen(ctx, &sn2, &pn2, pk2_comp+1, kSk2, &pub2, msg, &ka, extra2) == 1, "[MST-4e] nonce2");
 
     const secp256k1_musig_pubnonce* pns[2] = {&pn1, &pn2};
     secp256k1_musig_aggnonce agg_nonce;

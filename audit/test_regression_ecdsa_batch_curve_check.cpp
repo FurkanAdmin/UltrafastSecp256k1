@@ -56,7 +56,7 @@ static SlotData make_valid_slot(int v) {
 
     Scalar sk = make_sk(v);
     // CT sign to get a valid ECDSA signature
-    auto sig_pair = secp256k1::ct::ecdsa_sign(d.msg.data(), sk);
+    auto sig_pair = secp256k1::ct::ecdsa_sign(d.msg, sk);
     secp256k1::detail::secure_erase(&sk, sizeof(sk));
 
     auto sig_bytes = sig_pair.to_compact();
@@ -64,10 +64,12 @@ static SlotData make_valid_slot(int v) {
 
     // Derive public key
     Point pk = secp256k1::ct::generator_mul(make_sk(v));
-    // Store as affine x||y (secp256k1_pubkey layout)
-    auto aff = pk.to_affine_xy();
-    std::memcpy(d.pubkey_xy.data(),      aff.first.to_bytes().data(),  32);
-    std::memcpy(d.pubkey_xy.data() + 32, aff.second.to_bytes().data(), 32);
+    // Store as affine x||y (secp256k1_pubkey layout). Point::x()/y() normalize
+    // Jacobian→affine internally and to_bytes() returns big-endian coordinates.
+    auto x_bytes = pk.x().to_bytes();
+    auto y_bytes = pk.y().to_bytes();
+    std::memcpy(d.pubkey_xy.data(),      x_bytes.data(), 32);
+    std::memcpy(d.pubkey_xy.data() + 32, y_bytes.data(), 32);
     return d;
 }
 

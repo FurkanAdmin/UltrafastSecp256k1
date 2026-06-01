@@ -16,11 +16,13 @@ ENFORCED (fail-closed):
     `if(TARGET secp256k1_shim)`.
   - Every `shim_exploit_test(...)` call must reference a test source file that exists.
 
-WARNS (informational, does not fail): the count of OTHER bare
-`if(TARGET secp256k1_shim)` blocks that still guard test registration — these are the
-broader systemic CAAS-FG-01 surface tracked for a dedicated triage (see
-docs/REVIEW_VALIDATED_FINDINGS.md). They are advisory-only today; converting each to
-the `OR SECP256K1_BUILD_SHIM` pattern requires per-test compile triage.
+ENFORCED (fail-closed): there must be ZERO bare `if(TARGET secp256k1_shim)` blocks
+that guard test registration (add_test/add_executable). The 2026-06-01 systemic
+refactor converted all 31 of them to `OR SECP256K1_BUILD_SHIM` (and fixed/validated
+the bit-rotted tests they exposed — see docs/REVIEW_VALIDATED_FINDINGS.md), so any new
+bare guard is a regression: audit/ is processed before compat/libsecp256k1_shim/, so a
+bare guard is always FALSE in the main build and silently drops the test from every
+blocking job (a false-green). Use `if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)`.
 """
 from __future__ import annotations
 
@@ -66,19 +68,23 @@ def main() -> int:
         if not (ROOT / "audit" / src).exists():
             failures.append(f"shim_exploit_test references missing source: audit/{src}")
 
-    # --- WARN: other bare if(TARGET secp256k1_shim) registration blocks -----------
-    bare = 0
+    # --- ENFORCE: zero bare if(TARGET secp256k1_shim) registration blocks ----------
+    bare_lines: list[int] = []
     for i, l in enumerate(lines):
         if l.strip() == "if(TARGET secp256k1_shim)":
             blk = "\n".join(lines[i:i + 14])
             if "add_test(" in blk or "add_executable(" in blk:
-                bare += 1
+                bare_lines.append(i + 1)
 
     print("CAAS-FG-01 advisory-blocking-twin guard")
     print(f"  shim_exploit_test guard: {guard.strip()[:70]}")
-    if bare:
-        print(f"  [warn] {bare} other bare `if(TARGET secp256k1_shim)` registration "
-              f"block(s) remain (systemic CAAS-FG-01 surface — tracked for triage).")
+    if bare_lines:
+        failures.append(
+            f"{len(bare_lines)} bare `if(TARGET secp256k1_shim)` registration block(s) "
+            f"remain (audit/CMakeLists.txt lines {bare_lines}). audit/ is processed "
+            "before compat/libsecp256k1_shim/, so a bare guard is always FALSE in the "
+            "main build and silently drops the test from every blocking job (false-green). "
+            "Convert to `if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)`.")
 
     if failures:
         for f in failures:

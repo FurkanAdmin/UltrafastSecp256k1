@@ -21,6 +21,12 @@ static int g_pass = 0, g_fail = 0;
 #include <cstring>
 #include "secp256k1.h"
 
+// Counting no-op illegal callback: suppresses default_illegal_callback's abort()
+// so intentionally-illegal arguments can be exercised without SIGABRT. Mirrors the
+// canonical pattern in audit/test_regression_shim_null_arg_cb.cpp (nac_illegal_cb).
+static int g_illegal_cb_count = 0;
+static void counting_illegal_cb(const char*, void*) { ++g_illegal_cb_count; }
+
 static secp256k1_pubkey make_pubkey(secp256k1_context* ctx, unsigned char scalar_byte) {
     unsigned char sk[32] = {};
     sk[31] = scalar_byte;
@@ -108,14 +114,21 @@ static void test_sort_three_keys() {
 // ── PST-4: n=0 with null array — no crash and canary byte unchanged ──────
 static void test_sort_zero_count() {
     secp256k1_context* ctx = secp256k1_context_create(SECP256K1_CONTEXT_SIGN | SECP256K1_CONTEXT_VERIFY);
+    // Install a non-aborting illegal callback: NULL pubkeys is an illegal argument
+    // and the shim (matching upstream libsecp256k1 ARG_CHECK) fires the callback
+    // BEFORE the n_pubkeys==0 short-circuit. The default callback would abort().
+    secp256k1_context_set_illegal_callback(ctx, counting_illegal_cb, nullptr);
     // canary: a real pubkey allocated adjacent to where an OOB write would land
     secp256k1_pubkey canary = make_pubkey(ctx, 99);
     unsigned char canary_before[64];
     memcpy(canary_before, canary.data, 64);
-    // n=0 with null array: must not write anything, must not crash
+    // n=0 with null array: must fire the illegal callback (NULL pubkeys), must not
+    // write anything, must not crash.
+    g_illegal_cb_count = 0;
     secp256k1_ec_pubkey_sort(ctx, nullptr, 0);
+    check(g_illegal_cb_count > 0, "[PST-4a] n=0 with NULL array fires illegal_callback (no abort)");
     // Canary must be unchanged — OOB write would corrupt adjacent memory
-    check(memcmp(canary_before, canary.data, 64) == 0, "[PST-4] n=0 with null array: canary byte unchanged (no OOB write)");
+    check(memcmp(canary_before, canary.data, 64) == 0, "[PST-4b] n=0 with null array: canary byte unchanged (no OOB write)");
     secp256k1_context_destroy(ctx);
 }
 

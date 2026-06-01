@@ -125,6 +125,8 @@ static void test_hedged_nonce_correctness() {
 #if defined(SECP256K1_BUILD_COMPAT_SHIM)
 
 #include "secp256k1.h"
+#include "secp256k1_extrakeys.h"
+#include "secp256k1_schnorrsig.h"
 #include "secp256k1_musig.h"
 
 static const secp256k1_context* sctx() {
@@ -225,7 +227,7 @@ static void test_musig_ec_tweak_zero() {
     const secp256k1_pubkey* pks[2] = {&pk, &pk2};
     secp256k1_musig_keyagg_cache cache;
     secp256k1_xonly_pubkey agg_pk;
-    CHECK(secp256k1_musig_pubkey_agg(sctx(), nullptr, &agg_pk, &cache, pks, 2) == 1,
+    CHECK(secp256k1_musig_pubkey_agg(sctx(), &agg_pk, &cache, pks, 2) == 1,
           "MTZ-003: pubkey_agg ok");
 
     // Apply zero tweak — libsecp allows this (result = Q unchanged)

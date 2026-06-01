@@ -3076,7 +3076,7 @@ if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)
     add_executable(test_exploit_shim_musig_ka_cap_standalone
         test_exploit_shim_musig_ka_cap.cpp)
     audit_target_defaults(test_exploit_shim_musig_ka_cap_standalone)
-    if(TARGET secp256k1_shim)
+    if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)
         target_link_libraries(test_exploit_shim_musig_ka_cap_standalone PRIVATE secp256k1_shim)
     endif()
     target_include_directories(test_exploit_shim_musig_ka_cap_standalone PRIVATE
@@ -3087,7 +3087,7 @@ if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)
 endif()
 
 # Regression: g_static_ctx initializer for PERF-005 cached_r_G field (ecf47967)
-if(TARGET secp256k1_shim)
+if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)
     add_executable(test_regression_shim_static_ctx_standalone
         test_regression_shim_static_ctx.cpp)
     target_link_libraries(test_regression_shim_static_ctx_standalone PRIVATE secp256k1_shim fastsecp256k1)
@@ -3099,7 +3099,7 @@ if(TARGET secp256k1_shim)
         LABELS "audit;regression;shim;ct")
 endif()
 # -- SHIM-005: secp256k1_ecdsa_sign_recoverable NULL arg fail-closed (a3f56ae) --
-if(TARGET secp256k1_shim)
+if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)
     add_executable(test_exploit_shim_recovery_null_arg_standalone
         test_exploit_shim_recovery_null_arg.cpp)
     target_link_libraries(test_exploit_shim_recovery_null_arg_standalone PRIVATE secp256k1_shim fastsecp256k1)
@@ -3302,7 +3302,7 @@ if(TARGET secp256k1_shim OR TARGET ufsecp_static)
 add_executable(test_exploit_musig2_infinity_pubnonce_standalone
     test_exploit_musig2_infinity_pubnonce.cpp)
 audit_target_defaults(test_exploit_musig2_infinity_pubnonce_standalone)
-if(TARGET secp256k1_shim)
+if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)
     target_link_libraries(test_exploit_musig2_infinity_pubnonce_standalone PRIVATE secp256k1_shim)
     target_compile_definitions(test_exploit_musig2_infinity_pubnonce_standalone PRIVATE
         STANDALONE_TEST SECP256K1_BUILD_COMPAT_SHIM)
@@ -3319,26 +3319,15 @@ set_tests_properties(exploit_musig2_infinity_pubnonce PROPERTIES
     LABELS "audit;exploit;musig2;shim;infinity;pubnonce;p1_sec_003")
 endif()
 
-# -- SHIM-NONCEGEN-001: musig_nonce_gen extra_input32 behavioral freeze (NCI-1..3) --
-# advisory: documents that extra_input32 is silently ignored; behavioral freeze test.
-# SKIP_RETURN_CODE 77: when secp256k1_shim is absent the stub returns 77.
-if(TARGET secp256k1_shim)
-    add_executable(test_regression_musig_noncegen_extra_input_standalone
-        test_regression_musig_noncegen_extra_input.cpp)
-    audit_target_defaults(test_regression_musig_noncegen_extra_input_standalone)
-    target_link_libraries(test_regression_musig_noncegen_extra_input_standalone PRIVATE secp256k1_shim)
-    target_include_directories(test_regression_musig_noncegen_extra_input_standalone PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/../compat/libsecp256k1_shim/include)
-    target_compile_definitions(test_regression_musig_noncegen_extra_input_standalone PRIVATE STANDALONE_TEST)
-    add_test(NAME regression_musig_noncegen_extra_input
-        COMMAND test_regression_musig_noncegen_extra_input_standalone)
-    set_tests_properties(regression_musig_noncegen_extra_input PROPERTIES
-        TIMEOUT 30 SKIP_RETURN_CODE 77
-        LABELS "audit;regression;shim;musig;noncegen;shim-noncegen-001")
-endif()
+# -- SHIM-NONCEGEN-001: musig_nonce_gen extra_input32 behavioral freeze --
+#    Canonical registration is the UNCONDITIONAL block lower in this file
+#    (test_regression_musig_noncegen_extra_input_standalone, near the adaptor/GPU
+#    standalone cluster — it also wires the .cpp into unified_audit_runner).
+#    This bare-guard duplicate was removed 2026-06-01: with the OR-guard refactor it
+#    would create a duplicate add_executable target. Single source of truth below.
 
 # -- 2026-05-25 T-11/12: memset→secure_erase + is_zero→is_zero_ct in shim_context.cpp (SCE-1..5) --
-if(TARGET secp256k1_shim)
+if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)
     add_executable(test_regression_shim_context_erase_standalone
         test_regression_shim_context_erase.cpp)
     audit_target_defaults(test_regression_shim_context_erase_standalone)
@@ -3355,7 +3344,7 @@ if(TARGET secp256k1_shim)
 endif()
 
 # -- 2026-05-25 T-09/10: NULL-arg illegal_callback — keypair + sig parse (NCA-1..9) --
-if(TARGET secp256k1_shim)
+if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)
     add_executable(test_regression_shim_keypair_null_cb_standalone
         test_regression_shim_keypair_null_cb.cpp)
     audit_target_defaults(test_regression_shim_keypair_null_cb_standalone)
@@ -3371,7 +3360,7 @@ if(TARGET secp256k1_shim)
 endif()
 
 # -- 2026-05-26 SHIM-NEW-001/002/003: NULL non-ctx args fire illegal_callback (NAC-1..8) --
-if(TARGET secp256k1_shim)
+if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)
     add_executable(test_regression_shim_null_arg_cb_standalone
         test_regression_shim_null_arg_cb.cpp)
     audit_target_defaults(test_regression_shim_null_arg_cb_standalone)
@@ -4051,6 +4040,15 @@ target_sources(unified_audit_runner PRIVATE
 # Shim-dependent + internal-API tests: link real files when shim is available,
 # else use stubs that return ADVISORY_SKIP_CODE (77) so the unified runner
 # can link and reports them as advisory-skipped instead of failing.
+# IMPORTANT: this guard MUST stay bare `if(TARGET secp256k1_shim)` — do NOT add
+# `OR SECP256K1_BUILD_SHIM`. This is the unified_audit_runner stubs/real FORK, not a
+# standalone registration. audit/ is processed BEFORE compat/libsecp256k1_shim/, so
+# the target does not exist here yet → FALSE → the else() stubs branch is taken and
+# the runner links via shim_run_stubs_unified.cpp. The real shim tests run as
+# standalone CTest targets (which DO resolve secp256k1_shim at generate time). Forcing
+# this TRUE pulls real shim sources + links secp256k1_shim into the runner, which
+# (a) multiply-defines secp256k1_ecdsa_* against the legacy c_api bindings and
+# (b) drops the stubs that standalone-only shim tests rely on (undefined _run()).
 if(TARGET secp256k1_shim)
     target_sources(unified_audit_runner PRIVATE
         test_regression_ellswift_ct_path.cpp
@@ -4112,7 +4110,7 @@ else()
 endif()
 
 # -- v8: shim security regression guards — standalone CTest target (shim-dependent) --
-if(TARGET secp256k1_shim)
+if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)
     add_executable(test_regression_shim_security_v8_standalone
         test_regression_shim_security_v8.cpp)
     audit_target_defaults(test_regression_shim_security_v8_standalone)
@@ -4138,18 +4136,11 @@ if(TARGET secp256k1_shim)
     set_tests_properties(regression_schnorr_varlen_ct_fixes PROPERTIES
         TIMEOUT 60 LABELS "audit;regression;shim;schnorr;ct;varlen")
 
-    # -- v9: SHIM-NEW-012/015: serialize + seckey NULL arg callbacks (2026-05-22) --
-    add_executable(test_regression_shim_security_v9_standalone
-        test_regression_shim_security_v9.cpp)
-    audit_target_defaults(test_regression_shim_security_v9_standalone)
-    target_link_libraries(test_regression_shim_security_v9_standalone PRIVATE secp256k1_shim)
-    target_include_directories(test_regression_shim_security_v9_standalone PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/../compat/libsecp256k1_shim/include)
-    target_compile_definitions(test_regression_shim_security_v9_standalone PRIVATE STANDALONE_TEST)
-    add_test(NAME regression_shim_security_v9
-        COMMAND test_regression_shim_security_v9_standalone)
-    set_tests_properties(regression_shim_security_v9 PROPERTIES
-        TIMEOUT 60 LABELS "audit;regression;shim;security;callback")
+    # -- v9: SHIM-NEW-012/015 standalone — canonical registration is the
+    #    UNCONDITIONAL block lower in this file (it also wires the .cpp into
+    #    unified_audit_runner via target_sources). This bare-guard duplicate was
+    #    removed 2026-06-01: with the OR-guard refactor it would create a duplicate
+    #    add_executable target. Single source of truth below.
 
     # -- CA-001: curve membership check in large-batch ECDSA --
     add_executable(test_regression_ecdsa_batch_curve_check_standalone
@@ -4224,7 +4215,7 @@ if(SECP256K1_BUILD_SHIM AND SECP256K1_BUILD_CPU)
     add_executable(test_regression_shim_perf_correctness_standalone
         test_regression_shim_perf_correctness.cpp)
     audit_target_defaults(test_regression_shim_perf_correctness_standalone)
-    if(TARGET secp256k1_shim)
+    if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)
         target_link_libraries(test_regression_shim_perf_correctness_standalone PRIVATE secp256k1_shim)
         target_include_directories(test_regression_shim_perf_correctness_standalone PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/../compat/libsecp256k1_shim/include)
@@ -4241,7 +4232,7 @@ if(SECP256K1_BUILD_SHIM AND SECP256K1_BUILD_CPU)
     add_executable(test_regression_shim_high_s_verify_standalone
         test_regression_shim_high_s_verify.cpp)
     audit_target_defaults(test_regression_shim_high_s_verify_standalone)
-    if(TARGET secp256k1_shim)
+    if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)
         target_link_libraries(test_regression_shim_high_s_verify_standalone PRIVATE secp256k1_shim)
         target_include_directories(test_regression_shim_high_s_verify_standalone PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/../compat/libsecp256k1_shim/include)
@@ -4936,7 +4927,7 @@ endif()
 # ===========================================================================
 
 # # SHIM-012: uses secp256k1.h — only build when shim headers are available
-if(TARGET secp256k1_shim)
+if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)
     add_executable(test_regression_shim_pubkey_sort_standalone
         test_regression_shim_pubkey_sort.cpp)
     target_link_libraries(test_regression_shim_pubkey_sort_standalone PRIVATE secp256k1_shim fastsecp256k1)
@@ -4949,7 +4940,7 @@ if(TARGET secp256k1_shim)
 endif()
 
 # SHIM-001: per-context blinding
-if(TARGET secp256k1_shim)
+if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)
     add_executable(test_regression_shim_per_context_blinding_standalone
         test_regression_shim_per_context_blinding.cpp)
     target_link_libraries(test_regression_shim_per_context_blinding_standalone PRIVATE secp256k1_shim fastsecp256k1)
@@ -4961,7 +4952,7 @@ if(TARGET secp256k1_shim)
 endif()
 
 # SHIM-010: MuSig2 token-keyed session map
-if(TARGET secp256k1_shim)
+if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)
     add_executable(test_regression_musig2_session_token_standalone
         test_regression_musig2_session_token.cpp)
     target_link_libraries(test_regression_musig2_session_token_standalone PRIVATE secp256k1_shim fastsecp256k1)
@@ -4977,7 +4968,7 @@ if(TARGET secp256k1_shim)
 endif()
 
 # SHIM-NEW-004: NULL ctx rejected by 4 MuSig shim functions
-if(TARGET secp256k1_shim)
+if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)
     add_executable(test_regression_shim_musig_null_ctx_standalone
         test_regression_shim_musig_null_ctx.cpp)
     target_link_libraries(test_regression_shim_musig_null_ctx_standalone PRIVATE secp256k1_shim fastsecp256k1)
@@ -4993,7 +4984,7 @@ if(TARGET secp256k1_shim)
 endif()
 
 # CT-001: ellswift CT path
-if(TARGET secp256k1_shim)
+if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)
     add_executable(test_regression_ellswift_ct_path_standalone
         test_regression_ellswift_ct_path.cpp)
     target_link_libraries(test_regression_ellswift_ct_path_standalone PRIVATE secp256k1_shim fastsecp256k1)
@@ -5005,7 +4996,7 @@ if(TARGET secp256k1_shim)
 endif()
 
 # CT-006: MuSig2 nonce strict — uses secp256k1.h/secp256k1_musig.h, requires shim include
-if(TARGET secp256k1_shim)
+if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)
     add_executable(test_regression_musig2_nonce_strict_standalone
         test_regression_musig2_nonce_strict.cpp)
     target_link_libraries(test_regression_musig2_nonce_strict_standalone PRIVATE secp256k1_shim fastsecp256k1)
@@ -5025,7 +5016,7 @@ add_test(NAME regression_bip32_private_key_strict COMMAND test_regression_bip32_
 set_tests_properties(regression_bip32_private_key_strict PROPERTIES TIMEOUT 30 LABELS "audit;regression;bip32")
 
 # 2026-05-11 shim regression: DER parse r=0 rejection (Agent 5)
-if(TARGET secp256k1_shim)
+if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)
     add_executable(test_shim_der_zero_r_standalone
         ${CMAKE_CURRENT_SOURCE_DIR}/../compat/libsecp256k1_shim/tests/test_shim_der_zero_r.cpp)
     target_link_libraries(test_shim_der_zero_r_standalone PRIVATE secp256k1_shim fastsecp256k1)
@@ -5038,7 +5029,7 @@ if(TARGET secp256k1_shim)
 endif()
 
 # 2026-05-11 shim regression: NULL context illegal-callback enforcement (SHIM-001/002/003)
-if(TARGET secp256k1_shim)
+if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)
     add_executable(test_shim_null_ctx_standalone
         ${CMAKE_CURRENT_SOURCE_DIR}/../compat/libsecp256k1_shim/tests/test_shim_null_ctx.cpp)
     target_link_libraries(test_shim_null_ctx_standalone PRIVATE secp256k1_shim fastsecp256k1)
@@ -5124,7 +5115,7 @@ if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)
     add_executable(test_regression_schnorr_r_zero_ct_standalone
         test_regression_schnorr_r_zero_ct.cpp)
     audit_target_defaults(test_regression_schnorr_r_zero_ct_standalone)
-    if(TARGET secp256k1_shim)
+    if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)
         target_link_libraries(test_regression_schnorr_r_zero_ct_standalone PRIVATE secp256k1_shim)
         target_include_directories(test_regression_schnorr_r_zero_ct_standalone PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/../compat/libsecp256k1_shim/include)
@@ -5266,7 +5257,7 @@ if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)
     add_executable(test_shim_security_edge_cases_standalone
         ${CMAKE_CURRENT_SOURCE_DIR}/../compat/libsecp256k1_shim/tests/test_shim_security_edge_cases.cpp)
     target_link_libraries(test_shim_security_edge_cases_standalone PRIVATE fastsecp256k1)
-    if(TARGET secp256k1_shim)
+    if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)
         target_link_libraries(test_shim_security_edge_cases_standalone PRIVATE secp256k1_shim)
     endif()
     target_include_directories(test_shim_security_edge_cases_standalone PRIVATE
@@ -5287,7 +5278,7 @@ if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)
         test_regression_ecdsa_verify_cache_consistency.cpp)
     audit_target_defaults(test_regression_ecdsa_verify_cache_consistency_standalone)
     target_link_libraries(test_regression_ecdsa_verify_cache_consistency_standalone PRIVATE fastsecp256k1)
-    if(TARGET secp256k1_shim)
+    if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)
         target_link_libraries(test_regression_ecdsa_verify_cache_consistency_standalone PRIVATE secp256k1_shim)
     endif()
     target_compile_definitions(test_regression_ecdsa_verify_cache_consistency_standalone PRIVATE
@@ -5314,9 +5305,15 @@ if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)
     add_executable(test_shim_recovery_and_noncefp_standalone
         ${CMAKE_CURRENT_SOURCE_DIR}/../compat/libsecp256k1_shim/tests/test_shim_recovery_and_noncefp.cpp)
     target_link_libraries(test_shim_recovery_and_noncefp_standalone PRIVATE fastsecp256k1)
-    if(TARGET secp256k1_shim)
+    if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)
         target_link_libraries(test_shim_recovery_and_noncefp_standalone PRIVATE secp256k1_shim)
     endif()
+    # STANDALONE_TEST is required: the .cpp guards main() behind #ifdef STANDALONE_TEST
+    # (the unified runner uses the shim_run_stubs_unified.cpp stub instead). Without
+    # this define the standalone has no main() and the link fails with
+    # "undefined reference to 'main'" — matching the sibling cache_consistency target.
+    target_compile_definitions(test_shim_recovery_and_noncefp_standalone PRIVATE
+        STANDALONE_TEST SECP256K1_BUILD_COMPAT_SHIM)
     target_include_directories(test_shim_recovery_and_noncefp_standalone PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/../compat/libsecp256k1_shim/include)
     add_test(NAME shim_recovery_and_noncefp
@@ -5401,7 +5398,7 @@ add_executable(test_regression_shim_null_callback_standalone
     test_regression_shim_null_callback.cpp)
 audit_target_defaults(test_regression_shim_null_callback_standalone)
 target_compile_definitions(test_regression_shim_null_callback_standalone PRIVATE STANDALONE_TEST)
-if(TARGET secp256k1_shim)
+if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)
     target_link_libraries(test_regression_shim_null_callback_standalone PRIVATE secp256k1_shim)
 endif()
 add_test(NAME regression_shim_null_callback
@@ -5417,7 +5414,7 @@ add_executable(test_regression_shim_xonly_parse_standalone
     test_regression_shim_xonly_parse.cpp)
 audit_target_defaults(test_regression_shim_xonly_parse_standalone)
 target_compile_definitions(test_regression_shim_xonly_parse_standalone PRIVATE STANDALONE_TEST)
-if(TARGET secp256k1_shim)
+if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)
     target_link_libraries(test_regression_shim_xonly_parse_standalone PRIVATE secp256k1_shim)
 endif()
 add_test(NAME regression_shim_xonly_parse
@@ -5447,7 +5444,7 @@ add_executable(test_regression_shim_security_v9_standalone
     test_regression_shim_security_v9.cpp)
 audit_target_defaults(test_regression_shim_security_v9_standalone)
 target_compile_definitions(test_regression_shim_security_v9_standalone PRIVATE STANDALONE_TEST)
-if(TARGET secp256k1_shim)
+if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)
     target_link_libraries(test_regression_shim_security_v9_standalone PRIVATE secp256k1_shim)
 endif()
 add_test(NAME regression_shim_security_v9
@@ -5463,7 +5460,7 @@ add_executable(test_regression_musig_noncegen_extra_input_standalone
     test_regression_musig_noncegen_extra_input.cpp)
 audit_target_defaults(test_regression_musig_noncegen_extra_input_standalone)
 target_compile_definitions(test_regression_musig_noncegen_extra_input_standalone PRIVATE STANDALONE_TEST)
-if(TARGET secp256k1_shim)
+if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)
     target_link_libraries(test_regression_musig_noncegen_extra_input_standalone PRIVATE secp256k1_shim)
 endif()
 add_test(NAME regression_musig_noncegen_extra_input
@@ -5474,7 +5471,7 @@ set_tests_properties(regression_musig_noncegen_extra_input PROPERTIES TIMEOUT 30
 target_sources(unified_audit_runner PRIVATE test_regression_musig_noncegen_extra_input.cpp)
 
 # SHIM-P3-006: R-grinding functional (2026-05-24)
-if(TARGET secp256k1_shim)
+if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)
     add_executable(test_regression_shim_rgrind_functional_standalone
         test_regression_shim_rgrind_functional.cpp)
     audit_target_defaults(test_regression_shim_rgrind_functional_standalone)
@@ -5490,7 +5487,7 @@ if(TARGET secp256k1_shim)
 endif()
 
 # TASK-008: preallocated context API (2026-05-24)
-if(TARGET secp256k1_shim)
+if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)
     add_executable(test_regression_shim_preallocated_ctx_standalone
         test_regression_shim_preallocated_ctx.cpp)
     audit_target_defaults(test_regression_shim_preallocated_ctx_standalone)
@@ -5523,7 +5520,7 @@ add_executable(test_regression_ecdh_xy64_erase_standalone
     test_regression_ecdh_xy64_erase.cpp)
 audit_target_defaults(test_regression_ecdh_xy64_erase_standalone)
 target_compile_definitions(test_regression_ecdh_xy64_erase_standalone PRIVATE STANDALONE_TEST)
-if(TARGET secp256k1_shim)
+if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)
     target_link_libraries(test_regression_ecdh_xy64_erase_standalone PRIVATE secp256k1_shim)
 endif()
 add_test(NAME regression_ecdh_xy64_erase
@@ -5551,7 +5548,7 @@ add_executable(test_regression_musig_xonly_zero_tweak_standalone
     test_regression_musig_xonly_zero_tweak.cpp)
 audit_target_defaults(test_regression_musig_xonly_zero_tweak_standalone)
 target_compile_definitions(test_regression_musig_xonly_zero_tweak_standalone PRIVATE STANDALONE_TEST)
-if(TARGET secp256k1_shim)
+if(TARGET secp256k1_shim OR SECP256K1_BUILD_SHIM)
     target_link_libraries(test_regression_musig_xonly_zero_tweak_standalone PRIVATE secp256k1_shim)
 endif()
 add_test(NAME regression_musig_xonly_zero_tweak

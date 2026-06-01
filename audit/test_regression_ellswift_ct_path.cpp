@@ -21,6 +21,13 @@ static int g_pass = 0, g_fail = 0;
 #include <cstring>
 #include <array>
 
+// Non-aborting illegal callback: the shim's argument-validation path calls the
+// context illegal_callback, which defaults to std::abort() (SIGABRT). Tests that
+// intentionally pass illegal args (e.g. NULL seckey) MUST install a no-op callback
+// first, mirroring the canonical pattern in test_regression_shim_null_arg_cb.cpp.
+static int g_ecp_illegal_cb_count = 0;
+static void ecp_illegal_cb(const char*, void*) { ++g_ecp_illegal_cb_count; }
+
 #ifdef STANDALONE_TEST
 #include "secp256k1.h"
 #include "secp256k1_ellswift.h"
@@ -96,9 +103,16 @@ static void test_ellswift_xdh_roundtrip() {
 // ── ECP-4: null seckey rejected ───────────────────────────────────────────
 static void test_ellswift_null_seckey() {
     secp256k1_context* ctx = secp256k1_context_create(SECP256K1_CONTEXT_SIGN);
+    // Install a non-aborting illegal callback: NULL seckey fires the shim's
+    // illegal_callback, which defaults to std::abort(). Without this the test
+    // SIGABRTs instead of observing the validated return value.
+    secp256k1_context_set_illegal_callback(ctx, ecp_illegal_cb, nullptr);
     unsigned char enc[64];
+    int before = g_ecp_illegal_cb_count;
     int r = secp256k1_ellswift_create(ctx, enc, nullptr, nullptr);
+    int after = g_ecp_illegal_cb_count;
     check(r == 0, "[ECP-4] null seckey returns 0");
+    check(after > before, "[ECP-4] null seckey fires illegal_callback");
     secp256k1_context_destroy(ctx);
 }
 

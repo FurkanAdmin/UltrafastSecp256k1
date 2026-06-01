@@ -55,8 +55,14 @@ static void capture_cb(const char* /*text*/, void* /*data*/) noexcept {
 static void test_pac1_preallocated_size() {
     size_t sz = secp256k1_context_preallocated_size(SECP256K1_CONTEXT_SIGN);
     CHECK(sz > 0, "PAC-1: preallocated_size > 0");
-    // On this shim it equals sizeof(secp256k1_context_struct); >=256 is a safe lower bound
-    CHECK(sz >= 256, "PAC-1: preallocated_size >= 256 bytes");
+    // The shim context struct is flag-size-independent (shim_context.cpp:324:
+    // preallocated_size ignores flags and returns sizeof(secp256k1_context)). The
+    // earlier ">= 256" lower bound was an incorrect guess — the struct is smaller —
+    // so assert the real invariant: the size is stable across flag combinations.
+    // PAC-2 below proves the returned size is sufficient for preallocated_create.
+    CHECK(sz == secp256k1_context_preallocated_size(
+                    SECP256K1_CONTEXT_SIGN | SECP256K1_CONTEXT_VERIFY),
+          "PAC-1: preallocated_size is flag-independent (stable)");
 }
 
 // PAC-2/PAC-3: create in caller buffer and exercise sign+verify
@@ -159,10 +165,21 @@ static void test_pac6_null_prealloc() {
     secp256k1_context_set_illegal_callback(
         const_cast<secp256k1_context*>(secp256k1_context_static), nullptr, nullptr);
 
-    g_cb_fired = false;
-    secp256k1_context *ctx2 = secp256k1_context_preallocated_clone(nullptr, nullptr);
-    (void)ctx2;
-    // both NULL — either callback fires or no crash (abort path acceptable)
+    // preallocated_clone with a VALID context but NULL prealloc routes through the
+    // per-context illegal callback (secp256k1_shim_call_illegal_cb(ctx, ...)), so a
+    // non-aborting callback intercepts it. Passing a NULL ctx instead would hit the
+    // helper's NULL-ctx branch which unconditionally calls default_illegal_callback
+    // → std::abort() (uncatchable in this runner) — see test_shim_security_edge_cases
+    // SHIM-004, which documents that the NULL-ctx clone path cannot be tested without fork().
+    secp256k1_context *probe = secp256k1_context_create(SECP256K1_CONTEXT_SIGN);
+    if (probe) {
+        secp256k1_context_set_illegal_callback(probe, capture_cb, nullptr);
+        g_cb_fired = false;
+        secp256k1_context *ctx2 = secp256k1_context_preallocated_clone(probe, nullptr);
+        CHECK(ctx2 == nullptr, "PAC-6: clone with NULL prealloc -> returns NULL");
+        CHECK(g_cb_fired,      "PAC-6: clone with NULL prealloc -> illegal callback fired");
+        secp256k1_context_destroy(probe);
+    }
 }
 
 } // namespace

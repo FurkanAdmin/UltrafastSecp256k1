@@ -620,12 +620,23 @@ RETROACTIVELY_COVERED: dict[str, tuple[list[str], str]] = {
         "gate integrity is exercised by ci/test_caas_integrity.py. Retroactively whitelisted "
         "as a benign CI-retention change.",
     ),
+    "f0ea17663a": (
+        ["ci/test_caas_integrity.py"],
+        "fix(ci): revert the CAAS-FG-01 gate.yml hard-gate ctest step. The gate's shim "
+        "job builds with SECP256K1_BUILD_TESTS=OFF, so NO audit standalone CTest registers "
+        "there — the added `ctest --no-tests=error` step matched zero tests and correctly "
+        "failed, so it was reverted to the prior working step. Pure CI-workflow config revert "
+        "(.github/workflows/gate.yml) plus a docs/REVIEW_VALIDATED_FINDINGS.md note — NO "
+        "security logic touched, flagged solely because gate.yml ∈ SECURITY_CI_FILES. The "
+        "gate.yml workflow structure / CAAS gate integrity is exercised by "
+        "ci/test_caas_integrity.py. Same class as the 7d094c7c09 retention-change entry.",
+    ),
 }
 
 # Frozen count guard (CAAS-006): prevents silent whitelist growth.
 # When adding a new entry above, increment this constant too.
 # Unauthorized bypass (adding an entry without incrementing) → import-time assertion failure.
-RETROACTIVELY_COVERED_FROZEN_COUNT: int = 56
+RETROACTIVELY_COVERED_FROZEN_COUNT: int = 57
 assert len(RETROACTIVELY_COVERED) == RETROACTIVELY_COVERED_FROZEN_COUNT, (
     f"RETROACTIVELY_COVERED has {len(RETROACTIVELY_COVERED)} entries but "
     f"RETROACTIVELY_COVERED_FROZEN_COUNT={RETROACTIVELY_COVERED_FROZEN_COUNT}. "
