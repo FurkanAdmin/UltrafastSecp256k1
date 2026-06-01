@@ -342,6 +342,7 @@ review so `TEST_MATRIX.md` matches the live generated CTest surface:
 - `exploit_frost_secret_share_ct`
 - `regression_comb_gen_lockfree`
 - `regression_pippenger_stale_used`
+- `regression_negate_inplace_generator_flag`
 
 ### Generated Inventory Sync (2026-05-03)
 

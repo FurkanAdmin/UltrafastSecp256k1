@@ -9,7 +9,7 @@
 |------|---------|
 | Audit checks per run | ~1,000,000+ |
 | Nightly random checks | ~1,300,000+ |
-| Audit modules | 419 across 9 failure classes |
+| Audit modules | 420 across 9 failure classes |
 | Exploit PoC tests | 273 exploit-PoC modules, 200+ attack vectors |
 | Platforms | X64, ARM64, RISC-V, macOS, Windows, iOS, Android, WASM, ROCm (16 configurations) |
 | Fuzz inputs | seed corpus: ~530K entries (runtime corpus grows dynamically) |
