@@ -149,9 +149,8 @@ int main() {
         CHECK(ninv == 1 && inv[0] == 7, "schnorr: invalid index == 7 after corruption");
     }
 
-    /* --- C++ wrapper: pass the keyed-row BUFFER as a span + the record COUNT;
-     *     the wrapper derives key_size = rows.size()/count - RECORD. No key_size
-     *     is passed by hand. (C++17 falls back to the C ABI which takes key_size.) */
+    /* --- C++ wrapper: pass the row pointer + record COUNT + KEY SIZE. No buffer
+     *     size is passed — it is implied by count*(RECORD+key_size). --- */
     {
         const size_t N = 16, KS = 4;
         auto rows = build_ecdsa(sctx, N, KS); /* rows of [EcdsaRecord | 4-byte key] */
@@ -159,22 +158,11 @@ int main() {
         std::vector<uint8_t> res(N, 0xAA);
         const size_t stride = UFSECP_LBTC_ECDSA_RECORD + KS;
         size_t ninv = 0;
-#if __cplusplus >= 202002L
-        auto rc = wrap.verify_ecdsa(std::span<const uint8_t>(rows.data(), rows.size()), N,
-                                    res.data(), nullptr, 0, &ninv);
-#else
-        auto rc = ufsecp_lbtc_verify_ecdsa(wrap.get(), rows.data(), N, KS,
-                                           res.data(), nullptr, 0, &ninv);
-#endif
-        CHECK(rc == UFSECP_OK && ninv == 0, "wrapper: key_size derived from rows.size()/count");
+        auto rc = wrap.verify_ecdsa(rows.data(), N, KS, res.data(), nullptr, 0, &ninv);
+        CHECK(rc == UFSECP_OK && ninv == 0, "wrapper: count + key_size, buffer implied");
         rows[3 * stride + 65] ^= 0x04; /* flip a sig byte in row 3 */
         ninv = 0;
-#if __cplusplus >= 202002L
-        wrap.verify_ecdsa(std::span<const uint8_t>(rows.data(), rows.size()), N,
-                          res.data(), nullptr, 0, &ninv);
-#else
-        ufsecp_lbtc_verify_ecdsa(wrap.get(), rows.data(), N, KS, res.data(), nullptr, 0, &ninv);
-#endif
+        wrap.verify_ecdsa(rows.data(), N, KS, res.data(), nullptr, 0, &ninv);
         CHECK(ninv == 1 && res[3] == 0, "wrapper: corruption detected, row 3 marked");
     }
 

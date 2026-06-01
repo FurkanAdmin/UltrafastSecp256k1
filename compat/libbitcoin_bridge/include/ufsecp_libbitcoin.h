@@ -181,10 +181,6 @@ ufsecp_error_t ufsecp_lbtc_sp_scan(ufsecp_lbtc_ctrl* ctrl,
 #ifdef __cplusplus
 } /* extern "C" */
 
-#if __cplusplus >= 202002L
-#  include <span>
-#endif
-
 /* ------------------------------------------------------------------------- */
 /* Optional thin C++ RAII convenience wrapper (header-only, zero overhead).   */
 /* ------------------------------------------------------------------------- */
@@ -196,11 +192,10 @@ namespace lbtc {
 // byte layout, so a node's DB / mmap layout and the engine agree on the exact
 // bytes. Verified fields are FIRST, in on-wire order; any correlation id is the
 // caller's own trailing bytes appended to each record. Each on-wire row is
-// [ EcdsaRecord(129) | key_size bytes ] (key_size may be 0). To verify, hand the
-// C++ Controller the whole row buffer as a std::span plus the record COUNT — you
-// do NOT pass key_size, it is redundant: key_size = rows.size()/count - RECORD,
-// derived inside the wrapper (the buffer must be exactly count*(RECORD+key_size)
-// bytes, else UFSECP_ERR_BAD_INPUT). results[i] maps back to record i by index.
+// [ EcdsaRecord(129) | key_size bytes ] (key_size may be 0). To verify, pass the
+// row pointer + the record COUNT + the KEY SIZE. The buffer carries NO size: it
+// is fully determined by count * (RECORD + key_size), so it can never mismatch
+// and there is no size-related error condition. results[i] maps back to record i.
 //
 // FIELD ORDER — IMPORTANT: the message / sighash is FIRST for BOTH kinds. Schnorr
 // is UNIFORM with ECDSA (hash, then key, then sig); it is NOT x-only-key-first at
@@ -238,36 +233,24 @@ public:
     ufsecp_lbtc_bound backend() const { return ufsecp_lbtc_ctrl_backend(ctrl_); }
 
     // --- Batch verify --------------------------------------------------------
-    // Pass the packed row buffer as a span (it carries its own byte size) and the
-    // record COUNT. You do NOT pass key_size — it is redundant given the buffer
-    // size and the count, so the wrapper derives it: key_size = rows.size()/count
-    // - RECORD. The buffer must be exactly count*(RECORD + key_size) bytes; a size
-    // that is not a clean multiple of count (or a stride below RECORD) fails closed
-    // with UFSECP_ERR_BAD_INPUT. (key_size == 0 — no correlation key — just works.)
-    // C / C++17 callers that prefer to pass key_size explicitly call the C ABI
-    // ufsecp_lbtc_verify_ecdsa(...) directly.
-#if __cplusplus >= 202002L
-    ufsecp_error_t verify_ecdsa(std::span<const uint8_t> rows, size_t count,
+    // Pass the record COUNT and the KEY SIZE (key_size == 0 == no correlation key).
+    // The row pointer has NO size argument: the buffer is fully determined by the
+    // two values — exactly count * (RECORD + key_size) bytes — so it can never
+    // mismatch and there is no size-related error condition. (Per evoskuil: the
+    // buffer size is redundant with count + key_size; passing it would only add an
+    // unnecessary error path.)
+    ufsecp_error_t verify_ecdsa(const uint8_t* rows, size_t count, size_t key_size,
                                 uint8_t* results = nullptr, size_t* invalid_idx = nullptr,
                                 size_t invalid_cap = 0, size_t* invalid_count = nullptr) const {
-        if (count == 0 || rows.size() % count != 0) return UFSECP_ERR_BAD_INPUT;
-        const size_t stride = rows.size() / count;
-        if (stride < UFSECP_LBTC_ECDSA_RECORD) return UFSECP_ERR_BAD_INPUT;
-        return ufsecp_lbtc_verify_ecdsa(ctrl_, rows.data(), count,
-                                        stride - UFSECP_LBTC_ECDSA_RECORD, results,
+        return ufsecp_lbtc_verify_ecdsa(ctrl_, rows, count, key_size, results,
                                         invalid_idx, invalid_cap, invalid_count);
     }
-    ufsecp_error_t verify_schnorr(std::span<const uint8_t> rows, size_t count,
+    ufsecp_error_t verify_schnorr(const uint8_t* rows, size_t count, size_t key_size,
                                   uint8_t* results = nullptr, size_t* invalid_idx = nullptr,
                                   size_t invalid_cap = 0, size_t* invalid_count = nullptr) const {
-        if (count == 0 || rows.size() % count != 0) return UFSECP_ERR_BAD_INPUT;
-        const size_t stride = rows.size() / count;
-        if (stride < UFSECP_LBTC_SCHNORR_RECORD) return UFSECP_ERR_BAD_INPUT;
-        return ufsecp_lbtc_verify_schnorr(ctrl_, rows.data(), count,
-                                          stride - UFSECP_LBTC_SCHNORR_RECORD, results,
+        return ufsecp_lbtc_verify_schnorr(ctrl_, rows, count, key_size, results,
                                           invalid_idx, invalid_cap, invalid_count);
     }
-#endif
 
 private:
     ufsecp_lbtc_ctrl* ctrl_ = nullptr;
