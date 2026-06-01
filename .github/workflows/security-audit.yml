@@ -122,8 +122,9 @@ jobs:
         run: cmake --build build -j"$(nproc)"
 
       - name: Test under sanitizers
-        # CI-005: continue-on-error removed. All tests except test_large_scalar now run
-        # as a hard gate. Any new ASan/UBSan violation causes a red job failure.
+        # CI-005 + CORR-01: continue-on-error removed. ALL tests run as a hard gate
+        # (the former test_large_scalar advisory carve-out is gone — see the selftest
+        # step below). Any new ASan/UBSan violation causes a red job failure.
         id: asan_ubsan_tests
         env:
           ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
@@ -133,20 +134,21 @@ jobs:
         # Exclude py_*: Python ctypes loads ASan-built libufsecp.so without the
         # ASan runtime preloaded, causing __asan_option_detect_stack_use_after_return
         # undefined symbol errors. Python tests run in the normal linux jobs.
-        run: ctest --test-dir build --output-on-failure -j"$(nproc)" -E "^(ct_sidechannel|selftest|unified_audit|py_|test_large_scalar)" --timeout 900
+        run: ctest --test-dir build --output-on-failure -j"$(nproc)" -E "^(ct_sidechannel|selftest|unified_audit|py_)" --timeout 900
 
-      - name: Test large_scalar_multiplication (known non-asm divergence — advisory)
-        # CI-005: test_large_scalar is excluded from the main gate above due to a known
-        # scalar_mul divergence in the non-x86-asm fallback under sanitizers (pending fix).
-        # Run it separately as advisory (continue-on-error: true) so the known failure
-        # does not block CI but any regression beyond this single test IS caught above.
-        continue-on-error: true
+      - name: Selftest under sanitizers — scalar_mul large-vector coverage (CORR-01)
+        # CORR-01: the former "known non-asm scalar_mul divergence" no longer reproduces.
+        # The previous advisory step (`ctest -R "^test_large_scalar"` + continue-on-error)
+        # gated NOTHING — test_large_scalar_multiplication is compiled only into run_selftest,
+        # never as a standalone CTest target, so the regex matched no test. Meanwhile the
+        # main ctest step excludes `selftest`, so the fast-vs-generic kG / large-scalar / KAT
+        # checks had no sanitizer coverage at all. Run the selftest binary directly as a HARD
+        # gate (no continue-on-error): it passes cleanly under clang-17 + ASan/UBSan
+        # (verified: 31/31 modules, smoke+stress, no runtime errors).
         env:
           ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
           UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
-        run: |
-          ctest --test-dir build --output-on-failure -j"$(nproc)" -R "^test_large_scalar" --timeout 900 || \
-            echo "::warning::test_large_scalar failed under ASan+UBSan (known non-asm scalar_mul divergence — pending fix)"
+        run: ./build/src/cpu/run_selftest
 
   # ── Memory Sanitizer (uninitialized reads) ──────────────────────────────
   msan:
