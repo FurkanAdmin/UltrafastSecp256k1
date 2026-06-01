@@ -36,8 +36,11 @@
  *     the KEY SIZE. The buffer size is IMPLIED, always = count * (RECORD +
  *     key_size). There is no buffer-size argument, so there is no buffer/stride
  *     mismatch and no corresponding error condition.
- *   - Results are returned directly: a per-row pass/fail array AND, optionally,
- *     a compact list of the failing row indices.
+ *   - Results are returned directly: a per-row pass/fail byte array (results[i]
+ *     == 1 valid / 0 invalid). The verify call returns void — there is no error
+ *     code (the only recoverable failure, no usable backend, is reported at
+ *     controller creation). The caller maps a failing row back to its block/tx
+ *     via the opaque correlation tag carried in that row.
  *
  * Consensus note:
  *   For block validation the GPU path is used as a consensus-bearing
@@ -110,50 +113,41 @@ const char*       ufsecp_lbtc_ctrl_device_name(const ufsecp_lbtc_ctrl* ctrl);
 /*
  * Verify a homogeneous batch of ECDSA (resp. Schnorr) signatures.
  *
- *   rows          n rows, each (RECORD + key_size) bytes, tightly packed.
- *                 The signature record occupies the first RECORD bytes; the
- *                 trailing key_size bytes are the caller's opaque tag.
- *   n             number of rows (the record COUNT). With key_size this fully
- *                 determines the buffer: n * (RECORD + key_size) bytes. No
- *                 separate buffer-size argument is taken or needed.
- *   key_size      opaque trailing bytes per row; 0 to disable.
- *   results       OUT, optional. If non-NULL, must be n bytes: results[i] is
- *                 1 if row i is valid, 0 if invalid.
- *   invalid_idx   OUT, optional. If non-NULL, receives the indices of failing
- *                 rows, up to invalid_cap entries.
- *   invalid_cap   capacity of invalid_idx (entries); ignored if invalid_idx is
- *                 NULL.
- *   invalid_count OUT, optional. Set to the TOTAL number of failing rows (which
- *                 may exceed invalid_cap — the caller can detect truncation).
+ *   ctrl      the controller (one per worker thread). Must be non-NULL and
+ *             successfully created — controller creation is where the only
+ *             recoverable failure (no usable backend) is reported; once you
+ *             hold a live controller, verification itself has no error return.
+ *   rows      n rows, each (RECORD + key_size) bytes, tightly packed. The
+ *             signature record occupies the first RECORD bytes; the trailing
+ *             key_size bytes are the caller's opaque correlation tag, carried
+ *             but never interpreted.
+ *   n         number of rows (the record COUNT). Together with key_size this
+ *             fully determines the buffer — n * (RECORD + key_size) bytes — so
+ *             there is no buffer-size argument and no size-mismatch error.
+ *   key_size  opaque trailing bytes per row; 0 to disable. For a packed record
+ *             struct carrying a trailing id this is sizeof(id) (e.g. 3).
+ *   results   OUT, n bytes. results[i] == 1 if row i's signature is valid,
+ *             0 if invalid (structurally malformed rows — off-curve pubkey,
+ *             s >= n, R.x >= p — verify to 0, never abort the batch). The
+ *             caller maps a failing row back to its block/tx via the opaque
+ *             tag at rows[i] (or its own table) — no second side table needed.
  *
- * Return value:
- *   UFSECP_OK              the batch was processed (inspect results / counts);
- *                          all rows valid iff *invalid_count == 0.
- *   UFSECP_ERR_BAD_INPUT   reserved for arithmetic overflow of n * stride. There
- *                          is NO buffer-size / stride-mismatch error: the buffer
- *                          is implied by (count, key_size), so it is always
- *                          self-consistent by construction.
- *   UFSECP_ERR_BAD_PUBKEY  a row's pubkey is not a valid curve point.
- *   UFSECP_ERR_BAD_SIG     a row's signature is structurally invalid (e.g.
- *                          s >= n, R.x >= p). Such a row counts as invalid.
- *   UFSECP_ERR_NULL_ARG    ctrl or rows is NULL with n > 0.
- *
- * A NULL `rows` with n == 0 is the empty batch: vacuously valid, returns
- * UFSECP_OK with *invalid_count == 0.
+ * Returns void. There is deliberately no error code: every signature outcome is
+ * a normal per-row result (results[i]), the buffer can never mismatch (implied
+ * by count+key_size), and an unrecoverable condition (no backend) is surfaced at
+ * ufsecp_lbtc_ctrl_create time, not here. A NULL ctrl/rows or n == 0 is a no-op
+ * (results is left as the caller initialized it — zero-initialize for a
+ * fail-closed "all invalid" on a degenerate call).
  */
-ufsecp_error_t ufsecp_lbtc_verify_ecdsa(ufsecp_lbtc_ctrl* ctrl,
-                                        const uint8_t* rows, size_t n,
-                                        size_t key_size,
-                                        uint8_t* results,
-                                        size_t* invalid_idx, size_t invalid_cap,
-                                        size_t* invalid_count);
+void ufsecp_lbtc_verify_ecdsa(ufsecp_lbtc_ctrl* ctrl,
+                              const uint8_t* rows, size_t n,
+                              size_t key_size,
+                              uint8_t* results);
 
-ufsecp_error_t ufsecp_lbtc_verify_schnorr(ufsecp_lbtc_ctrl* ctrl,
-                                          const uint8_t* rows, size_t n,
-                                          size_t key_size,
-                                          uint8_t* results,
-                                          size_t* invalid_idx, size_t invalid_cap,
-                                          size_t* invalid_count);
+void ufsecp_lbtc_verify_schnorr(ufsecp_lbtc_ctrl* ctrl,
+                                const uint8_t* rows, size_t n,
+                                size_t key_size,
+                                uint8_t* results);
 
 /* ------------------------------------------------------------------------- */
 /* 2. BIP-352 Silent Payments scan batch.                                     */
@@ -238,77 +232,66 @@ public:
     ufsecp_lbtc_bound backend() const { return ufsecp_lbtc_ctrl_backend(ctrl_); }
 
     // --- Batch verify --------------------------------------------------------
-    // Pass the record COUNT and the KEY SIZE (key_size == 0 == no correlation key).
-    // The row pointer has NO size argument: the buffer is fully determined by the
-    // two values — exactly count * (RECORD + key_size) bytes — so it can never
-    // mismatch and there is no size-related error condition. (Per evoskuil: the
-    // buffer size is redundant with count + key_size; passing it would only add an
-    // unnecessary error path.)
-    ufsecp_error_t verify_ecdsa(const uint8_t* rows, size_t count, size_t key_size,
-                                uint8_t* results = nullptr, size_t* invalid_idx = nullptr,
-                                size_t invalid_cap = 0, size_t* invalid_count = nullptr) const {
-        return ufsecp_lbtc_verify_ecdsa(ctrl_, rows, count, key_size, results,
-                                        invalid_idx, invalid_cap, invalid_count);
+    // Pass the record COUNT and the KEY SIZE (key_size == 0 == no correlation key)
+    // plus the per-row results buffer. The row pointer has NO size argument: the
+    // buffer is fully determined by count * (RECORD + key_size) bytes, so it can
+    // never mismatch and there is no size-related error condition. Returns void —
+    // results[i] (1=valid/0=invalid) is the only output; the caller maps a failing
+    // row back to its block/tx via the opaque tag at rows[i]. (Per evoskuil: the
+    // buffer size is redundant with count+key_size, and there is no calling failure
+    // mode — controller-init is the only recoverable error, checked via ok().)
+    void verify_ecdsa(const uint8_t* rows, size_t count, size_t key_size,
+                      uint8_t* results) const {
+        ufsecp_lbtc_verify_ecdsa(ctrl_, rows, count, key_size, results);
     }
-    ufsecp_error_t verify_schnorr(const uint8_t* rows, size_t count, size_t key_size,
-                                  uint8_t* results = nullptr, size_t* invalid_idx = nullptr,
-                                  size_t invalid_cap = 0, size_t* invalid_count = nullptr) const {
-        return ufsecp_lbtc_verify_schnorr(ctrl_, rows, count, key_size, results,
-                                          invalid_idx, invalid_cap, invalid_count);
+    void verify_schnorr(const uint8_t* rows, size_t count, size_t key_size,
+                        uint8_t* results) const {
+        ufsecp_lbtc_verify_schnorr(ctrl_, rows, count, key_size, results);
     }
 
 #if __cplusplus >= 202002L
     // --- Typed-span overloads (C++20) ---------------------------------------
     // Pass the packed record span directly; NOTHING about its size is restated at
-    // the call site. The element type IS the layout, so:
-    //     count    = batch.size()
-    //     key_size = sizeof(Row) - RECORD            (the trailing correlation id)
-    // are both recovered from the type — no count, no key_size, no buffer size to
-    // pass or mismatch. This is the form a node uses with its own packed struct,
-    // e.g. libbitcoin's `secp256k1::ecdsa::triple` (a #pragma pack(1) struct of
-    // { hash_digest, ec_compressed, ec_signature, token } == 129 + sizeof(token)):
+    // the call site. The element type IS the layout, so count = batch.size() and
+    // key_size = sizeof(Row) - RECORD (the trailing correlation id) are both
+    // recovered from the type. Equivalent to computing key_size yourself and
+    // calling the C ABI, e.g. evoskuil's
+    //     constexpr auto id_size = array_count<decltype(triple::identifier)>; // 3
+    //     ufsecp_lbtc_verify_ecdsa(ctx, in, count, id_size, out);
     //
     //     std::span<const ecdsa::triple> batch = ...;
     //     std::vector<uint8_t> results(batch.size());
-    //     size_t fails = 0;
-    //     ctrl.verify_ecdsa(batch, results.data(), nullptr, 0, &fails);
+    //     ctrl.verify_ecdsa(batch, results.data());
     //
     // CONTRACT — `Row` MUST be a tightly-packed (#pragma pack(1)) standard-layout
     // struct whose FIRST RECORD bytes are the on-wire record in order (hash, key,
     // sig) with NO leading or internal padding; any trailing bytes (including zero)
-    // are the opaque correlation key. key_size = sizeof(Row) - RECORD, so any
-    // padding folded into sizeof(Row) before the record, or between the record
-    // fields, would silently misread — hence the standard-layout assert and the
-    // packing requirement. evoskuil's `secp256k1::ecdsa::triple` satisfies this:
-    // it is #pragma pack(1) over byte-array members (hash_digest, ec_compressed,
-    // ec_signature, data_array<3>), so the record is the first 129 bytes exactly.
+    // are the opaque correlation key. key_size = sizeof(Row) - RECORD, so padding
+    // folded into sizeof(Row) before/within the record would silently misread —
+    // hence the standard-layout assert and the packing requirement. evoskuil's
+    // `secp256k1::ecdsa::triple` satisfies this: it is #pragma pack(1) over
+    // byte-array members, so the record is the first 129 bytes exactly.
     template <class Row>
-    ufsecp_error_t verify_ecdsa(std::span<const Row> batch,
-                                uint8_t* results = nullptr, size_t* invalid_idx = nullptr,
-                                size_t invalid_cap = 0, size_t* invalid_count = nullptr) const {
+    void verify_ecdsa(std::span<const Row> batch, uint8_t* results) const {
         static_assert(sizeof(Row) >= UFSECP_LBTC_ECDSA_RECORD,
                       "Row must contain the 129-byte ECDSA record (hash|point|sig) first");
         static_assert(std::is_standard_layout_v<Row>,
                       "Row must be a standard-layout, tightly-packed (#pragma pack(1)) "
                       "struct so the first 129 bytes are the contiguous on-wire record");
-        return ufsecp_lbtc_verify_ecdsa(
+        ufsecp_lbtc_verify_ecdsa(
             ctrl_, reinterpret_cast<const uint8_t*>(batch.data()), batch.size(),
-            sizeof(Row) - UFSECP_LBTC_ECDSA_RECORD, results,
-            invalid_idx, invalid_cap, invalid_count);
+            sizeof(Row) - UFSECP_LBTC_ECDSA_RECORD, results);
     }
     template <class Row>
-    ufsecp_error_t verify_schnorr(std::span<const Row> batch,
-                                  uint8_t* results = nullptr, size_t* invalid_idx = nullptr,
-                                  size_t invalid_cap = 0, size_t* invalid_count = nullptr) const {
+    void verify_schnorr(std::span<const Row> batch, uint8_t* results) const {
         static_assert(sizeof(Row) >= UFSECP_LBTC_SCHNORR_RECORD,
                       "Row must contain the 128-byte Schnorr record (hash|xonly|sig) first");
         static_assert(std::is_standard_layout_v<Row>,
                       "Row must be a standard-layout, tightly-packed (#pragma pack(1)) "
                       "struct so the first 128 bytes are the contiguous on-wire record");
-        return ufsecp_lbtc_verify_schnorr(
+        ufsecp_lbtc_verify_schnorr(
             ctrl_, reinterpret_cast<const uint8_t*>(batch.data()), batch.size(),
-            sizeof(Row) - UFSECP_LBTC_SCHNORR_RECORD, results,
-            invalid_idx, invalid_cap, invalid_count);
+            sizeof(Row) - UFSECP_LBTC_SCHNORR_RECORD, results);
     }
 #endif /* C++20 std::span */
 

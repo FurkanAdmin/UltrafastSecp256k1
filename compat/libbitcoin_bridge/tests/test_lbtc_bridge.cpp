@@ -76,6 +76,16 @@ std::vector<uint8_t> build_schnorr(ufsecp_ctx* ctx, size_t n, size_t key_size) {
     return rows;
 }
 
+/* Derive failure info from the per-row results array — the bridge's only output.
+ * The consumer (e.g. libbitcoin) maps failures to tokens the same way. */
+struct InvalidInfo { size_t count; size_t first; };
+InvalidInfo invalids(const std::vector<uint8_t>& res) {
+    InvalidInfo r{0, (size_t)-1};
+    for (size_t i = 0; i < res.size(); ++i)
+        if (res[i] == 0) { if (r.first == (size_t)-1) r.first = i; ++r.count; }
+    return r;
+}
+
 } // namespace
 
 int main() {
@@ -98,11 +108,8 @@ int main() {
         const size_t N = 64;
         auto rows = build_ecdsa(sctx, N, 0);
         std::vector<uint8_t> res(N, 0xAA);
-        size_t inv[8], ninv = 0;
-        auto rc = ufsecp_lbtc_verify_ecdsa(ctrl, rows.data(), N, 0,
-                                           res.data(), inv, 8, &ninv);
-        CHECK(rc == UFSECP_OK, "ecdsa: rc OK");
-        CHECK(ninv == 0, "ecdsa: whole batch verifies");
+        ufsecp_lbtc_verify_ecdsa(ctrl, rows.data(), N, 0, res.data());
+        CHECK(invalids(res).count == 0, "ecdsa: whole batch verifies");
         bool all1 = true; for (auto v : res) if (v != 1) all1 = false;
         CHECK(all1, "ecdsa: every result == 1");
     }
@@ -113,10 +120,10 @@ int main() {
         auto rows = build_ecdsa(sctx, N, 0);
         rows[25 * UFSECP_LBTC_ECDSA_RECORD + 65] ^= 0x01; /* flip a sig byte */
         std::vector<uint8_t> res(N, 0xAA);
-        size_t inv[8], ninv = 0;
-        ufsecp_lbtc_verify_ecdsa(ctrl, rows.data(), N, 0, res.data(), inv, 8, &ninv);
-        CHECK(ninv == 1, "ecdsa: exactly 1 invalid after corruption");
-        CHECK(ninv == 1 && inv[0] == 25, "ecdsa: invalid index == 25");
+        ufsecp_lbtc_verify_ecdsa(ctrl, rows.data(), N, 0, res.data());
+        auto iv = invalids(res);
+        CHECK(iv.count == 1, "ecdsa: exactly 1 invalid after corruption");
+        CHECK(iv.count == 1 && iv.first == 25, "ecdsa: invalid row == 25");
         CHECK(res[25] == 0 && res[24] == 1, "ecdsa: per-row result marks row 25");
     }
 
@@ -127,9 +134,9 @@ int main() {
         const size_t stride = UFSECP_LBTC_ECDSA_RECORD + KS;
         rows[10 * stride + 65] ^= 0x02;
         std::vector<uint8_t> res(N, 0xAA);
-        size_t inv[8], ninv = 0;
-        ufsecp_lbtc_verify_ecdsa(ctrl, rows.data(), N, KS, res.data(), inv, 8, &ninv);
-        CHECK(ninv == 1 && inv[0] == 10, "ecdsa+key: invalid index == 10 (stride ok)");
+        ufsecp_lbtc_verify_ecdsa(ctrl, rows.data(), N, KS, res.data());
+        auto iv = invalids(res);
+        CHECK(iv.count == 1 && iv.first == 10, "ecdsa+key: invalid row == 10 (stride ok)");
         /* opaque tag at the failing row is the caller's to read back */
         const uint8_t* tag = rows.data() + 10 * stride + UFSECP_LBTC_ECDSA_RECORD;
         CHECK(tag[0] == 10, "ecdsa+key: opaque tag preserved (= row id)");
@@ -140,31 +147,28 @@ int main() {
         const size_t N = 32;
         auto rows = build_schnorr(sctx, N, 0);
         std::vector<uint8_t> res(N, 0xAA);
-        size_t inv[8], ninv = 0;
-        ufsecp_lbtc_verify_schnorr(ctrl, rows.data(), N, 0, res.data(), inv, 8, &ninv);
-        CHECK(ninv == 0, "schnorr: whole batch verifies");
+        ufsecp_lbtc_verify_schnorr(ctrl, rows.data(), N, 0, res.data());
+        CHECK(invalids(res).count == 0, "schnorr: whole batch verifies");
 
         rows[7 * UFSECP_LBTC_SCHNORR_RECORD + 64] ^= 0x01;
-        ninv = 0;
-        ufsecp_lbtc_verify_schnorr(ctrl, rows.data(), N, 0, res.data(), inv, 8, &ninv);
-        CHECK(ninv == 1 && inv[0] == 7, "schnorr: invalid index == 7 after corruption");
+        ufsecp_lbtc_verify_schnorr(ctrl, rows.data(), N, 0, res.data());
+        auto iv = invalids(res);
+        CHECK(iv.count == 1 && iv.first == 7, "schnorr: invalid row == 7 after corruption");
     }
 
-    /* --- C++ wrapper: pass the row pointer + record COUNT + KEY SIZE. No buffer
-     *     size is passed — it is implied by count*(RECORD+key_size). --- */
+    /* --- C++ wrapper: pass the row pointer + record COUNT + KEY SIZE + results.
+     *     No buffer size, no invalid-index outputs — failures come from results[]. --- */
     {
         const size_t N = 16, KS = 4;
         auto rows = build_ecdsa(sctx, N, KS); /* rows of [EcdsaRecord | 4-byte key] */
         ufsecp::lbtc::Controller wrap;        /* RAII, AUTO backend */
         std::vector<uint8_t> res(N, 0xAA);
         const size_t stride = UFSECP_LBTC_ECDSA_RECORD + KS;
-        size_t ninv = 0;
-        auto rc = wrap.verify_ecdsa(rows.data(), N, KS, res.data(), nullptr, 0, &ninv);
-        CHECK(rc == UFSECP_OK && ninv == 0, "wrapper: count + key_size, buffer implied");
+        wrap.verify_ecdsa(rows.data(), N, KS, res.data());
+        CHECK(invalids(res).count == 0, "wrapper: count + key_size, buffer implied");
         rows[3 * stride + 65] ^= 0x04; /* flip a sig byte in row 3 */
-        ninv = 0;
-        wrap.verify_ecdsa(rows.data(), N, KS, res.data(), nullptr, 0, &ninv);
-        CHECK(ninv == 1 && res[3] == 0, "wrapper: corruption detected, row 3 marked");
+        wrap.verify_ecdsa(rows.data(), N, KS, res.data());
+        CHECK(invalids(res).count == 1 && res[3] == 0, "wrapper: corruption detected, row 3 marked");
     }
 
     /* --- typed-span overload: pass a packed struct span; count + key_size are both
@@ -185,22 +189,19 @@ int main() {
         const Triple* batch = reinterpret_cast<const Triple*>(raw.data());
         ufsecp::lbtc::Controller wrap;
         std::vector<uint8_t> res(N, 0xAA);
-        size_t ninv = 0;
         /* key_size (3) is derived from sizeof(Triple)-RECORD; count from span.size() */
-        auto rc = wrap.verify_ecdsa(std::span<const Triple>(batch, N),
-                                    res.data(), nullptr, 0, &ninv);
-        CHECK(rc == UFSECP_OK && ninv == 0, "span<Triple>: count+key_size from type, all valid");
+        wrap.verify_ecdsa(std::span<const Triple>(batch, N), res.data());
+        CHECK(invalids(res).count == 0, "span<Triple>: count+key_size from type, all valid");
         raw[5 * sizeof(Triple) + 65] ^= 0x08; /* flip a sig byte in row 5 */
-        ninv = 0;
-        wrap.verify_ecdsa(std::span<const Triple>(batch, N), res.data(), nullptr, 0, &ninv);
-        CHECK(ninv == 1 && res[5] == 0, "span<Triple>: 3-byte stride correct, row 5 marked");
+        wrap.verify_ecdsa(std::span<const Triple>(batch, N), res.data());
+        CHECK(invalids(res).count == 1 && res[5] == 0, "span<Triple>: 3-byte stride correct, row 5 marked");
     }
 
-    /* --- empty batch --- */
+    /* --- empty batch (no-op; results untouched) --- */
     {
-        size_t ninv = 123;
-        auto rc = ufsecp_lbtc_verify_ecdsa(ctrl, nullptr, 0, 0, nullptr, nullptr, 0, &ninv);
-        CHECK(rc == UFSECP_OK && ninv == 0, "empty batch returns OK");
+        std::vector<uint8_t> res(1, 0xAA);
+        ufsecp_lbtc_verify_ecdsa(ctrl, nullptr, 0, 0, res.data());
+        CHECK(res[0] == 0xAA, "empty batch is a no-op (results untouched)");
     }
 
     ufsecp_ctx_destroy(sctx);

@@ -79,20 +79,14 @@ inline ufsecp_error_t cpu_verify_run(ufsecp_ctx* ctx, Kind k,
                             : ufsecp_schnorr_batch_verify(ctx, recs, cnt);
 }
 
-/* Accumulates per-row results + the compact invalid-index list. */
+/* Writes the per-row pass/fail byte array. results[i] == 1 valid / 0 invalid.
+ * The caller derives any failure list it needs from this array (failures are
+ * rare during honest IBD), so the bridge keeps a single, minimal output. */
 struct Sink {
     uint8_t* results;
-    std::size_t* invalid_idx;
-    std::size_t  invalid_cap;
-    std::size_t  total_invalid;
 
     inline void mark(std::size_t global, bool valid) {
         if (results) results[global] = valid ? 1u : 0u;
-        if (!valid) {
-            if (invalid_idx && total_invalid < invalid_cap)
-                invalid_idx[total_invalid] = global;
-            ++total_invalid;
-        }
     }
     inline void mark_all_valid(std::size_t base, std::size_t cnt) {
         if (results) std::memset(results + base, 1, cnt);
@@ -190,24 +184,23 @@ bool gpu_chunk(ufsecp_gpu_ctx* gpu, Kind k, const uint8_t* rows,
 }
 #endif /* UFSECP_LBTC_WITH_GPU */
 
-ufsecp_error_t verify_impl(ufsecp_lbtc_ctrl* ctrl, Kind k,
-                           const uint8_t* rows, std::size_t n, std::size_t key_size,
-                           uint8_t* results,
-                           std::size_t* invalid_idx, std::size_t invalid_cap,
-                           std::size_t* invalid_count) {
-    if (!ctrl) return UFSECP_ERR_NULL_ARG;
-    if (invalid_count) *invalid_count = 0;
-    if (n == 0) return UFSECP_OK; /* empty batch is vacuously valid */
-    if (!rows) return UFSECP_ERR_NULL_ARG;
+void verify_impl(ufsecp_lbtc_ctrl* ctrl, Kind k,
+                 const uint8_t* rows, std::size_t n, std::size_t key_size,
+                 uint8_t* results) {
+    /* No-op on a degenerate call: a NULL ctrl/rows or empty batch leaves results
+     * exactly as the caller initialized it. Callers zero-initialize results, so a
+     * degenerate call reads as "all invalid" (fail-closed), never falsely valid. */
+    if (!ctrl || n == 0 || !rows) return;
 
     const std::size_t stride = record_size(k) + key_size;
-    Sink sink{results, invalid_idx, invalid_cap, 0};
+    Sink sink{results};
 
     /* The chunk paths allocate scratch / marshalling buffers (the GPU per-field
      * arrays and the Schnorr CPU reorder). A mid-batch allocation failure is
-     * unrecoverable — never let an exception escape this extern "C" boundary;
-     * surface it as an internal error so the caller fails fast (the libbitcoin
-     * wrapper std::abort()s on a non-OK return). */
+     * unrecoverable — never let an exception escape this extern "C" boundary.
+     * On such a failure the loop is abandoned: rows already processed keep their
+     * 0/1 verdict and rows not yet reached stay at the caller's zero-init, i.e.
+     * fail-closed (treated as invalid), never falsely accepted. */
     try {
         for (std::size_t base = 0; base < n; base += kChunk) {
             const std::size_t cnt = (n - base) < kChunk ? (n - base) : kChunk;
@@ -220,11 +213,8 @@ ufsecp_error_t verify_impl(ufsecp_lbtc_ctrl* ctrl, Kind k,
             cpu_chunk(ctrl->cpu, k, rows, base, cnt, stride, sink);
         }
     } catch (...) {
-        return UFSECP_ERR_INTERNAL;
+        return; /* fail-closed: unprocessed rows remain at caller zero-init */
     }
-
-    if (invalid_count) *invalid_count = sink.total_invalid;
-    return UFSECP_OK;
 }
 
 } // namespace
@@ -308,22 +298,16 @@ const char* ufsecp_lbtc_ctrl_device_name(const ufsecp_lbtc_ctrl* ctrl) {
     return ctrl ? ctrl->device_name : "";
 }
 
-ufsecp_error_t ufsecp_lbtc_verify_ecdsa(ufsecp_lbtc_ctrl* ctrl,
-                                        const uint8_t* rows, size_t n,
-                                        size_t key_size, uint8_t* results,
-                                        size_t* invalid_idx, size_t invalid_cap,
-                                        size_t* invalid_count) {
-    return verify_impl(ctrl, Kind::Ecdsa, rows, n, key_size, results,
-                       invalid_idx, invalid_cap, invalid_count);
+void ufsecp_lbtc_verify_ecdsa(ufsecp_lbtc_ctrl* ctrl,
+                              const uint8_t* rows, size_t n,
+                              size_t key_size, uint8_t* results) {
+    verify_impl(ctrl, Kind::Ecdsa, rows, n, key_size, results);
 }
 
-ufsecp_error_t ufsecp_lbtc_verify_schnorr(ufsecp_lbtc_ctrl* ctrl,
-                                          const uint8_t* rows, size_t n,
-                                          size_t key_size, uint8_t* results,
-                                          size_t* invalid_idx, size_t invalid_cap,
-                                          size_t* invalid_count) {
-    return verify_impl(ctrl, Kind::Schnorr, rows, n, key_size, results,
-                       invalid_idx, invalid_cap, invalid_count);
+void ufsecp_lbtc_verify_schnorr(ufsecp_lbtc_ctrl* ctrl,
+                                const uint8_t* rows, size_t n,
+                                size_t key_size, uint8_t* results) {
+    verify_impl(ctrl, Kind::Schnorr, rows, n, key_size, results);
 }
 
 ufsecp_error_t ufsecp_lbtc_sp_scan(ufsecp_lbtc_ctrl* ctrl,

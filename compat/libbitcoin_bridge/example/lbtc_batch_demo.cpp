@@ -54,20 +54,21 @@ int main() {
     /* simulate a bad signature in row 5 */
     rows[5 * stride + 70] ^= 0x01;
 
-    /* --- one call --- */
+    /* --- one call --- results[i] == 1 valid / 0 invalid is the only output.
+     * Map failures back to block ids by scanning it (exactly how libbitcoin's
+     * verify_signatures collects failed-token identifiers). --- */
     std::vector<uint8_t> results(N);
-    std::vector<size_t> invalid(N);
-    size_t ninvalid = 0;
-    ufsecp_lbtc_verify_ecdsa(ctrl, rows.data(), N, KEY,
-                             results.data(), invalid.data(), N, &ninvalid);
+    ufsecp_lbtc_verify_ecdsa(ctrl, rows.data(), N, KEY, results.data());
 
+    size_t ninvalid = 0;
+    for (size_t i = 0; i < N; ++i) if (!results[i]) ++ninvalid;
     std::printf("invalid rows: %zu\n", ninvalid);
-    for (size_t j = 0; j < ninvalid; ++j) {
-        const size_t idx = invalid[j];
-        const uint8_t* tag = rows.data() + idx * stride + UFSECP_LBTC_ECDSA_RECORD;
+    for (size_t i = 0; i < N; ++i) {
+        if (results[i]) continue;
+        const uint8_t* tag = rows.data() + i * stride + UFSECP_LBTC_ECDSA_RECORD;
         const uint32_t block_id =
             (uint32_t)tag[0] | ((uint32_t)tag[1] << 8) | ((uint32_t)tag[2] << 16);
-        std::printf("  row %zu invalid -> block %u\n", idx, block_id);
+        std::printf("  row %zu invalid -> block %u\n", i, block_id);
     }
 
     ufsecp_ctx_destroy(sctx);

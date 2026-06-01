@@ -68,54 +68,70 @@ invalid row can be mapped back to its block/tx **without a second side table**.
   it would only add an unnecessary error condition (a `byte*, size` API can
   mismatch; `count + key_size` cannot).
 
-  ```cpp
-  // rows = the contiguous [record | key] buffer; n = records; ks = key bytes/row
-  ctrl.verify_ecdsa(rows, n, ks, results);   // no buffer size; same on the C ABI
+  ```c
+  // C ABI — rows = contiguous [record | key] buffer; n = records; ks = key bytes/row;
+  // results = n bytes (1=valid/0=invalid). Returns void: no error code, no buffer size,
+  // no invalid-index outputs — the caller maps failures from results[].
+  void ufsecp_lbtc_verify_ecdsa(ufsecp_lbtc_ctrl* ctrl,
+                                const uint8_t* rows, size_t n,
+                                size_t key_size, uint8_t* results);
   ```
 
-  **Typed-span form (C++20) — nothing about size is restated at the call site.**
-  A node that already has its rows as a packed struct (e.g. libbitcoin's
-  `secp256k1::ecdsa::triple`, a `#pragma pack(1)` struct of
-  `{ hash_digest, ec_compressed, ec_signature, token }`) passes the span directly.
-  The element type *is* the layout, so both values are recovered from it —
-  `count = batch.size()`, `key_size = sizeof(Row) - RECORD` (the trailing `token`):
+  This is exactly the shape evoskuil's libbitcoin integration calls. With a packed
+  `secp256k1::ecdsa::triple` (`#pragma pack(1)` of `{ hash_digest, ec_compressed,
+  ec_signature, token }`, where `token = data_array<3>`), the key size is the
+  compile-time `sizeof(token)`:
 
   ```cpp
-  std::span<const ecdsa::triple> batch = ...;     // 129-byte record + 3-byte token
+  static thread_local ufsecp::lbtc::Controller context{ UFSECP_LBTC_AUTO };
+  if (!context.ok()) std::abort();                   // only recoverable failure (no backend)
+  const auto count   = batch.size();
+  std::vector<uint8_t> results(count);               // zero-init → fail-closed on a no-op call
+  const auto in      = pointer_cast<uint8_t>(batch.data());
+  const auto out     = results.data();
+  constexpr auto id_size = array_count<decltype(triple::identifier)>;   // = 3
+  ufsecp_lbtc_verify_ecdsa(context.get(), in, count, id_size, out);     // void; 5 args
+  // map failures (results[i] == 0) back to your tokens:
+  for (size_t row = 0; row < results.size(); ++row)
+      if (!to_bool(results[row])) failed.push_back(batch[row].identifier);
+  ```
+
+  **Typed-span convenience overload (C++20)** — if you prefer not to compute
+  `id_size` yourself, pass the span and the bridge recovers both `count =
+  batch.size()` and `key_size = sizeof(Row) - RECORD` from the element type:
+
+  ```cpp
+  std::span<const ecdsa::triple> batch = ...;
   std::vector<uint8_t> results(batch.size());
-  size_t fails = 0;
-  ctrl.verify_ecdsa(batch, results.data(), nullptr, 0, &fails);   // no count, no key_size
+  ctrl.verify_ecdsa(batch, results.data());          // also void, results-only
   ```
-
-  This is the form evoskuil's integration uses: the `key_size` is redundant because
-  it is `sizeof(triple) - 129`, derived from the type — so it is *never written at
-  the call site*. The overload `reinterpret_cast`s the span to the byte pointer and
-  forwards the derived `count` + `key_size` to the C ABI below. `results` is one
-  byte per row (`std::vector<uint8_t>`, `1`=valid / `0`=invalid).
 
   **Integration notes for the consumer:**
-  - The two values fully determine the layout — the buffer is `count*(RECORD+key_size)`
-    bytes by construction, so there is no size mismatch and no size error path.
+  - `count` + `key_size` fully determine the layout — the buffer is
+    `count*(RECORD+key_size)` bytes by construction, so there is no size argument,
+    no size mismatch, and no size error path.
   - `RECORD` is `129` for ECDSA, `128` for Schnorr; the message/sighash is the
     **first** field for both kinds (Schnorr is uniform with ECDSA, not xonly-first).
   - The correlation key is opaque to the bridge: it is carried, never interpreted,
-    so `results[i]` / the invalid-index list map straight back to your row `i`.
-  - The C ABI is identical: `ufsecp_lbtc_verify_ecdsa(ctx, rows, count, key_size, …)`
-    — also no buffer-size argument.
+    so `results[i]` maps straight back to your row `i`.
 - The caller builds **one unified table**; the controller internally splits each
   row into the signature payload (→ verify) and the opaque tail (→ carried).
 
 ### Results returned directly
 
-- `results[i]` — `1` valid / `0` invalid, one byte per row (optional).
-- `invalid_idx[]` + `invalid_count` — compact list of failing row indices
-  (optional). Since failures are rare during honest IBD, returning just the few
-  bad indices is cheap. The caller then reads its own key from
-  `rows[idx]`’s opaque tail (or its own id table) to locate the block/tx.
+- The verify call returns **`void`**. `results[i]` — `1` valid / `0` invalid, one
+  byte per row — is the only output. The caller maps a failing row back to its
+  block/tx by reading the opaque tag carried in `rows[i]` (no second side table).
+  Since honest IBD failures are rare, scanning `results[]` for the few zeros is cheap.
+- There is **no error return** and **no invalid-index list**: the only recoverable
+  failure (no usable backend) is reported at `ufsecp_lbtc_ctrl_create` /
+  `Controller::ok()` time; a degenerate call (NULL/`n==0`) is a no-op that leaves
+  `results` at the caller's zero-init (fail-closed = all invalid).
 
 This is the design space evoskuil and Vano converged on: *"make entry point
 function as you wish with your data and return types … inside that function i
-will link gpu side."* The controller is that middleware entry point.
+will link gpu side."* The controller is that middleware entry point — and evoskuil
+confirmed the final `void verify(ctrl, rows, count, key_size, results)` shape ideal.
 
 ## Consensus correctness
 

@@ -113,20 +113,18 @@ bool diff_kind(ufsecp_lbtc_ctrl* gpu, ufsecp_lbtc_ctrl* cpu, const void* ls_opaq
     auto rows = build_corpus(sctx, k, n);
     ufsecp_ctx_destroy(sctx);
 
-    std::vector<uint8_t> g_res(n), c_res(n);
-    size_t g_ninv=0, c_ninv=0;
-    int gp, cp;
+    std::vector<uint8_t> g_res(n), c_res(n);  /* zero-init: bridge writes 1=valid/0=invalid */
     if (k==ECDSA) {
-        gp = ufsecp_lbtc_verify_ecdsa(gpu, rows.data(), n, 0, g_res.data(), nullptr, 0, &g_ninv);
-        cp = ufsecp_lbtc_verify_ecdsa(cpu, rows.data(), n, 0, c_res.data(), nullptr, 0, &c_ninv);
+        ufsecp_lbtc_verify_ecdsa(gpu, rows.data(), n, 0, g_res.data());
+        ufsecp_lbtc_verify_ecdsa(cpu, rows.data(), n, 0, c_res.data());
     } else {
-        gp = ufsecp_lbtc_verify_schnorr(gpu, rows.data(), n, 0, g_res.data(), nullptr, 0, &g_ninv);
-        cp = ufsecp_lbtc_verify_schnorr(cpu, rows.data(), n, 0, c_res.data(), nullptr, 0, &c_ninv);
+        ufsecp_lbtc_verify_schnorr(gpu, rows.data(), n, 0, g_res.data());
+        ufsecp_lbtc_verify_schnorr(cpu, rows.data(), n, 0, c_res.data());
     }
-    if (gp != UFSECP_OK || cp != UFSECP_OK) {
-        std::printf("  ERROR: verify call failed (gpu rc=%d, cpu rc=%d)\n", gp, cp);
-        return false;
-    }
+    /* Invalid counts are derived from the per-row results — the bridge's only
+     * output (it returns void; failures are mapped by the caller from results[]). */
+    size_t g_ninv=0, c_ninv=0;
+    for (size_t i=0;i<n;++i) { if (!g_res[i]) ++g_ninv; if (!c_res[i]) ++c_ninv; }
     const char* name = (k==ECDSA)?"ECDSA":"Schnorr";
 
     /* Per-row agreement across GPU, CPU and (when linked) libsecp256k1 is the
