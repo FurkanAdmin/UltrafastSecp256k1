@@ -127,6 +127,41 @@ static void test_seckey_failure_clear(secp256k1_context* ctx) {
     CHECK(memcmp(buf, zero, 32) == 0, "seckey_tweak_mul failure zeroes seckey");
 }
 
+// PASS-COMPAT-002/004: on a failed op, upstream zeroes the OUTPUT buffer.
+// ecdsa_recover (output pubkey) and xonly_pubkey_tweak_add (output pubkey) are
+// output-only (no in-place hazard); verify the shim zeroes them on failure.
+static void test_passcompat_failure_clear(secp256k1_context* ctx) {
+    printf("\n[Shim failure-path output zeroing (PASS-COMPAT-002/004)]\n");
+    const unsigned char zero64[64] = {};
+
+    // PASS-COMPAT-002: ecdsa_recover with an r=0 recoverable sig -> 0, output zeroed.
+    {
+        secp256k1_ecdsa_recoverable_signature rsig{};
+        unsigned char compact0[64] = {}; // r=0,s=0: parses, but is not recoverable
+        int parsed = secp256k1_ecdsa_recoverable_signature_parse_compact(ctx, &rsig, compact0, 0);
+        CHECK(parsed == 1, "recoverable parse_compact(r=0,s=0) accepted");
+        secp256k1_pubkey pk; memset(pk.data, 0xAB, 64); // sentinel
+        int rc = secp256k1_ecdsa_recover(ctx, &pk, &rsig, MSG32);
+        CHECK(rc == 0, "ecdsa_recover on r=0 sig returns 0");
+        CHECK(memcmp(pk.data, zero64, 64) == 0,
+              "ecdsa_recover zeroes pubkey output (PASS-COMPAT-002)");
+    }
+
+    // PASS-COMPAT-004: xonly_pubkey_tweak_add with an out-of-range tweak -> 0, output zeroed.
+    {
+        secp256k1_keypair kp{};
+        CHECK(secp256k1_keypair_create(ctx, &kp, PRIVKEY) == 1, "keypair_create for tweak_add");
+        secp256k1_xonly_pubkey xpk{};
+        CHECK(secp256k1_keypair_xonly_pub(ctx, &xpk, NULL, &kp) == 1, "keypair_xonly_pub");
+        unsigned char big_tweak[32]; memset(big_tweak, 0xff, 32); // >= n
+        secp256k1_pubkey out; memset(out.data, 0xCD, 64); // sentinel
+        int rc = secp256k1_xonly_pubkey_tweak_add(ctx, &out, &xpk, big_tweak);
+        CHECK(rc == 0, "xonly_pubkey_tweak_add with >= n tweak returns 0");
+        CHECK(memcmp(out.data, zero64, 64) == 0,
+              "xonly_pubkey_tweak_add zeroes output (PASS-COMPAT-004)");
+    }
+}
+
 static secp256k1_pubkey test_pubkey(secp256k1_context* ctx) {
     printf("\n[Public key]\n");
     secp256k1_pubkey pubkey{};
@@ -616,6 +651,7 @@ int main() {
     test_context(ctx);
     test_seckey(ctx);
     test_seckey_failure_clear(ctx);
+    test_passcompat_failure_clear(ctx);
     secp256k1_pubkey pubkey = test_pubkey(ctx);
     test_ecdsa(ctx, &pubkey);
     test_schnorr(ctx);

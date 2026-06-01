@@ -212,7 +212,13 @@ int secp256k1_ecdsa_recover(
     auto rsig = rsig_from_data(sig->data);
 
     auto [pk, ok] = secp256k1::ecdsa_recover(msg, rsig.sig, rsig.recid);
-    if (!ok || pk.is_infinity()) return 0;
+    if (!ok || pk.is_infinity()) {
+        // PASS-COMPAT-002: upstream secp256k1_ecdsa_recover memsets the output
+        // pubkey to 0 on failure. pubkey is output-only (separate from msg/sig),
+        // so zero it to match (no in-place hazard).
+        std::memset(pubkey->data, 0, sizeof(pubkey->data));
+        return 0;
+    }
 
     point_to_pubkey_data(pk, pubkey->data);
     return 1;

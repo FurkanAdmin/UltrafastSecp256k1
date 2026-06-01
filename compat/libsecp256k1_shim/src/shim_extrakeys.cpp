@@ -283,16 +283,19 @@ int secp256k1_xonly_pubkey_tweak_add(
         return 0;
     }
 
+    // PASS-COMPAT-004: upstream xonly_pubkey_tweak_add memsets output_pubkey to 0
+    // on every failure path. output_pubkey is a separate buffer from the inputs
+    // (no in-place hazard), so zero it before each failure return to match.
     auto P = xonly_to_point(internal_pubkey);
-    if (P.is_infinity()) return 0;
+    if (P.is_infinity()) { std::memset(output_pubkey->data, 0, 64); return 0; }
 
     // Reject tweak >= n (libsecp uses scalar_set_b32_limit)
     Scalar t;
-    if (!Scalar::parse_bytes_strict(tweak32, t)) return 0;
+    if (!Scalar::parse_bytes_strict(tweak32, t)) { std::memset(output_pubkey->data, 0, 64); return 0; }
 
     auto tG = scalar_mul_generator(t);
     auto Q  = P.add(tG);
-    if (Q.is_infinity()) return 0;
+    if (Q.is_infinity()) { std::memset(output_pubkey->data, 0, 64); return 0; }
 
     // PERF-006: use point_to_pubkey_data instead of to_uncompressed() to avoid
     // a 65-byte allocation. point_to_pubkey_data uses the fast affine path when
