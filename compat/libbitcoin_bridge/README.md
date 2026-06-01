@@ -66,9 +66,13 @@ invalid row can be mapped back to its block/tx **without a second side table**.
   and the **key size**. The buffer size is *implied*, always
   `count * (RECORD + key_size)`. There is deliberately **no buffer-size argument**,
   so there is no buffer/stride mismatch and **no corresponding error condition**.
-  The C++ `Controller::verify(std::span<const Record>)` overload takes the count
-  from `span.size()` (never a byte count) with `key_size == 0`; the keyed case
-  uses `verify_ecdsa(rows, count, key_size, …)`.
+  **Keyed rows (the usual node case)** — each on-wire row is
+  `[ record | key_size bytes ]` — are verified **zero-copy** with
+  `verify_ecdsa(rows_ptr, count, key_size)`: a raw byte pointer over the
+  interleaved buffer plus count + key_size. A `std::span<const EcdsaRecord>`
+  **cannot** carry keyed rows (its element stride is fixed at `sizeof(EcdsaRecord)`,
+  so it skips the key bytes); the `Controller::verify(std::span<const Record>)`
+  overload is therefore sugar for the `key_size == 0` case only.
 - The caller builds **one unified table**; the controller internally splits each
   row into the signature payload (→ verify) and the opaque tail (→ carried).
 

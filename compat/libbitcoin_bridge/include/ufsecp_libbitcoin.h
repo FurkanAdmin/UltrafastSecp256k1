@@ -197,8 +197,14 @@ namespace lbtc {
 // byte layout, so a node's DB / mmap layout and the engine agree on the exact
 // bytes. Verified fields are FIRST, in on-wire order; any correlation id is the
 // caller's own trailing bytes on a wrapping struct (pass key_size on the call).
-// A bare std::span<const EcdsaRecord> with key_size == 0 forwards zero-copy and
-// results[i] maps back to record i by index — no second side table needed.
+// If the caller appends a correlation key to each row (the usual node case), the
+// on-wire row is [ EcdsaRecord(129) | key_size bytes ] and you verify it ZERO-COPY
+// with verify_ecdsa(rows_ptr, count, key_size) — the raw byte pointer over that
+// interleaved buffer, plus count + key_size (no buffer-size argument). A
+// std::span<const EcdsaRecord> can NOT represent keyed rows: its element stride is
+// fixed at sizeof(EcdsaRecord)==129, so it would skip the key bytes. The
+// span<const Record> overloads below are therefore sugar for the key_size == 0
+// case ONLY. results[i] maps back to record i by index either way.
 //
 // FIELD ORDER — IMPORTANT: the message / sighash is FIRST for BOTH kinds. Schnorr
 // is UNIFORM with ECDSA (hash, then key, then sig); it is NOT x-only-key-first at
@@ -255,9 +261,11 @@ public:
     }
 
 #ifdef UFSECP_LBTC_HAS_SPAN
-    // Zero-copy, unkeyed: the COUNT is records.size() — never a byte buffer size,
-    // exactly the "pass record count + key size" contract (key_size == 0 here).
-    // `results`, if non-null, must hold records.size() bytes.
+    // Sugar for the NO-correlation-key case ONLY (key_size == 0): the records are
+    // pure contiguous EcdsaRecords, so the COUNT is records.size() (never a byte
+    // buffer size). For keyed rows ([record | key]), use verify_ecdsa(rows_ptr,
+    // count, key_size) instead — a span<const EcdsaRecord> cannot stride over the
+    // key bytes. `results`, if non-null, must hold records.size() bytes.
     ufsecp_error_t verify(std::span<const EcdsaRecord> records,
                           uint8_t* results = nullptr, size_t* invalid_idx = nullptr,
                           size_t invalid_cap = 0, size_t* invalid_count = nullptr) const {
