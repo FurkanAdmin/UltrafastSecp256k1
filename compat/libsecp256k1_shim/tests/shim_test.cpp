@@ -95,6 +95,35 @@ static void test_seckey(secp256k1_context* ctx) {
     secp256k1_ec_seckey_tweak_add(ctx, key_copy, zero_tweak);
 }
 
+// PASS-COMPAT-001: on a FAILED seckey op, upstream libsecp256k1 zeroes the
+// caller's seckey buffer (secp256k1_scalar_cmov(&sec, &zero, !ret) + get_b32).
+// Verify the shim matches: every failure path leaves the buffer all-zero.
+static void test_seckey_failure_clear(secp256k1_context* ctx) {
+    printf("\n[Secret key failure-path clearing (PASS-COMPAT-001)]\n");
+    const unsigned char zero[32] = {};
+    unsigned char invalid[32];
+    memset(invalid, 0xff, 32);  // >= n -> invalid seckey, but non-zero (so a no-op
+                                // would leave 0xff.. visible; the fix must zero it)
+    unsigned char buf[32];
+
+    // negate(invalid) -> 0 and buffer zeroed
+    memcpy(buf, invalid, 32);
+    CHECK(secp256k1_ec_seckey_negate(ctx, buf) == 0, "seckey_negate(invalid) returns 0");
+    CHECK(memcmp(buf, zero, 32) == 0, "seckey_negate failure zeroes seckey (upstream parity)");
+
+    // tweak_add(invalid) -> 0 and buffer zeroed
+    memcpy(buf, invalid, 32);
+    unsigned char tweak[32] = {}; tweak[31] = 0x02;
+    CHECK(secp256k1_ec_seckey_tweak_add(ctx, buf, tweak) == 0, "seckey_tweak_add(invalid) returns 0");
+    CHECK(memcmp(buf, zero, 32) == 0, "seckey_tweak_add failure zeroes seckey");
+
+    // tweak_mul(VALID key, zero tweak) -> 0 and a valid key is zeroed (matches upstream)
+    memcpy(buf, PRIVKEY, 32);
+    unsigned char zero_tweak[32] = {};
+    CHECK(secp256k1_ec_seckey_tweak_mul(ctx, buf, zero_tweak) == 0, "seckey_tweak_mul(valid, 0) returns 0");
+    CHECK(memcmp(buf, zero, 32) == 0, "seckey_tweak_mul failure zeroes seckey");
+}
+
 static secp256k1_pubkey test_pubkey(secp256k1_context* ctx) {
     printf("\n[Public key]\n");
     secp256k1_pubkey pubkey{};
@@ -457,11 +486,17 @@ static void test_der_parity(secp256k1_context* ctx) {
     CHECK(secp256k1_ecdsa_signature_parse_der(ctx, &sig, trunc, 4) == 0,
           "DER truncated: reject");
 
-    // Compact parse parity: r=0 compact → reject
+    // Compact parse parity: r=0,s=0 compact → ACCEPT (matches upstream).
+    // Upstream secp256k1_ecdsa_signature_parse_compact only fails on overflow
+    // (r>=n or s>=n); r=0/s=0 are accepted at parse time and rejected later by
+    // verify. The shim mirrors this exactly (shim_ecdsa.cpp parse_compact uses
+    // parse_bytes_strict, which allows 0). The previous "reject" assertion was a
+    // stale false expectation — the shim's DER parser is stricter, but compact
+    // deliberately matches upstream. (PASS-COMPAT review: test-stale, not a bug.)
     unsigned char compact_zero[64] = {};
     secp256k1_ecdsa_signature csig{};
-    CHECK(secp256k1_ecdsa_signature_parse_compact(ctx, &csig, compact_zero) == 0,
-          "compact r=0: reject");
+    CHECK(secp256k1_ecdsa_signature_parse_compact(ctx, &csig, compact_zero) == 1,
+          "compact r=0,s=0: accept (matches upstream; verify rejects)");
 
     // Compact parse parity: r=n compact → reject
     unsigned char compact_n[64] = {};
@@ -577,6 +612,7 @@ int main() {
 
     test_context(ctx);
     test_seckey(ctx);
+    test_seckey_failure_clear(ctx);
     secp256k1_pubkey pubkey = test_pubkey(ctx);
     test_ecdsa(ctx, &pubkey);
     test_schnorr(ctx);

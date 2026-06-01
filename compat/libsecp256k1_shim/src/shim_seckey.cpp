@@ -41,6 +41,10 @@ int secp256k1_ec_seckey_negate(
     Scalar k;
     if (!Scalar::parse_bytes_strict_nonzero(seckey, k)) {
         secp256k1::detail::secure_erase(&k, sizeof(k));   // RT-05
+        // PASS-COMPAT-001: upstream zeroes the caller's seckey on failure
+        // (secp256k1_scalar_cmov(&sec, &zero, !ret) + get_b32). Match it so a
+        // failed seckey op never leaves a usable key in the caller's buffer.
+        std::memset(seckey, 0, 32);
         return 0;
     }
     // CT-SECKEY-NEGATE: use scalar_cneg with always-negate mask (all-ones) so
@@ -76,12 +80,14 @@ int secp256k1_ec_seckey_tweak_add(
     if (!Scalar::parse_bytes_strict_nonzero(seckey, k)) {
         secp256k1::detail::secure_erase(&k, sizeof(k));   // RT-05
         secp256k1::detail::secure_erase(&t, sizeof(t));
+        std::memset(seckey, 0, 32);  // PASS-COMPAT-001: upstream zeroes seckey on failure
         return 0;
     }
     // tweak in [0, n-1]; 0 is valid (result == seckey)
     if (!Scalar::parse_bytes_strict(tweak32, t)) {
         secp256k1::detail::secure_erase(&k, sizeof(k));   // RT-05
         secp256k1::detail::secure_erase(&t, sizeof(t));
+        std::memset(seckey, 0, 32);  // PASS-COMPAT-001: upstream zeroes seckey on failure
         return 0;
     }
     auto result = secp256k1::ct::scalar_add(k, t);  // CT-001: k is secret
@@ -89,6 +95,7 @@ int secp256k1_ec_seckey_tweak_add(
         secp256k1::detail::secure_erase(&k, sizeof(k));        // RT-05
         secp256k1::detail::secure_erase(&t, sizeof(t));
         secp256k1::detail::secure_erase(&result, sizeof(result));
+        std::memset(seckey, 0, 32);  // PASS-COMPAT-001: upstream zeroes seckey on failure
         return 0;
     }
     auto out = result.to_bytes();
@@ -118,11 +125,13 @@ int secp256k1_ec_seckey_tweak_mul(
     if (!Scalar::parse_bytes_strict_nonzero(seckey, k)) {
         secp256k1::detail::secure_erase(&k, sizeof(k));   // RT-05
         secp256k1::detail::secure_erase(&t, sizeof(t));
+        std::memset(seckey, 0, 32);  // PASS-COMPAT-001: upstream zeroes seckey on failure
         return 0;
     }
     if (!Scalar::parse_bytes_strict_nonzero(tweak32, t)) {
         secp256k1::detail::secure_erase(&k, sizeof(k));   // RT-05
         secp256k1::detail::secure_erase(&t, sizeof(t));
+        std::memset(seckey, 0, 32);  // PASS-COMPAT-001: upstream zeroes seckey on failure
         return 0;
     }
     auto result = secp256k1::ct::scalar_mul(k, t);  // CT-001: k is secret
@@ -130,6 +139,7 @@ int secp256k1_ec_seckey_tweak_mul(
         secp256k1::detail::secure_erase(&k, sizeof(k));        // RT-05
         secp256k1::detail::secure_erase(&t, sizeof(t));
         secp256k1::detail::secure_erase(&result, sizeof(result));
+        std::memset(seckey, 0, 32);  // PASS-COMPAT-001: upstream zeroes seckey on failure
         return 0;
     }
     auto out = result.to_bytes();
