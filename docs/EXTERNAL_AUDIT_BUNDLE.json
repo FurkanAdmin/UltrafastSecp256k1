@@ -33,14 +33,14 @@
     {
       "exists": true,
       "path": "docs/TEST_MATRIX.md",
-      "sha256": "f86ea2f434abb7376d95d0616320c916c11a6df2f088a2a350c560a94c0a56f7",
-      "size": 62457
+      "sha256": "429381ca6979f25fb911abceee2a5a500393fbc9f9a4e9809cd0ac3fb6c00593",
+      "size": 62502
     },
     {
       "exists": true,
       "path": "docs/CT_VERIFICATION.md",
-      "sha256": "e830a070fd3f6508ef9ef76e1ec3f35d62bd4580a7ea7550bfd6bce84a8bfb83",
-      "size": 46195
+      "sha256": "2923183e10aaaa29db5ccb45c1b50af331c7e315c81fe88f5b2463b2b23697cc",
+      "size": 48223
     },
     {
       "exists": true,
@@ -156,7 +156,7 @@
           {
             "findings": [
               {
-                "message": "Audit test-quality findings: files=421, critical=0, high=0, medium=0, low=0",
+                "message": "Audit test-quality findings: files=422, critical=0, high=0, medium=0, low=0",
                 "severity": "INFO"
               },
               {
@@ -170,7 +170,7 @@
           {
             "findings": [
               {
-                "message": "All 725 security patterns preserved",
+                "message": "All 735 security patterns preserved",
                 "severity": "PASS"
               }
             ],
@@ -200,15 +200,27 @@
           {
             "findings": [
               {
-                "message": "2 files modified/deleted since graph build (2026-05-31T11:32:02)",
+                "message": "6 files modified/deleted since graph build (2026-06-01T09:01:25)",
                 "severity": "WARN"
               },
               {
-                "message": "MODIFIED: docs/SECRET_LIFECYCLE.md",
+                "message": "MODIFIED: README.md",
                 "severity": "INFO"
               },
               {
-                "message": "MODIFIED: docs/SECURITY_AUTONOMY_KPI.json",
+                "message": "MODIFIED: docs/AUDIT_COVERAGE.md",
+                "severity": "INFO"
+              },
+              {
+                "message": "MODIFIED: docs/REVIEW_VALIDATED_FINDINGS.md",
+                "severity": "INFO"
+              },
+              {
+                "message": "MODIFIED: docs/TEST_MATRIX.md",
+                "severity": "INFO"
+              },
+              {
+                "message": "MODIFIED: docs/canonical_data.json",
                 "severity": "INFO"
               }
             ],
@@ -390,11 +402,11 @@
           {
             "findings": [
               {
-                "message": "Mutation report age: 47.2 days (threshold: 14)",
+                "message": "Mutation report age: 48.1 days (threshold: 14)",
                 "severity": "INFO"
               },
               {
-                "message": "Mutation report is stale (47.2 > 14 days) \u2014 rerun recommended",
+                "message": "Mutation report is stale (48.1 > 14 days) \u2014 rerun recommended",
                 "severity": "WARN"
               }
             ],
@@ -604,7 +616,7 @@
                 "severity": "INFO"
               },
               {
-                "message": "Source graph \"files\" has 1336 rows (threshold: 200)",
+                "message": "Source graph \"files\" has 1341 rows (threshold: 200)",
                 "severity": "PASS"
               }
             ],
@@ -618,11 +630,11 @@
           "value": {
             "dirty": false,
             "ref": "dev",
-            "sha": "5d2a1324d52dee624fb3a2c2bf5509d97c170021",
-            "short": "5d2a1324d5"
+            "sha": "93c6127b7b039179b9ab177a03997dee9c489616",
+            "short": "93c6127b7b"
           }
         },
-        "generated_at": "2026-05-31T12:25:50.250825+00:00",
+        "generated_at": "2026-06-01T10:30:44.958704+00:00",
         "platform": "Linux",
         "provenance": {
           "build_flags": {
@@ -639,12 +651,12 @@
             },
             "flags_hash": "f6054a07e934d755"
           },
-          "collected_at": "2026-05-31T12:25:50.250771+00:00",
+          "collected_at": "2026-06-01T10:30:44.958650+00:00",
           "git": {
             "dirty": false,
             "ref": "dev",
-            "sha": "5d2a1324d52dee624fb3a2c2bf5509d97c170021",
-            "short": "5d2a1324d5"
+            "sha": "93c6127b7b039179b9ab177a03997dee9c489616",
+            "short": "93c6127b7b"
           },
           "platform": {
             "machine": "x86_64",
@@ -665,7 +677,7 @@
           },
           "version": "4.1.0"
         },
-        "run_id": "audit_gate-5d2a1324d5-20260531T122550",
+        "run_id": "audit_gate-93c6127b7b-20260601T103044",
         "runner": "audit_gate",
         "schema_version": "1.0.0",
         "sections": [
@@ -771,7 +783,7 @@
               {
                 "check_id": "p2__audit_test_quality",
                 "severity": "info",
-                "title": "Audit test-quality findings: files=421, critical=0, high=0, medium=0, low=0"
+                "title": "Audit test-quality findings: files=422, critical=0, high=0, medium=0, low=0"
               },
               {
                 "check_id": "p2__audit_test_quality",
@@ -787,7 +799,7 @@
               {
                 "check_id": "p3__security_patterns",
                 "severity": "pass",
-                "title": "All 725 security patterns preserved"
+                "title": "All 735 security patterns preserved"
               }
             ],
             "name": "P3: Security Patterns",
@@ -820,17 +832,32 @@
               {
                 "check_id": "p6__graph_freshness",
                 "severity": "advisory:medium",
-                "title": "2 files modified/deleted since graph build (2026-05-31T11:32:02)"
+                "title": "6 files modified/deleted since graph build (2026-06-01T09:01:25)"
               },
               {
                 "check_id": "p6__graph_freshness",
                 "severity": "info",
-                "title": "MODIFIED: docs/SECRET_LIFECYCLE.md"
+                "title": "MODIFIED: README.md"
               },
               {
                 "check_id": "p6__graph_freshness",
                 "severity": "info",
-                "title": "MODIFIED: docs/SECURITY_AUTONOMY_KPI.json"
+                "title": "MODIFIED: docs/AUDIT_COVERAGE.md"
+              },
+              {
+                "check_id": "p6__graph_freshness",
+                "severity": "info",
+                "title": "MODIFIED: docs/REVIEW_VALIDATED_FINDINGS.md"
+              },
+              {
+                "check_id": "p6__graph_freshness",
+                "severity": "info",
+                "title": "MODIFIED: docs/TEST_MATRIX.md"
+              },
+              {
+                "check_id": "p6__graph_freshness",
+                "severity": "info",
+                "title": "MODIFIED: docs/canonical_data.json"
               }
             ],
             "name": "P6: Graph Freshness",
@@ -1050,12 +1077,12 @@
               {
                 "check_id": "p2__mutation_evidence_freshness",
                 "severity": "info",
-                "title": "Mutation report age: 47.2 days (threshold: 14)"
+                "title": "Mutation report age: 48.1 days (threshold: 14)"
               },
               {
                 "check_id": "p2__mutation_evidence_freshness",
                 "severity": "advisory:medium",
-                "title": "Mutation report is stale (47.2 > 14 days) \u2014 rerun recommended"
+                "title": "Mutation report is stale (48.1 > 14 days) \u2014 rerun recommended"
               }
             ],
             "name": "P2: Mutation Evidence Freshness",
@@ -1304,7 +1331,7 @@
               {
                 "check_id": "g-12__source_graph_quality",
                 "severity": "pass",
-                "title": "Source graph \"files\" has 1336 rows (threshold: 200)"
+                "title": "Source graph \"files\" has 1341 rows (threshold: 200)"
               }
             ],
             "name": "G-12: Source Graph Quality",
@@ -1312,12 +1339,12 @@
           }
         ],
         "summary": {
-          "advisory": 50,
+          "advisory": 53,
           "blocking": 0,
-          "info": 44,
+          "info": 47,
           "sections": 26,
           "skipped_sections": 0,
-          "total_findings": 97,
+          "total_findings": 100,
           "warnings": 6
         },
         "verdict": "PASS with advisory"
@@ -1325,8 +1352,8 @@
       "passing": true,
       "required": true,
       "returncode": 0,
-      "stderr_sha256": "77ca7608d74f41580ef435316d1503656dfa14801062567e7439af2201a8f109",
-      "stdout_sha256": "6cfee85a5e3e20d9ad4c767846445abeb4fac5511aea55f6cf6a8a18b7310d43"
+      "stderr_sha256": "782c30c665b1d377e101a46be94838f11b2c352c63fab42f59044eca8ad3f2e6",
+      "stdout_sha256": "a20ad3ac31fbc120e71f17690c0386535fbf80c53a55b7a41c821fc9896deaf5"
     },
     {
       "name": "audit_gap_report_strict",
@@ -1628,13 +1655,13 @@
         "gates_skipped": 0,
         "gates_total": 8,
         "overall_pass": true,
-        "timestamp": "2026-05-31T12:25:54.732078+00:00"
+        "timestamp": "2026-06-01T10:30:49.455201+00:00"
       },
       "passing": true,
       "required": true,
       "returncode": 0,
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stdout_sha256": "589445eda89524feb12f77479ef9fb02055ed0e5562b27e8251235277ced9a3f"
+      "stdout_sha256": "671a464344d2cb03855d5d04dbec8ad719569f18171f0e46ff6689386c6e491d"
     },
     {
       "name": "supply_chain_gate",
@@ -1680,19 +1707,19 @@
         "checks_total": 5,
         "failing_checks": [],
         "overall_pass": true,
-        "timestamp": "2026-05-31T12:25:54.790859+00:00"
+        "timestamp": "2026-06-01T10:30:49.515359+00:00"
       },
       "passing": true,
       "required": true,
       "returncode": 0,
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stdout_sha256": "05841cf1f27a6fb3e2a3365007bb931b86f99614b6737efe7e0be456d83a6a31"
+      "stdout_sha256": "4d2cf9e9f2162d4d663f17ec3c1576568131386d7adf8360791f2dca4ee6a799"
     }
   ],
-  "generated_at": "2026-05-31T12:25:54.811439+00:00",
+  "generated_at": "2026-06-01T10:30:49.538352+00:00",
   "git": {
     "branch": "dev",
-    "commit": "5d2a1324d52dee624fb3a2c2bf5509d97c170021",
+    "commit": "93c6127b7b039179b9ab177a03997dee9c489616",
     "dirty": true
   },
   "repo_root": "/home/shrek/Secp256k1/Secp256K1fast/libs/UltrafastSecp256k1",
