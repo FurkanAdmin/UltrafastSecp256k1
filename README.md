@@ -37,6 +37,14 @@ It is not a trust request. It is a verification package.
 - **CAAS** — continuous audit and evidence system (`audit/`, `ci/`); not runtime code.
 - **Reviewer docs** — scoped evidence, known limitations, replay commands (`docs/`).
 
+> **Bitcoin Core PR candidate — scope:** the proposed Bitcoin Core integration is the
+> **CPU ECDSA / Schnorr (BIP-340) verify + sign backend only** — a compile-time *secondary*
+> backend selected behind the existing libsecp256k1, **not a replacement**. Explicitly
+> **out of scope** for that PR (and reviewed/used separately): the GPU backends
+> (CUDA / Metal / OpenCL), WASM, embedded (ESP32/STM32) targets, the non-C++ bindings, and
+> the protocol extensions (FROST, MuSig2, adaptor signatures, ECIES, BIP-352). Those are
+> real features of the wider engine but are not part of the Core backend candidate.
+
 ---
 
 ## For Bitcoin Core Reviewers
@@ -242,7 +250,7 @@ This project: `code → test → execution → evidence → continuous verificat
 We do not rely on trust. We provide reproducible evidence.
 
 - Every exploit attempt becomes a permanent regression test
-- Every commit runs ~1,000,000+ assertions (aggregate estimate) across 147 non-exploit audit modules and 270 exploit PoCs ( 417 modules total; count via `python3 ci/sync_module_count.py`; canonical data: `docs/canonical_data.json`)
+- Every commit runs ≈600K explicitly itemized field/scalar/point/CT assertions (plus full-suite KAT/differential/fuzz checks, not individually counted) across 147 non-exploit audit modules and 270 exploit PoCs ( 417 modules total; count via `python3 ci/sync_module_count.py`; canonical data: `docs/canonical_data.json`)
 - Every claim maps to a test in [docs/AUDIT_TRACEABILITY.md](docs/AUDIT_TRACEABILITY.md)
 - Every performance number has pinned compiler/driver/toolkit versions and raw logs
 
@@ -281,7 +289,7 @@ Benchmark numbers and historical milestones are maintained in [`docs/BENCHMARKS.
 
 > TL;DR is above. This section covers what differentiates this library in depth.
 
-- **Continuous adversarial audit system** -- every exploit attempt becomes a permanent regression test; ~1,000,000+ assertions (aggregate estimate) per release evidence run, 270 exploit PoCs runner modules in `unified_audit_runner.cpp` (some source files contain multiple registered test functions; all wired, verified by `ci/check_exploit_wiring.py`) across 200+ attack vectors, a block-based PR/push gate, release CAAS gate, and manual deep-assurance workflows — security hardens through executable evidence, not snapshot PDFs ([→ how it works](#engineering-quality--self-audit-culture))
+- **Continuous adversarial audit system** -- every exploit attempt becomes a permanent regression test; ≈600K explicitly itemized field/scalar/point/CT assertions (plus full-suite KAT/differential/fuzz checks, not individually counted) per release evidence run, 270 exploit PoCs runner modules in `unified_audit_runner.cpp` (some source files contain multiple registered test functions; all wired, verified by `ci/check_exploit_wiring.py`) across 200+ attack vectors, a block-based PR/push gate, release CAAS gate, and manual deep-assurance workflows — security hardens through executable evidence, not snapshot PDFs ([→ how it works](#engineering-quality--self-audit-culture))
 - **High-performance CPU secp256k1 engine** -- optimized generator multiply, scalar multiply, hashing, and serialization pipelines across x86-64, ARM64, RISC-V, and embedded targets ([see bench_unified ratio table](docs/BENCHMARKS.md))
 - **Built for modern secp256k1 workloads** -- signing, verification, wallet derivation, threshold protocols, adaptor signatures, ZK primitives, address generation, and large-scale public-key pipelines in one engine
 - **Dual-layer security** -- variable-time FAST path for throughput, constant-time CT path for secret-key operations
@@ -395,7 +403,7 @@ This top-level narrative maps directly to the assurance ledger: CT secret-key ro
 
 | Metric | Value |
 |--------|-------|
-| Internal audit assertions per build | **~1,000,000+** (aggregate estimate; ≈600K explicitly itemized field/scalar/point/CT in [WHY_ULTRAFASTSECP256K1.md](docs/WHY_ULTRAFASTSECP256K1.md), plus unquantified full-suite KAT/differential/fuzz checks) |
+| Internal audit assertions per build | **≈600K explicitly itemized** field/scalar/point/CT (see [WHY_ULTRAFASTSECP256K1.md](docs/WHY_ULTRAFASTSECP256K1.md)), plus full-suite KAT/differential/fuzz checks (not individually counted) |
 | Audit modules (`unified_audit_runner`) | **147 non-exploit modules + 270 exploit PoCs across 10 sections, 0 mandatory failures** (see [docs/AUDIT_COVERAGE.md](docs/AUDIT_COVERAGE.md) for advisory cluster status) |
 | Exploit PoC test files | **270 exploit-PoC modules (258 source files), 20+ coverage areas, 0 mandatory failures** |
 | CI/CD workflows | **50+ GitHub Actions workflows** |
@@ -545,7 +553,7 @@ In addition to the 417-module `unified_audit_runner`, UltrafastSecp256k1 ships *
 **Report vulnerabilities** via [GitHub Security Advisories](https://github.com/shrec/UltrafastSecp256k1/security/advisories/new) or email [payysoon@gmail.com](mailto:payysoon@gmail.com).
 For production cryptographic systems, perform your own risk review, review the current guarantees in [SUPPORTED_GUARANTEES.md](include/ufsecp/SUPPORTED_GUARANTEES.md), and apply the assurance level appropriate to your deployment.
 
-For the full audit infrastructure breakdown (1M+ assertions, block-based CAAS gates, formal CT verification pipelines, self-audit document index), see the [Engineering Quality & Self-Audit Culture](#engineering-quality--self-audit-culture) section above and [WHY_ULTRAFASTSECP256K1.md](docs/WHY_ULTRAFASTSECP256K1.md).
+For the full audit infrastructure breakdown (≈600K itemized assertions, block-based CAAS gates, formal CT verification pipelines, self-audit document index), see the [Engineering Quality & Self-Audit Culture](#engineering-quality--self-audit-culture) section above and [WHY_ULTRAFASTSECP256K1.md](docs/WHY_ULTRAFASTSECP256K1.md).
 
 > **Sponsors / funding partners:** see the "Support the Project" section at the bottom of this README.
 
@@ -669,12 +677,14 @@ Standalone single-threaded benchmark by [@craigraw](https://github.com/craigraw)
 |-----------|-------------|-------------------|-------|
 | k\*P (scalar mul) | 37,975 ns | 26,460 ns | 1.44x faster |
 | Serialize compressed (1st) | 36 ns | 15 ns | 2.4x faster |
-| Tagged SHA-256 | 744 ns | 65 ns | 11.4x faster |
+| Tagged SHA-256 ‡ | 744 ns | 65 ns | 11.4x faster (diagnostic) |
 | k\*G (generator mul) | 17,460 ns | 8,559 ns | 2.04x faster |
 | Point addition | 2,250 ns | 2,457 ns | 0.92x |
 | Serialize compressed (2nd) | 23 ns | 21 ns | 1.1x faster |
 
 > **Note:** Point addition is slightly slower because both inputs have Z=1 (affine), so UltrafastSecp256k1 uses direct affine addition with a field inversion to return an affine result -- this eliminates the separate inversion in serialization.
+>
+> **‡ Tagged SHA-256 — diagnostic only:** this ratio is environment-dependent. libsecp256k1's SHA-256 throughput depends on whether the comparison build enables SHA-NI / hardware SHA extensions and its compiler flags; on a SHA-NI-enabled libsecp build the gap narrows substantially. Treat this row as a diagnostic of our tagged-hash path, not a portable "faster than libsecp" claim.
 
 ---
 
