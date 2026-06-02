@@ -81,7 +81,11 @@ jobs:
 
       - name: Install Ninja
         shell: bash
-        run: choco install ninja -y --no-progress
+        # Pin the chocolatey package version (Scorecard PinnedDependenciesID):
+        # a floating `choco install ninja` is an unpinned supply-chain dependency.
+        # Bump deliberately; this workflow is workflow_dispatch-only so the pin is
+        # validated on the next manual NuGet build, never on an automatic push.
+        run: choco install ninja --version 1.12.1 -y --no-progress
 
       - name: Configure + build fastsecp256k1 (shim ABI, static runtime)
         shell: bash
