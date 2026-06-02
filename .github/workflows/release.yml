@@ -221,9 +221,13 @@ jobs:
           git add -A
           git commit -m "chore(release): stamp CHANGELOG [Unreleased] → ${RELEASE_VERSION#v} [skip ci]"
           # checkout was `ref: <tag>` so HEAD is detached — there is no local `dev`
-          # branch. Push the new (stamp) commit to dev explicitly via HEAD:dev;
-          # `git push origin dev` would fail with "src refspec dev does not match any".
-          git push origin HEAD:dev
+          # branch. Push the new (stamp) commit to dev explicitly via HEAD:dev.
+          # dev is protected (14 required checks) and the github-actions bot is NOT
+          # a bypass actor, so this push can be rejected — that is NON-FATAL: the
+          # ESSENTIAL action is moving the tag below so the tagged tree carries the
+          # stamped CHANGELOG. dev already tracks the stamped CHANGELOG via the
+          # normal dev workflow, so a skipped dev sync here loses nothing.
+          git push origin HEAD:dev || echo "::warning::dev push rejected (protected branch) — stamp lives on the moved tag; dev sync skipped"
           # Move the tag to the new stamped commit so the tagged tree is correct.
           NEW_SHA=$(git rev-parse HEAD)
           git tag -f "${RELEASE_TAG}" "$NEW_SHA"
