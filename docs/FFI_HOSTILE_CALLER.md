@@ -1,6 +1,37 @@
 # FFI Hostile-Caller Coverage
 
-**Last updated**: 2026-05-28 | **Version**: 4.1.0
+**Last updated**: 2026-06-02 | **Version**: 4.1.0
+
+### 2026-06-02 — failure-path output zeroing + recover overflow guard (review fixes)
+
+ABI/shim hardening from the 2026-06-01 review tightens the hostile-caller
+contract at the C boundary (`include/ufsecp/ufsecp.h` and the libsecp256k1 shim):
+
+- **Failure-path output zeroing (PASS-COMPAT-001/002/004).** On any FAILED
+  operation the output buffer is zeroed before return, matching upstream:
+  `secp256k1_ec_seckey_negate/_tweak_add/_tweak_mul` zero the caller's seckey
+  (`shim_seckey.cpp`); `secp256k1_ecdsa_recover` zeros the output pubkey
+  (`shim_recovery.cpp`); `secp256k1_xonly_pubkey_tweak_add` zeros the output
+  pubkey (`shim_extrakeys.cpp`). A hostile caller cannot read a stale/partial
+  key or pubkey out of a failed call.
+- **ECDSA recover overflow guard (bbhunt-001).** `ecdsa_recover` (CPU + shim +
+  ABI + CUDA/OpenCL kernels) rejects any `r >= (p - n)` in the recid&2 branch,
+  matching upstream `secp256k1_ecdsa_sig_recover`. A hostile caller crafting
+  `recid&2` with `r ∈ [p-n, n)` can no longer obtain a bogus public key returned
+  as success — recovery returns failure (0), as upstream does.
+- **Constant-time variable-base scalar mul (CT-CRYPTO-001).**
+  `secp256k1::ct::scalar_mul(Point,Scalar)` (reached from ECDH /
+  `ec_seckey_tweak_mul`) no longer branches on the secret GLV sign bit; the GLV
+  "v" half-scalars are built with a branchless masked select.
+- **ABI version contract.** `ufsecp_abi_version()` returns `4` (== `PROJECT_VERSION_MAJOR`);
+  all bindings pin `EXPECTED_ABI = 4` and fail closed at context creation on
+  mismatch — a mismatched/hostile binding cannot construct a context.
+
+Coverage: `audit/test_regression_recover_rplus_n_overflow` (REC-1..4),
+`audit/test_regression_ct_glv_make_v_branchless` (CT-GLV-1..3),
+`compat/libsecp256k1_shim/tests/shim_test.cpp`
+(`test_seckey_failure_clear` + `test_passcompat_failure_clear`),
+`ci/check_abi_version_sync.py`.
 
 ### 2026-05-28 — batch parallel dispatch: hostile-caller contract
 
