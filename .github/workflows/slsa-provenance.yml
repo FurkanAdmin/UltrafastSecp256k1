@@ -116,9 +116,12 @@ jobs:
 
       - name: Keyless sign with Cosign
         run: |
+          # cosign v3.8.0 auto-detects the GitHub Actions OIDC issuer via its
+          # signing config; passing --oidc-issuer (a service URL) now errors with
+          # "cannot specify service URLs and use signing config". Omit it — this
+          # matches the working cosign step in release.yml.
           cosign sign-blob \
             --yes \
-            --oidc-issuer https://token.actions.githubusercontent.com \
             --bundle ufsecp-linux-x64.bundle \
             ufsecp-linux-x64.tar.gz
 

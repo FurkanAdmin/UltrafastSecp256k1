@@ -231,7 +231,11 @@ jobs:
           # Move the tag to the new stamped commit so the tagged tree is correct.
           NEW_SHA=$(git rev-parse HEAD)
           git tag -f "${RELEASE_TAG}" "$NEW_SHA"
-          git push origin "${RELEASE_TAG}" --force-with-lease
+          # Plain --force (NOT --force-with-lease): the checkout was `ref: <tag>`
+          # (detached), so there is no remote-tracking ref for the lease to compare
+          # against and force-with-lease rejects with "stale info". Moving the tag
+          # to the stamped commit is intentional, so a plain force is correct.
+          git push origin "${RELEASE_TAG}" --force
           echo "Tag ${RELEASE_TAG} moved to stamped commit ${NEW_SHA}."
         shell: bash
         env:
