@@ -198,9 +198,15 @@ int secp256k1_ecdsa_signature_parse_compact(
     }
     // libsecp accepts r==0 and s==0 at parse time (verify will reject them).
     // Only r>=n or s>=n triggers a parse failure, matching upstream behaviour.
+    // On parse failure, zero the output sig to match upstream libsecp256k1
+    // (secp256k1_ecdsa_signature_parse_compact does memset(sig,0,...) on its
+    // failure path) — fail-closed, no stale data left behind (PASS3-SHIM-001).
     Scalar r, s;
-    if (!Scalar::parse_bytes_strict(input64,      r)) return 0;
-    if (!Scalar::parse_bytes_strict(input64 + 32, s)) return 0;
+    if (!Scalar::parse_bytes_strict(input64,      r) ||
+        !Scalar::parse_bytes_strict(input64 + 32, s)) {
+        std::memset(sig->data, 0, sizeof(sig->data));
+        return 0;
+    }
     std::memcpy(sig->data, input64, 64);
     return 1;
 }
@@ -243,6 +249,10 @@ int secp256k1_ecdsa_signature_parse_der(
         secp256k1_shim_call_illegal_cb(ctx, "secp256k1_ecdsa_signature_parse_der: input is NULL");
         return 0;
     }
+    // Match upstream: any parse failure must leave sig fully zeroed (PASS3-SHIM-001).
+    // Zero up-front so every early-return path is fail-closed; the parse writes below
+    // only persist on success, and post-write failure paths re-zero explicitly.
+    std::memset(sig->data, 0, sizeof(sig->data));
     if (inputlen < 8) return 0;
 
     const unsigned char *p = input;
@@ -279,8 +289,8 @@ int secp256k1_ecdsa_signature_parse_der(
     };
 
     // Parse r and s directly into sig->data — no intermediate stack buffers.
-    if (!parse_int(p, end, sig->data))      return 0;  // r → data[0..31]
-    if (!parse_int(p, end, sig->data + 32)) return 0;  // s → data[32..63]
+    if (!parse_int(p, end, sig->data))      { std::memset(sig->data, 0, sizeof(sig->data)); return 0; }  // r → data[0..31]
+    if (!parse_int(p, end, sig->data + 32)) { std::memset(sig->data, 0, sizeof(sig->data)); return 0; }  // s → data[32..63]
 
     // RT-02 (strict-DER): the SEQUENCE body must be EXACTLY consumed by r and s.
     // The line-255 check only verifies the declared SEQUENCE length fills the
@@ -288,7 +298,7 @@ int secp256k1_ecdsa_signature_parse_der(
     // s (e.g. 30 08 02 01 0F 02 01 01 7F 7F — seqlen=8 covers offsets 2..9 but
     // r,s consume only 2..7). Upstream secp256k1_ecdsa_sig_parse rejects this, and
     // the native C-ABI parser (src/cpu/src/impl/ufsecp_ecdsa.cpp) already does.
-    if (p != end) return 0;
+    if (p != end) { std::memset(sig->data, 0, sizeof(sig->data)); return 0; }
 
     // Validate r, s ∈ [1, n-1]: reject overflow (>= n) AND zero.
     //
@@ -332,8 +342,8 @@ int secp256k1_ecdsa_signature_parse_der(
         return a3 < N3;
     };
 
-    if (!in_range_scalar(sig->data))      return 0;  // r
-    if (!in_range_scalar(sig->data + 32)) return 0;  // s
+    if (!in_range_scalar(sig->data))      { std::memset(sig->data, 0, sizeof(sig->data)); return 0; }  // r
+    if (!in_range_scalar(sig->data + 32)) { std::memset(sig->data, 0, sizeof(sig->data)); return 0; }  // s
 
     return 1;
 }
