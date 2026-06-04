@@ -14,6 +14,11 @@ failure path. `current` is a LOCAL copy of the caller's master (never the caller
 object); the FINAL returned key is never scrubbed. No behavioral change — verified by
 `src/cpu/tests/test_bip32.cpp` (derive_path == manual derive_child chain, deterministic).
 
+**2026-06-04 follow-up:** the on-failure intermediate scrub was made *unconditional*
+(a harmless erase of the public x-coordinate when the material is not secret) so the
+on-failure path is reachable and is exercised by an xpub-hardened-derivation regression
+test in `test_bip32.cpp` — restoring codecov patch coverage of the new lines to 100%.
+
 ### 2026-05-31 — MuSig2 signer-index check made mandatory (fail-closed); no new secret residue
 
 `src/cpu/src/musig2.cpp` — `musig2_partial_sign` now treats the Rule-13 signer-index

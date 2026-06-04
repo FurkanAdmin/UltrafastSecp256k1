@@ -12,6 +12,11 @@ across iterations. Pure hardening — the derived key is unchanged (`test_bip32.
 asserts derive_path equals a manual `derive_child` chain byte-for-byte and is
 deterministic). No API or semantic change.
 
+**2026-06-04 follow-up:** the on-failure intermediate scrub is now *unconditional* (the
+public x-coordinate erase is a harmless write when the material is not secret), making
+the on-failure path reachable and covered by an xpub-hardened-derivation regression test
+in `test_bip32.cpp`.
+
 ### 2026-06-01 — SHIM-001: variable-length Schnorr `sign_custom` restored (CT, matches upstream)
 
 `secp256k1_schnorrsig_sign_custom` previously rejected `msglen != 32` (`return 0`), diverging
