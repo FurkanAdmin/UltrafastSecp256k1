@@ -129,9 +129,9 @@ static void check_parse_failure_zeroing(secp256k1_context* ctx) {
 
         memset(&sig, 0xAA, sizeof(sig));
         int rc2 = secp256k1_ecdsa_recoverable_signature_parse_compact(ctx, &sig, compact_valid, 5);
-        CHECK(rc2 == 0, "recoverable parse_compact rejects invalid recid=5");
+        CHECK(rc2 == 0, "recoverable parse_compact rejects recid=5 (out of 0..3)");
         CHECK(all_zero(sig.data, sizeof(sig.data)),
-              "recoverable parse_compact zeroes sig on bad-recid failure (PASS3-SHIM-001)");
+              "recoverable parse_compact zeroes sig on out-of-range-recid (PASS3-SHIM-001)");
     }
 }
 

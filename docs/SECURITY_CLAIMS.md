@@ -2,6 +2,16 @@
 
 **UltrafastSecp256k1 v4.1.0** -- FAST / CT Dual-Layer Architecture (CPU + GPU)
 
+### 2026-06-04 — P2-CT-001: bip32_derive_path intermediate-key erasure (stack residue)
+
+`src/cpu/src/bip32.cpp` `bip32_derive_path` now `secure_erase`s the redundant `child`
+copy of each intermediate extended private key (key + chain code) between derivation
+steps, and the working `current` on the failure path. Closes a stack secret-residue
+gap: the path-walk loop previously left intermediate child private keys un-erased
+across iterations. Pure hardening — the derived key is unchanged (`test_bip32.cpp`
+asserts derive_path equals a manual `derive_child` chain byte-for-byte and is
+deterministic). No API or semantic change.
+
 ### 2026-06-01 — SHIM-001: variable-length Schnorr `sign_custom` restored (CT, matches upstream)
 
 `secp256k1_schnorrsig_sign_custom` previously rejected `msglen != 32` (`return 0`), diverging
