@@ -115,9 +115,11 @@ _CHECK_OR_TRUE_RE = re.compile(r'CHECK\s*\([^)]*\|\|\s*true\s*[,)]')
 _CHECK_OR_NOT_RE  = re.compile(r'CHECK\s*\([^)]*\b(\w+)\s*\|\|\s*!\s*\1\b')
 _ANY_CHECK_RE  = re.compile(r'(?:CHECK|check)\s*\(')
 # A4: bare g_pass++ — increments pass counter without testing any condition.
-# Matches lines whose non-whitespace content is exactly "g_pass++;" or "g_pass += 1;"
+# Matches lines whose non-whitespace content is exactly "g_pass++;", "++g_pass;"
+# or "g_pass += 1;". Both postfix AND prefix increment must be caught (P7-TEST-001:
+# the prefix form "++g_pass;" previously slipped past the postfix-only pattern).
 # Does NOT flag g_pass = 0 (reset), g_pass + 1 (expression), or printf(g_pass) (report).
-_BARE_GPASS_RE = re.compile(r'^\s*g_pass\s*(?:\+\+|\+=\s*1)\s*;')
+_BARE_GPASS_RE = re.compile(r'^\s*(?:\+\+\s*g_pass|g_pass\s*(?:\+\+|\+=\s*1))\s*;')
 
 # Statistical bounds: catch things like  CHECK(x >= 32 && x <= 224, ...)
 _STAT_BOUND_RE = re.compile(

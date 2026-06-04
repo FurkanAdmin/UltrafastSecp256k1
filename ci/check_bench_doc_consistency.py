@@ -72,18 +72,18 @@ BANNED: list[tuple[str, str, str | None]] = [
     # ── Stale GCC 13.3 CT signing percentages ────────────────────────────────
     (
         r"GCC 13\.3[^\n]{0,80}\+37%",
-        "Stale GCC 13.3 CT signing claim — GCC 14 CT ECDSA is +24% (1.24×), not +37%",
+        "Stale GCC 13.3 CT signing claim — canonical GCC 14 CT ECDSA is +33% (1.33×), not +37%",
         None,
     ),
     (
         r"GCC 13\.3[^\n]{0,80}\+25%",
-        "Stale GCC 13.3 CT signing claim — GCC 14 CT Schnorr is +9% (1.09×), not +25%",
+        "Stale GCC 13.3 CT signing claim — canonical GCC 14 CT Schnorr is +26% (1.26×), not +25%",
         None,
     ),
     # ── Stale GCC 13/14 "slower" CT signing claim ────────────────────────────
     (
         r"GCC 13/14[^\n]{0,80}0\.8[2345]",
-        "Stale CT signing: GCC 13/14 0.82-0.85× (slower) — GCC 14 is 1.09-1.24× (faster)",
+        "Stale CT signing: GCC 13/14 0.82-0.85× (slower) — canonical GCC 14 is 1.26-1.33× (faster)",
         None,
     ),
     (
@@ -148,32 +148,18 @@ BANNED: list[tuple[str, str, str | None]] = [
         "Stale SignSchnorrWithMerkleRoot speedup — actual is ~36% (1.36×)",
         None,
     ),
-    # ── Clang 19 archived CT signing ratios cited without qualifier ───────────
-    # These ratios (1.33× CT ECDSA, 1.20× CT Schnorr) belong to the archived
-    # Clang 19 bench run.  If cited without "Clang 19" or "[archived]" context
-    # they mislead reviewers into thinking the GCC 14 baseline matches them.
-    # The canonical GCC 14.2.0 ratios are 1.24× ECDSA and 1.09× Schnorr.
-    # Note: context-aware banning (requires adjacent "Clang 19" or "archived")
-    # is not yet implemented — these patterns are documented here so future
-    # reviews can detect them, and a comment-only entry marks the intent.
-    #
-    # TODO(BENCH-005): implement context-aware banning once the pattern engine
-    # supports negative lookahead or a "must NOT have adjacent" context_hint.
-    # For now, exact banned strings are listed below and rely on the reviewer-doc
-    # set being small enough that false positives are unlikely.
-    (
-        r"1\.33.*CT ECDSA",
-        "Clang 19 archived CT ECDSA ratio (1.33×) cited without 'Clang 19' or '[archived]' qualifier — canonical GCC 14 ratio is 1.24×",
-        # context_hint: only ban when NOT in a section already marked archived.
-        # The current pattern engine matches on presence, so this fires when
-        # 1.33× CT ECDSA appears anywhere; reviewers must check context manually.
-        None,
-    ),
-    (
-        r"1\.20.*CT Schnorr",
-        "Clang 19 archived CT Schnorr ratio (1.20×) cited without 'Clang 19' or '[archived]' qualifier — canonical GCC 14 ratio is 1.09×",
-        None,
-    ),
+    # ── CT signing ratio freshness — enforced DYNAMICALLY, not by string bans ──
+    # The current canonical GCC 14.2.0 ratios are CT ECDSA 1.33× and CT Schnorr
+    # 1.26× (docs/canonical_numbers.json → ct_signing_gcc; the archived Clang 19
+    # run was 1.20–1.33×). We deliberately do NOT ban literal "1.33× CT ECDSA"
+    # strings here: 1.33× IS the correct current canonical ECDSA ratio, so a static
+    # ban would either be inert (as the old `1\.33.*CT ECDSA` pattern was — its
+    # reason text even cited the superseded 1.24×/1.09×) or, worse, flag the right
+    # value. CT-ratio freshness is enforced instead by check_canonical_vs_bench_json()
+    # below, which derives the ratios from the bench JSON artifact and compares them
+    # to canonical_numbers.json within a 3% tolerance — the authoritative check.
+    # (P8-CAAS-001 / BENCH-005: removed the hardcoded 1.24×/1.09× ban entries that
+    # gave a false sense of CT-ratio-freshness enforcement.)
     # ── FAST-path ratios cited in reviewer docs ───────────────────────────────
     # These ratios (2.45× ECDSA sign, 2.34× Schnorr sign) reflect variable-time
     # FAST-path vs libsecp256k1 CT.  They must not appear in reviewer docs because

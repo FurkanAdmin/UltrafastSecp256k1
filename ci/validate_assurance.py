@@ -650,14 +650,17 @@ def main():
         'extra_in_json': claims['extra_in_json'],
         'invalid_entries': claims['invalid_entries'],
     }
+    # EVID-003: set exit_code in BOTH modes. Previously this lived inside the
+    # `if not json_mode` block, so `--json` callers (run_fast_gates.sh) silently
+    # exited 0 even when checks 2-6 failed. Mirror the H-2 ledger fix above.
+    if claims['extra_in_json'] or claims['missing_in_json'] or claims['invalid_entries']:
+        exit_code = 1
     if not json_mode:
         print(f"{BOLD}[2/3] Assurance Claims Companion{RESET}")
         print(f"  Ledger claims: {len(claims['ledger_ids'])}, JSON claims: {len(claims['json_ids'])}")
         if claims['issues']:
             for i in claims['issues']:
                 print(i)
-            if claims['extra_in_json'] or claims['missing_in_json'] or claims['invalid_entries']:
-                exit_code = 1
         else:
             print(f"  {GREEN}[OK] ASSURANCE_CLAIMS.json matches ASSURANCE_LEDGER.md claim IDs{RESET}")
         print()
@@ -669,14 +672,15 @@ def main():
         'missing_surfaces': claim_surface['missing_surfaces'],
         'unindexed_surfaces': claim_surface['unindexed_surfaces'],
     }
+    # EVID-003: set exit_code in BOTH modes (see check [2/3] above).
+    if claim_surface['missing_surfaces'] or claim_surface['unindexed_surfaces']:
+        exit_code = 1
     if not json_mode:
         print(f"{BOLD}[3/4] Claim Surface Graph Coverage{RESET}")
         print(f"  Checked surfaces: {len(claim_surface['checked_surfaces'])}")
         if claim_surface['issues']:
             for i in claim_surface['issues']:
                 print(i)
-            if claim_surface['missing_surfaces'] or claim_surface['unindexed_surfaces']:
-                exit_code = 1
         else:
             print(f"  {GREEN}[OK] Path-like claim surfaces resolve and are indexed in source_graph.db{RESET}")
         print()
@@ -687,13 +691,15 @@ def main():
         'event_count': ai_review['event_count'],
         'invalid_entries': ai_review['invalid_entries'],
     }
+    # EVID-003: set exit_code in BOTH modes (see check [2/3] above).
+    if ai_review['issues']:
+        exit_code = 1
     if not json_mode:
         print(f"{BOLD}[4/5] AI Review Event Log{RESET}")
         print(f"  Logged events: {ai_review['event_count']}")
         if ai_review['issues']:
             for i in ai_review['issues']:
                 print(i)
-            exit_code = 1
         else:
             print(f"  {GREEN}[OK] AI_REVIEW_EVENTS.json is present and schema-valid{RESET}")
         print()
@@ -704,13 +710,15 @@ def main():
         'backend_count': gpu_evidence['backend_count'],
         'invalid_entries': gpu_evidence['invalid_entries'],
     }
+    # EVID-003: set exit_code in BOTH modes (see check [2/3] above).
+    if gpu_evidence['issues']:
+        exit_code = 1
     if not json_mode:
         print(f"{BOLD}[5/6] GPU Backend Evidence{RESET}")
         print(f"  Tracked backends: {gpu_evidence['backend_count']}")
         if gpu_evidence['issues']:
             for i in gpu_evidence['issues']:
                 print(i)
-            exit_code = 1
         else:
             print(f"  {GREEN}[OK] GPU_BACKEND_EVIDENCE.json is present and fail-closed for ROCm/HIP promotion{RESET}")
         print()
@@ -723,14 +731,15 @@ def main():
         'missing': matrix['missing'],
         'extra': matrix['extra'],
     }
+    # EVID-003: set exit_code in BOTH modes (see check [2/3] above).
+    if matrix['missing']:
+        exit_code = 1
     if not json_mode:
         print(f"{BOLD}[6/6] Test Matrix Accuracy{RESET}")
         print(f"  CTest targets: {matrix['actual_count']}, Documented: {matrix['documented_count']}")
         if matrix['issues']:
             for i in matrix['issues']:
                 print(i)
-            if matrix['missing']:
-                exit_code = 1
         else:
             print(f"  {GREEN}[OK] TEST_MATRIX matches CTest targets{RESET}")
         print()

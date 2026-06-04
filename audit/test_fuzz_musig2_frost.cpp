@@ -46,7 +46,7 @@ static int g_pass = 0, g_fail = 0;
 #define MUST_NOT_CRASH(expr, msg) CHECK((expr) == UFSECP_OK, msg)
 #define MUST_NOT_CRASH(expr, label) do { \
     (expr); \
-    ++g_pass; \
+    ++g_pass; /* no-crash fuzz probe: reaching here = survived = pass */ \
     (void)(label); \
 } while(0)
 

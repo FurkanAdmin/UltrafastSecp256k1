@@ -10,8 +10,12 @@
 # Approach: Build with special VALGRIND_CT_CHECK define that:
 #   1. Marks secret scalars as UNDEFINED via VALGRIND_MAKE_MEM_UNDEFINED
 #   2. Runs CT operations (scalar_mul, ecdsa_sign, schnorr_sign)
-#   3. Valgrind reports any "Conditional jump depends on uninitialised value"
-#   4. Zero reports = CT proven at binary level
+#   3. Valgrind reports ANY secret-dependent behaviour:
+#        - "Conditional jump or move depends on uninitialised value" (branch), AND
+#        - "Use of uninitialised value" (a secret-indexed memory READ / table lookup,
+#          which is NOT a conditional jump and would otherwise slip past), AND
+#        - a tracked error via --error-exitcode=42 (process exit code).
+#   4. Zero of ALL THREE = CT proven at binary level. ANY one trips FAIL (fail-closed).
 #
 # Usage:
 #   ./ci/valgrind_ct_check.sh [build_dir]
@@ -133,6 +137,16 @@ echo "  Full log:   $VALGRIND_LOG"
 echo "  XML report: $VALGRIND_XML"
 echo "-----------------------------------------------------------"
 
+# -- Compute verdict (fail-closed on ALL secret-dependent signals) --------
+# Keying the verdict on CT_ERRORS alone (conditional jumps) let a secret-indexed
+# memory READ — reported as "Use of uninitialised value", not a branch — and any
+# tracked Valgrind error (exit 42) pass silently. Fail on any of the three.
+if [[ "$CT_ERRORS" -eq 0 && "$UNINIT_ERRORS" -eq 0 && "$VG_EXIT" -ne 42 ]]; then
+    CT_VERDICT="PASS"
+else
+    CT_VERDICT="FAIL"
+fi
+
 # -- Generate JSON report -------------------------------------------------
 
 cat > "$REPORT_DIR/valgrind_ct_report.json" <<EOF
@@ -144,7 +158,7 @@ cat > "$REPORT_DIR/valgrind_ct_report.json" <<EOF
   "ct_branch_errors": $CT_ERRORS,
   "uninit_value_errors": $UNINIT_ERRORS,
   "valgrind_exit_code": $VG_EXIT,
-  "verdict": "$([ "$CT_ERRORS" -eq 0 ] && echo "PASS" || echo "FAIL")"
+  "verdict": "$CT_VERDICT"
 }
 EOF
 
@@ -153,13 +167,16 @@ echo ""
 
 # -- Verdict --------------------------------------------------------------
 
-if [[ "$CT_ERRORS" -eq 0 ]]; then
-    echo "  OK No secret-dependent branches detected by Valgrind"
+if [[ "$CT_VERDICT" == "PASS" ]]; then
+    echo "  OK No secret-dependent behaviour detected by Valgrind"
     exit 0
 else
-    echo "  X POTENTIAL CT VIOLATION: $CT_ERRORS conditional branches on uninit data"
+    echo "  X POTENTIAL CT VIOLATION (fail-closed on any signal):"
+    echo "      conditional branches on uninit:  $CT_ERRORS"
+    echo "      uses of uninitialised value:      $UNINIT_ERRORS"
+    echo "      valgrind error exit code:         $VG_EXIT  (42 = tracked error)"
     echo ""
     echo "  Offending locations:"
-    grep -A5 "Conditional jump or move depends on uninitialised" "$VALGRIND_LOG" | head -30
+    grep -E -A5 "Conditional jump or move depends on uninitialised|Use of uninitialised value" "$VALGRIND_LOG" | head -40
     exit 1
 fi
