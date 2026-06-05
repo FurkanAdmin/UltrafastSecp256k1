@@ -1,6 +1,23 @@
 # Secret Lifecycle Review
 
-**Last updated**: 2026-05-31 | **Version**: 4.1.0
+**Last updated**: 2026-06-04 | **Version**: 4.1.0
+
+### 2026-06-04 — P2-CT-001: bip32_derive_path erases intermediate child keys
+
+`bip32_derive_path` (`src/cpu/src/bip32.cpp`) walks the path with `current = child`
+each iteration but did not scrub the redundant `child` copy of the intermediate
+private key / chain code, leaving secret material on the stack across iterations
+(`derive_child` already scrubs its own internals — `child_scalar`, `parent_scalar`,
+`I`, `IL`, `il_scalar` — but the path-walk loop did not). Now `detail::secure_erase`
+the `child` key + chain_code after each assignment, and the working `current` on the
+failure path. `current` is a LOCAL copy of the caller's master (never the caller's
+object); the FINAL returned key is never scrubbed. No behavioral change — verified by
+`src/cpu/tests/test_bip32.cpp` (derive_path == manual derive_child chain, deterministic).
+
+**2026-06-04 follow-up:** the on-failure intermediate scrub was made *unconditional*
+(a harmless erase of the public x-coordinate when the material is not secret) so the
+on-failure path is reachable and is exercised by an xpub-hardened-derivation regression
+test in `test_bip32.cpp` — restoring codecov patch coverage of the new lines to 100%.
 
 ### 2026-05-31 — MuSig2 signer-index check made mandatory (fail-closed); no new secret residue
 

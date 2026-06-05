@@ -149,7 +149,9 @@ static void test_shim_der_strict_consumption() {
     if (ecdsa.empty()) return;
     std::string body = extract_function_body(ecdsa, "secp256k1_ecdsa_signature_parse_der(");
     CHECK(!body.empty(), "RT-02: parse_der body located");
-    CHECK(body.find("if (p != end) return 0;") != std::string::npos,
+    // The strict-DER `p != end` rejection now also zeroes the output sig on failure
+    // (PASS3-SHIM-001), so the source reads `if (p != end) { std::memset(...); return 0; }`.
+    CHECK(body.find("if (p != end) {") != std::string::npos,
           "RT-02: parse_der rejects trailing bytes inside SEQUENCE (p != end)");
 }
 

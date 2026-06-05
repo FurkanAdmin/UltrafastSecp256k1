@@ -70,15 +70,19 @@ int secp256k1_ecdsa_recoverable_signature_parse_compact(
             "secp256k1_ecdsa_recoverable_signature_parse_compact: NULL argument");
         return 0;
     }
-    if (recid < 0 || recid > 3) return 0;
+    // On any parse failure, zero the output to match upstream libsecp256k1
+    // (main_impl.h memsets the recoverable sig on its failure path) — fail-closed,
+    // no stale/partial recid+r+s left behind (PASS3-SHIM-001).
+    if (recid < 0 || recid > 3) { std::memset(sig->data, 0, sizeof(sig->data)); return 0; }
     // Accept r and s in [0, n-1] at parse time — matches libsecp256k1 behavior.
     // Rejection of r==0 or s==0 happens at secp256k1_ecdsa_recover time, not here.
     // Using parse_bytes_strict_nonzero was a divergence from libsecp (PASS3-002 fix).
     Scalar r, s;
-    if (!Scalar::parse_bytes_strict(
-            reinterpret_cast<const uint8_t*>(input64),      r)) return 0;
-    if (!Scalar::parse_bytes_strict(
-            reinterpret_cast<const uint8_t*>(input64 + 32), s)) return 0;
+    if (!Scalar::parse_bytes_strict(reinterpret_cast<const uint8_t*>(input64),      r) ||
+        !Scalar::parse_bytes_strict(reinterpret_cast<const uint8_t*>(input64 + 32), s)) {
+        std::memset(sig->data, 0, sizeof(sig->data));
+        return 0;
+    }
     sig->data[0] = static_cast<unsigned char>(recid);
     std::memcpy(sig->data + 1, input64, 64);
     return 1;

@@ -255,7 +255,10 @@ def _parse_valgrind_log(path: Path) -> dict:
     text = _read_text(path)
     ct_branch_errors = text.count('Conditional jump or move depends on uninitialised')
     uninit_value_errors = text.count('Use of uninitialised value')
-    verdict = 'PASS' if ct_branch_errors == 0 else 'FAIL'
+    # Fail-closed: a secret-indexed memory READ surfaces as "Use of uninitialised
+    # value" (not a conditional jump), so the verdict must consider both counts —
+    # mirrors ci/valgrind_ct_check.sh (PASS6-CT-001).
+    verdict = 'PASS' if (ct_branch_errors == 0 and uninit_value_errors == 0) else 'FAIL'
     return {
         'tool': 'valgrind_ct_check',
         'generated_by': 'ci/collect_ct_evidence.py',

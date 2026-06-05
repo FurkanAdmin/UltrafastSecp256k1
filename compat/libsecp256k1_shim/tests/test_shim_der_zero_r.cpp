@@ -23,6 +23,7 @@
 // ============================================================================
 
 #include <secp256k1.h>
+#include <secp256k1_recovery.h>
 #include <cstdio>
 #include <cstring>
 #include <cstdint>
@@ -75,6 +76,65 @@ static int parse(secp256k1_context* ctx, const uint8_t* d, size_t n) {
     return secp256k1_ecdsa_signature_parse_der(ctx, &sig, d, n);
 }
 
+static bool all_zero(const unsigned char* p, size_t n) {
+    for (size_t i = 0; i < n; ++i) if (p[i] != 0) return false;
+    return true;
+}
+
+// PASS3-SHIM-001: on a FAILED parse, the shim must zero the output sig (matching
+// upstream libsecp256k1, which memsets the sig on every parse failure path), so no
+// stale or partially-parsed data is left behind. Pre-fill the output with 0xAA,
+// force a parse failure, and assert (a) return 0 AND (b) the output is fully zeroed.
+static void check_parse_failure_zeroing(secp256k1_context* ctx) {
+    // r=s=0xFF..FF  → >= curve order n → parse_bytes_strict rejects.
+    uint8_t compact_overflow[64];
+    memset(compact_overflow, 0xFF, sizeof(compact_overflow));
+    // r=s=0x01..01 → in range; used with an invalid recid to hit the recid guard.
+    uint8_t compact_valid[64];
+    memset(compact_valid, 0x01, sizeof(compact_valid));
+    // DER: r = 00 || FF*32 (parses OK as a 32-byte INTEGER, then fails the in-range
+    // check) — exercises the POST-write failure path; s = 01. SEQUENCE len 0x26.
+    uint8_t der_overflow[40];
+    der_overflow[0] = 0x30; der_overflow[1] = 0x26;
+    der_overflow[2] = 0x02; der_overflow[3] = 0x21; der_overflow[4] = 0x00;
+    memset(der_overflow + 5, 0xFF, 32);
+    der_overflow[37] = 0x02; der_overflow[38] = 0x01; der_overflow[39] = 0x01;
+
+    // -- ECDSA compact --
+    {
+        secp256k1_ecdsa_signature sig;
+        memset(&sig, 0xAA, sizeof(sig));
+        int rc = secp256k1_ecdsa_signature_parse_compact(ctx, &sig, compact_overflow);
+        CHECK(rc == 0, "parse_compact rejects r>=n");
+        CHECK(all_zero(sig.data, sizeof(sig.data)),
+              "parse_compact zeroes sig on failure (PASS3-SHIM-001)");
+    }
+    // -- ECDSA DER (post-write in-range failure) --
+    {
+        secp256k1_ecdsa_signature sig;
+        memset(&sig, 0xAA, sizeof(sig));
+        int rc = secp256k1_ecdsa_signature_parse_der(ctx, &sig, der_overflow, sizeof(der_overflow));
+        CHECK(rc == 0, "parse_der rejects r>=n");
+        CHECK(all_zero(sig.data, sizeof(sig.data)),
+              "parse_der zeroes sig on post-write failure (PASS3-SHIM-001)");
+    }
+    // -- recoverable compact: r>=n, and invalid recid --
+    {
+        secp256k1_ecdsa_recoverable_signature sig;
+        memset(&sig, 0xAA, sizeof(sig));
+        int rc = secp256k1_ecdsa_recoverable_signature_parse_compact(ctx, &sig, compact_overflow, 0);
+        CHECK(rc == 0, "recoverable parse_compact rejects r>=n");
+        CHECK(all_zero(sig.data, sizeof(sig.data)),
+              "recoverable parse_compact zeroes sig on r>=n failure (PASS3-SHIM-001)");
+
+        memset(&sig, 0xAA, sizeof(sig));
+        int rc2 = secp256k1_ecdsa_recoverable_signature_parse_compact(ctx, &sig, compact_valid, 5);
+        CHECK(rc2 == 0, "recoverable parse_compact rejects recid=5 (out of 0..3)");
+        CHECK(all_zero(sig.data, sizeof(sig.data)),
+              "recoverable parse_compact zeroes sig on out-of-range-recid (PASS3-SHIM-001)");
+    }
+}
+
 int test_shim_der_zero_r_run() {
     printf("\n[der-parse-strict] reject r=0 / s=0 / trailing-in-SEQUENCE; accept valid\n");
 
@@ -92,6 +152,9 @@ int test_shim_der_zero_r_run() {
           "parse_der rejects trailing bytes inside SEQUENCE (strict-DER, RT-02)");
     CHECK(parse(ctx, DER_VALID, sizeof(DER_VALID)) == 1,
           "parse_der accepts a well-formed minimal DER signature");
+
+    // PASS3-SHIM-001: failed parses must zero the output sig (match upstream).
+    check_parse_failure_zeroing(ctx);
 
     secp256k1_context_destroy(ctx);
 

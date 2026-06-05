@@ -62,7 +62,10 @@ jobs:
             -DSECP256K1_BUILD_JAVA=OFF \
             -DSECP256K1_BUILD_EXAMPLES=OFF \
             -DSECP256K1_BUILD_BENCH=OFF
-          ninja -j$(nproc) 2>/dev/null || ninja -j1 2>/dev/null || true
+          # A build failure must FAIL the job. The previous '|| true' swallowed it,
+          # so a build producing zero ct_*.o files reported a falsely-clean CT
+          # result (P7-CAAS-002). Retry serially on parallel failure, then propagate.
+          ninja -j"$(nproc)" 2>/dev/null || ninja -j1
 
       - name: Analyze compiled objects for CT violations
         run: |
@@ -126,8 +129,18 @@ jobs:
           echo "=== Cycle-Level CT Summary (-${{ matrix.opt }}) ==="
           echo "Files analyzed: $ANALYZED"
           echo "Violations: $VIOLATIONS"
+          # Hard-fail if NO ct_*.o objects were analyzed: that means the build
+          # produced no CT objects (likely a build failure) and a "clean" result
+          # would be a false green (P7-CAAS-002).
+          if [ "$ANALYZED" -eq 0 ]; then
+            echo "::error::No ct_*.o objects were analyzed — build likely failed; refusing to report a clean CT result."
+            exit 1
+          fi
+          # NOTE: the disassembly heuristic (any conditional branch near a 'ct_'
+          # label) is intentionally ADVISORY — high false-positive rate — so
+          # detected concerns are surfaced as warnings, not a gate failure.
           if [ "$VIOLATIONS" -gt 0 ]; then
-            echo "::warning::$VIOLATIONS binary-level CT concerns at -${{ matrix.opt }}"
+            echo "::warning::$VIOLATIONS binary-level CT concerns at -${{ matrix.opt }} (advisory heuristic)"
           fi
 
       - name: Upload disassembly artifacts

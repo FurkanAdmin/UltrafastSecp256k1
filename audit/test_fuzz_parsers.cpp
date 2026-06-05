@@ -44,7 +44,7 @@ static int g_fail  = 0;
 
 #define MUST_NOT_CRASH(expr, msg) do { \
     (expr); \
-    ++g_pass; \
+    ++g_pass; /* no-crash fuzz probe: reaching here = survived = pass */ \
 } while(0)
 
 static std::mt19937_64 rng(0xDEADBEEF);  // NOLINT(cert-msc32-c,cert-msc51-cpp)
